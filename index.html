@@ -298,7 +298,9 @@
             let chatHistory = [];
             chatHistory.push({ role: "user", parts: [{ text: `Genera 5 ideas de investigación innovadoras y aplicadas en el campo del diseño, la innovación y la experiencia de usuario, basadas en el siguiente interés: "${prompt}". Las ideas deben ser específicas y formuladas como posibles títulos de proyectos o preguntas de investigación.` }] });
             const payload = { contents: chatHistory };
-            const apiKey = "";
+            // ¡IMPORTANTE! Reemplaza "TU_CLAVE_DE_API_AQUI" con tu clave de API real de Google Cloud.
+            // Asegúrate de que la API de "Generative Language API" esté habilitada en tu proyecto de Google Cloud.
+            const apiKey = "AIzaSyBzLwEB55QV2l8AZm1ldox-gNUoFAUwgWs"; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
             try {
