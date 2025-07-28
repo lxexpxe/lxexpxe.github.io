@@ -307,6 +307,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+
+                // Verificar si la respuesta de la red fue exitosa
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Error en la respuesta de la API:', response.status, response.statusText, errorData);
+                    ideasOutput.innerHTML = `<p class="text-red-500">Error en la API (${response.status}): ${errorData.error.message || 'Error desconocido'}.</p>`;
+                    return;
+                }
+
                 const result = await response.json();
 
                 if (result.candidates && result.candidates.length > 0 &&
@@ -315,10 +324,12 @@
                     const text = result.candidates[0].content.parts[0].text;
                     ideasOutput.innerHTML = `<p class="text-gray-800 whitespace-pre-wrap">${text}</p>`;
                 } else {
-                    ideasOutput.innerHTML = '<p class="text-red-500">No se pudieron generar ideas. Intenta de nuevo.</p>';
+                    console.error('Estructura de respuesta inesperada de la API:', result);
+                    ideasOutput.innerHTML = '<p class="text-red-500">No se pudieron generar ideas. La IA no proporcionó una respuesta válida. Intenta de nuevo.</p>';
                 }
             } catch (error) {
-                ideasOutput.innerHTML = `<p class="text-red-500">Error al conectar con la IA: ${error.message}.</p>`;
+                console.error('Error al conectar con la IA:', error);
+                ideasOutput.innerHTML = `<p class="text-red-500">Error de red o conexión: ${error.message}. Asegúrate de que la página está servida desde un servidor web (ej. GitHub Pages).</p>`;
             } finally {
                 loadingSpinner.classList.add('hidden');
                 generateIdeasBtn.disabled = false;
@@ -327,4 +338,3 @@
     </script>
 </body>
 </html>
-
