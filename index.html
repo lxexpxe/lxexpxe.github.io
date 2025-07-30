@@ -3,41 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infografía: Seminario de Investigación</title>
+    <title>Seminario de Investigación</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- React & ReactDOM CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Firebase CDNs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- Lucide React Icons CDN -->
+    <script src="https://unpkg.com/lucide-react@0.395.0/dist/umd/lucide-react.min.js"></script>
+    <!-- Babel CDN (for JSX transpilation in browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-        }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-            height: 300px;
-            max-height: 400px;
-        }
-        @media (min-width: 768px) {
-            .chart-container {
-                height: 350px;
-            }
-        }
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: #FF6B6B;
-            border: 3px solid #FFF5F5;
         }
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
@@ -52,291 +38,885 @@
                 transform: rotate(360deg);
             }
         }
+        /* Estilos para las tablas dentro del contenido de las semanas */
+        .prose table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .prose th, .prose td {
+            border: 1px solid #e2e8f0; /* gray-200 */
+            padding: 0.75rem;
+            text-align: left;
+        }
+        .prose th {
+            background-color: #f8fafc; /* gray-50 */
+            font-weight: 600;
+        }
+        .prose ul.list-disc, .prose ul.list-circle {
+            padding-left: 1.5rem;
+        }
+        .prose ul.list-circle li {
+            list-style-type: circle;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
+    <div id="root"></div>
 
-    <div class="container mx-auto p-4 md:p-8">
+    <script type="text/babel">
+        // Importaciones de Firebase (se cargan globalmente por los CDNs, pero se usan aquí)
+        // Usamos la versión "compat" para compatibilidad con el estilo de importación global
+        const { initializeApp } = firebase;
+        const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } = firebase.auth;
+        const { getFirestore, doc, setDoc, getDoc, onSnapshot } = firebase.firestore;
 
-        <header class="text-center mb-12">
-            <h1 class="text-4xl md:text-6xl font-black text-gray-900 mb-2">Seminario de Investigación</h1>
-            <p class="text-xl md:text-2xl text-gray-600">Tu Aventura de 16 Semanas en Diseño e Innovación</p>
-        </header>
+        // Importaciones de Lucide React (se cargan globalmente por el CDN)
+        const { Home, Lock, Unlock, User, Award, BookOpen, ChevronRight, LogOut, Loader2, PlusCircle, CheckCircle } = lucideReact;
 
-        <section id="overview" class="mb-16">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-6xl font-bold text-[#4D96FF]">16</p>
-                    <p class="text-lg font-semibold">Semanas de Viaje</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-6xl font-bold text-[#FF6B6B]">4</p>
-                    <p class="text-lg font-semibold">Unidades Clave</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <p class="text-6xl font-bold text-[#FFC107]">1</p>
-                    <p class="text-lg font-semibold">Proyecto Final Épico</p>
-                </div>
-            </div>
-        </section>
+        // Contexto para el usuario y la base de datos
+        const AuthContext = React.createContext(null);
 
-        <section id="journey" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-8">El Viaje del Investigador</h2>
-            <div class="relative pl-8 border-l-4 border-gray-200">
-                
-                <div class="timeline-item mb-12 ml-4">
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                        <span class="text-sm font-semibold text-[#4D96FF]">Semanas 1-2</span>
-                        <h3 class="text-xl font-bold mt-1">Unidad 1: Reconocer Enfoques</h3>
-                        <p class="mt-2 text-gray-600">Comenzamos la aventura descubriendo los territorios de la investigación en diseño, sus rutas metodológicas y la ética que todo explorador debe conocer.</p>
-                    </div>
-                </div>
+        // Componente para el spinner de carga
+        const LoadingSpinner = () => (
+          <div className="flex justify-center items-center py-4">
+            <Loader2 className="animate-spin text-[#4D96FF] h-8 w-8" />
+            <p className="ml-2 text-gray-600">Cargando...</p>
+          </div>
+        );
 
-                <div class="timeline-item mb-12 ml-4">
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                        <span class="text-sm font-semibold text-[#FF6B6B]">Semanas 3-7</span>
-                        <h3 class="text-xl font-bold mt-1">Unidad 2: Plantear la Investigación</h3>
-                        <p class="mt-2 text-gray-600">Aprenderás a sembrar ideas, formular preguntas poderosas y construir los pilares de tu proyecto. ¡Crearás tu propio mapa del tesoro!</p>
-                    </div>
-                </div>
+        // Componente de Autenticación
+        function AuthPage({ firebaseApp }) {
+            const auth = getAuth(firebaseApp);
+            const db = getFirestore(firebaseApp);
+            const [isLogin, setIsLogin] = React.useState(true);
+            const [studentCode, setStudentCode] = React.useState('');
+            const [password, setPassword] = React.useState('');
+            const [fullName, setFullName] = React.useState('');
+            const [error, setError] = React.useState('');
+            const [loading, setLoading] = React.useState(false);
 
-                <div class="timeline-item mb-12 ml-4">
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                         <span class="text-sm font-semibold" style="color: #69D2E7;">Semanas 8-13</span>
-                        <h3 class="text-xl font-bold mt-1">Unidad 3: Ejecutar la Investigación</h3>
-                        <p class="mt-2 text-gray-600">Es hora de la acción: diseñarás tus herramientas, recolectarás datos y descifrarás los secretos que esconden, tanto cualitativa como cuantitativamente.</p>
-                    </div>
-                </div>
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
 
-                <div class="timeline-item ml-4">
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                        <span class="text-sm font-semibold text-[#FFC107]">Semanas 14-16</span>
-                        <h3 class="text-xl font-bold mt-1">Unidad 4: Presentar Resultados</h3>
-                        <p class="mt-2 text-gray-600">Transformarás tus hallazgos en una historia cautivadora. Aprenderás a comunicar tus resultados con impacto y a defender tu proyecto final.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
+                // Firebase Auth requiere un formato de email, mapeamos el código de estudiante a un email ficticio
+                const email = `${studentCode}@icesi.edu`;
 
-        <section id="competencies" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-8">Competencias que Desbloquearás</h2>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <p class="text-center text-gray-600 mb-6">Este seminario está diseñado para potenciar habilidades clave tanto para Diseño Industrial (DIS) como para Diseño de Medios Interactivos (DMI), preparándote para los desafíos del mundo profesional.</p>
-                <div class="chart-container mx-auto">
-                    <canvas id="competenciesChart"></canvas>
-                </div>
-            </div>
-        </section>
-
-        <section id="evaluation" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-8">Sistema de Evaluación y Badges</h2>
-             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-xl font-bold text-center mb-4">Ponderación de Notas</h3>
-                     <p class="text-center text-gray-600 mb-4">Tu esfuerzo se medirá a través de tres grandes hitos evaluativos a lo largo del semestre.</p>
-                    <div class="chart-container mx-auto">
-                        <canvas id="evaluationChart"></canvas>
-                    </div>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center">
-                    <h3 class="text-xl font-bold text-center mb-4">¡Gana Badges Semanales!</h3>
-                    <p class="text-center text-gray-600 mb-6">Cada semana, al completar tus misiones y desafíos, ganarás un badge único que reconoce tu progreso en esta aventura de investigación. ¡Colecciónalos todos!</p>
-                    <div class="flex flex-wrap justify-center gap-4">
-                        <span class="bg-[#FFF5F5] text-[#FF6B6B] text-sm font-bold px-3 py-1 rounded-full">Iniciación</span>
-                        <span class="bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1 rounded-full">Brújula Ética</span>
-                        <span class="bg-yellow-100 text-yellow-800 text-sm font-bold px-3 py-1 rounded-full">Sembrador de Ideas</span>
-                        <span class="bg-green-100 text-green-800 text-sm font-bold px-3 py-1 rounded-full">Artífice de Preguntas</span>
-                        <span class="bg-purple-100 text-purple-800 text-sm font-bold px-3 py-1 rounded-full">Bibliotecario Experto</span>
-                        <span class="bg-pink-100 text-pink-800 text-sm font-bold px-3 py-1 rounded-full">Arquitecto de Proyectos</span>
-                        <span class="bg-indigo-100 text-indigo-800 text-sm font-bold px-3 py-1 rounded-full">Navegante Experto</span>
-                        <span class="bg-red-100 text-red-800 text-sm font-bold px-3 py-1 rounded-full">Investigador Élite</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="gemini-feature" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-8">Generador de Ideas de Investigación ✨</h2>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <p class="text-center text-gray-600 mb-6">¿Atascado buscando un tema para tu proyecto? Describe tus intereses y deja que la IA de Gemini te inspire con nuevas ideas de investigación en diseño e innovación.</p>
-                <div class="mb-4">
-                    <label for="researchInterest" class="block text-gray-700 text-sm font-bold mb-2">Describe tus intereses (ej. "diseño de productos sostenibles", "experiencia de usuario en realidad virtual"):</label>
-                    <textarea id="researchInterest" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline resize-none"></textarea>
-                </div>
-                <div class="flex justify-center mb-4">
-                    <button id="generateIdeasBtn" class="bg-[#4D96FF] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center">
-                        Generar Ideas ✨
-                        <div id="loadingSpinner" class="spinner ml-2 hidden"></div>
-                    </button>
-                </div>
-                <div id="ideasOutput" class="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-200 text-gray-800 min-h-[100px] overflow-auto">
-                    <p class="text-gray-500">Tus ideas de investigación aparecerán aquí...</p>
-                </div>
-            </div>
-        </section>
-
-    </div>
-
-    <script>
-        const wrapText = (text) => {
-            const maxLength = 16;
-            if (text.length <= maxLength) {
-                return text;
-            }
-            const words = text.split(' ');
-            let lines = [];
-            let currentLine = '';
-            words.forEach(word => {
-                if ((currentLine + ' ' + word).trim().length > maxLength) {
-                    lines.push(currentLine.trim());
-                    currentLine = word;
-                } else {
-                    currentLine = (currentLine + ' ' + word).trim();
-                }
-            });
-            if (currentLine) {
-                lines.push(currentLine.trim());
-            }
-            return lines;
-        };
-
-        const tooltipTitleCallback = (tooltipItems) => {
-            const item = tooltipItems[0];
-            let label = item.chart.data.labels[item.dataIndex];
-            if (Array.isArray(label)) {
-                return label.join(' ');
-            }
-            return label;
-        };
-        
-        const tooltipPlugin = {
-            tooltip: {
-                callbacks: {
-                    title: tooltipTitleCallback
-                }
-            }
-        };
-
-        const evaluationCtx = document.getElementById('evaluationChart').getContext('2d');
-        new Chart(evaluationCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Parcial 1: Propuesta (30%)', 'Parcial 2: Análisis (30%)', 'Parcial 3: Proyecto Final (40%)'],
-                datasets: [{
-                    label: 'Ponderación de Notas',
-                    data: [30, 30, 40],
-                    backgroundColor: ['#4D96FF', '#FF6B6B', '#FFC107'],
-                    borderColor: '#FFFFFF',
-                    borderWidth: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                    },
-                    ...tooltipPlugin
-                }
-            }
-        });
-
-        const competenciesCtx = document.getElementById('competenciesChart').getContext('2d');
-        new Chart(competenciesCtx, {
-            type: 'bar',
-            data: {
-                labels: [
-                    wrapText('Adaptación y Aprendizaje Autónomo'), 
-                    wrapText('Pensamiento Innovador y Creativo (DIS)'), 
-                    wrapText('Diseño de Experiencia Digital (DMI)'),
-                    wrapText('Identificar Problemas y Oportunidades'),
-                    wrapText('Validar y Mejorar Usabilidad'),
-                ],
-                datasets: [{
-                    label: 'Nivel de Desarrollo',
-                    data: [80, 95, 95, 90, 85],
-                    backgroundColor: ['#4D96FF', '#FF6B6B', '#FFC107', '#69D2E7', '#FA6900'],
-                    borderRadius: 5
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        max: 100
+                try {
+                    if (isLogin) {
+                        await signInWithEmailAndPassword(auth, email, password);
+                    } else {
+                        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                        const user = userCredential.user;
+                        // Usamos un appId fijo para GitHub Pages
+                        const appId = 'seminario-investigacion-app'; 
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}`);
+                        await setDoc(userDocRef, {
+                            studentCode: studentCode,
+                            fullName: fullName,
+                            badgesEarned: [], // Inicialmente sin badges
+                            createdAt: new Date()
+                        });
                     }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    ...tooltipPlugin
+                } catch (err) {
+                    console.error("Error de autenticación:", err.code, err.message);
+                    switch (err.code) {
+                        case 'auth/invalid-email':
+                            setError('El código de estudiante no tiene un formato válido.');
+                            break;
+                        case 'auth/user-disabled':
+                            setError('Tu cuenta ha sido deshabilitada.');
+                            break;
+                        case 'auth/user-not-found':
+                            setError('Usuario no encontrado. Verifica tu código de estudiante o crea una cuenta.');
+                            break;
+                        case 'auth/wrong-password':
+                            setError('Contraseña incorrecta.');
+                            break;
+                        case 'auth/email-already-in-use':
+                            setError('Este código de estudiante ya está registrado.');
+                            break;
+                        case 'auth/weak-password':
+                            setError('La contraseña es demasiado débil. Debe tener al menos 6 caracteres.');
+                            break;
+                        default:
+                            setError('Error de autenticación. Por favor, intenta de nuevo.');
+                    }
+                } finally {
+                    setLoading(false);
                 }
-            }
-        });
+            };
 
-        const generateIdeasBtn = document.getElementById('generateIdeasBtn');
-        const researchInterestInput = document.getElementById('researchInterest');
-        const ideasOutput = document.getElementById('ideasOutput');
-        const loadingSpinner = document.getElementById('loadingSpinner');
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                    <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+                        <h2 className="text-3xl font-bold text-center text-gray-900 mb-6">
+                            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                        </h2>
+                        {error && (
+                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                                <span className="block sm:inline">{error}</span>
+                            </div>
+                        )}
+                        <form onSubmit={handleAuth}>
+                            <div className="mb-4">
+                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="studentCode">
+                                    Código de Estudiante
+                                </label>
+                                <input
+                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    id="studentCode"
+                                    type="text"
+                                    placeholder="Ej. DIS12345"
+                                    value={studentCode}
+                                    onChange={(e) => setStudentCode(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            {!isLogin && (
+                                <div className="mb-4">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="fullName">
+                                        Nombre Completo
+                                    </label>
+                                    <input
+                                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                        id="fullName"
+                                        type="text"
+                                        placeholder="Tu Nombre Completo"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        required={!isLogin}
+                                    />
+                                </div>
+                            )}
+                            <div className="mb-6">
+                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+                                    Contraseña
+                                </label>
+                                <input
+                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+                                    id="password"
+                                    type="password"
+                                    placeholder="********"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <button
+                                    className="bg-[#4D96FF] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center justify-center"
+                                    type="submit"
+                                    disabled={loading}
+                                >
+                                    {loading ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
+                                    {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
+                                </button>
+                                <button
+                                    className="inline-block align-baseline font-bold text-sm text-[#FF6B6B] hover:text-red-800"
+                                    type="button"
+                                    onClick={() => {
+                                        setIsLogin(!isLogin);
+                                        setError('');
+                                        setStudentCode('');
+                                        setPassword('');
+                                        setFullName('');
+                                    }}
+                                >
+                                    {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
 
-        generateIdeasBtn.addEventListener('click', async () => {
-            const prompt = researchInterestInput.value.trim();
-            if (!prompt) {
-                ideasOutput.innerHTML = '<p class="text-red-500">Por favor, describe tus intereses para generar ideas.</p>';
-                return;
-            }
+        // Componente de Tarjeta de Semana del Curso
+        function CourseWeek({ weekNumber, title, content, badgeName, isUnlocked, hasBadge }) {
+            const [isExpanded, setIsExpanded] = React.useState(false);
 
-            ideasOutput.innerHTML = '';
-            loadingSpinner.classList.remove('hidden');
-            generateIdeasBtn.disabled = true;
+            return (
+                <div className={`bg-white rounded-lg shadow-md p-6 mb-6 transition-all duration-300 ${isUnlocked ? 'border-l-8 border-[#4D96FF]' : 'border-l-8 border-gray-300'}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-gray-900">Semana {weekNumber}: {title}</h3>
+                        <div className="flex items-center space-x-2">
+                            {hasBadge ? (
+                                <span className="inline-flex items-center bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                    <CheckCircle size={14} className="mr-1" /> Badge Obtenido
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                    <Award size={14} className="mr-1" /> {badgeName}
+                                </span>
+                            )}
+                            {isUnlocked ? (
+                                <button
+                                    onClick={() => setIsExpanded(!isExpanded)}
+                                    className="p-2 rounded-full bg-blue-100 text-[#4D96FF] hover:bg-blue-200 focus:outline-none"
+                                    aria-expanded={isExpanded}
+                                    aria-controls={`week-content-${weekNumber}`}
+                                >
+                                    <ChevronRight className={`transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} size={20} />
+                                </button>
+                            ) : (
+                                <Lock size={24} className="text-gray-400" />
+                            )}
+                        </div>
+                    </div>
+                    {!isUnlocked && (
+                        <p className="text-gray-500 italic flex items-center">
+                            <Lock size={16} className="mr-2" /> Contenido bloqueado. Necesitas el badge de la semana anterior para desbloquear.
+                        </p>
+                    )}
+                    {isUnlocked && isExpanded && (
+                        <div id={`week-content-${weekNumber}`} className="mt-4 text-gray-700 prose max-w-none">
+                            {content}
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
-            let chatHistory = [];
-            chatHistory.push({ role: "user", parts: [{ text: `Genera 5 ideas de investigación innovadoras y aplicadas en el campo del diseño, la innovación y la experiencia de usuario, basadas en el siguiente interés: "${prompt}". Las ideas deben ser específicas y formuladas como posibles títulos de proyectos o preguntas de investigación.` }] });
-            const payload = { contents: chatHistory };
-            // ¡IMPORTANTE! Reemplaza "TU_CLAVE_DE_API_AQUI" con tu clave de API real de Google Cloud.
-            // Asegúrate de que la API de "Generative Language API" esté habilitada en tu proyecto de Google Cloud.
-            const apiKey = "AIzaSyBzLwEB55QV2l8AZm1ldox-gNUoFAUwgWs"; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        // Componente de la Página del Curso Principal
+        function CoursePage({ firebaseApp, currentUser }) {
+            const auth = getAuth(firebaseApp);
+            const db = getFirestore(firebaseApp);
+            const [userData, setUserData] = React.useState(null);
+            const [loadingUserData, setLoadingUserData] = React.useState(true);
+            const [error, setError] = React.useState('');
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+            // Usamos un appId fijo para GitHub Pages
+            const appId = 'seminario-investigacion-app'; 
 
-                // Verificar si la respuesta de la red fue exitosa
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error('Error en la respuesta de la API:', response.status, response.statusText, errorData);
-                    ideasOutput.innerHTML = `<p class="text-red-500">Error en la API (${response.status}): ${errorData.error.message || 'Error desconocido'}.</p>`;
+            React.useEffect(() => {
+                if (!currentUser) {
+                    setLoadingUserData(false);
                     return;
                 }
 
-                const result = await response.json();
+                const userDocRef = doc(db, `artifacts/${appId}/users/${currentUser.uid}`);
+                const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setUserData(docSnap.data());
+                        setError('');
+                    } else {
+                        console.warn("No se encontró el documento del usuario en Firestore.");
+                        setError("No se encontró tu perfil de estudiante. Contacta al profesor.");
+                    }
+                    setLoadingUserData(false);
+                }, (err) => {
+                    console.error("Error al obtener datos del usuario:", err);
+                    setError("Error al cargar tu perfil. Intenta recargar la página.");
+                    setLoadingUserData(false);
+                });
 
-                if (result.candidates && result.candidates.length > 0 &&
-                    result.candidates[0].content && result.candidates[0].content.parts &&
-                    result.candidates[0].content.parts.length > 0) {
-                    const text = result.candidates[0].content.parts[0].text;
-                    ideasOutput.innerHTML = `<p class="text-gray-800 whitespace-pre-wrap">${text}</p>`;
-                } else {
-                    console.error('Estructura de respuesta inesperada de la API:', result);
-                    ideasOutput.innerHTML = '<p class="text-red-500">No se pudieron generar ideas. La IA no proporcionó una respuesta válida. Intenta de nuevo.</p>';
+                return () => unsubscribe(); // Limpiar el listener al desmontar
+            }, [currentUser, db, appId]);
+
+            const handleLogout = async () => {
+                try {
+                    await signOut(auth);
+                } catch (err) {
+                    console.error("Error al cerrar sesión:", err);
+                    setError("Error al cerrar sesión. Intenta de nuevo.");
                 }
-            } catch (error) {
-                console.error('Error al conectar con la IA:', error);
-                ideasOutput.innerHTML = `<p class="text-red-500">Error de red o conexión: ${error.message}. Asegúrate de que la página está servida desde un servidor web (ej. GitHub Pages).</p>`;
-            } finally {
-                loadingSpinner.classList.add('hidden');
-                generateIdeasBtn.disabled = false;
+            };
+
+            const hasBadge = (badgeName) => userData?.badgesEarned?.includes(badgeName) || false;
+
+            const courseWeeks = [
+                {
+                    week: 1,
+                    title: 'Misión de Inicio - Descubriendo el Territorio de la Investigación',
+                    badge: 'Badge de Iniciación',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Presentación del curso: objetivos, metodología (teórico-práctica, gamificada), sistema de "badges" y evaluación.</li>
+                                <li>Acuerdos sobre el uso ético, crítico y transparente de la Inteligencia Artificial Generativa (IAG) en el curso.</li>
+                                <li>Introducción a la investigación aplicada en diseño, innovación y experiencia de usuario: ¿Por qué investigamos en diseño?</li>
+                                <li>Identificación de los diferentes campos y tipos de investigación desde la disciplina del diseño (investigación para el diseño, a través del diseño, sobre el diseño).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Círculo de Expectativas" (15 min):** Cada estudiante comparte qué espera del curso y qué le gustaría investigar.</li>
+                                <li>**"Exploración de Casos Inspiradores" (60 min):** Análisis grupal de 2-3 proyectos de investigación en diseño (ej. estudios de usabilidad, investigación de mercado para un nuevo producto, diseño participativo). Discusión guiada: ¿Qué problema abordaron? ¿Qué métodos usaron? ¿Cuál fue su impacto?</li>
+                                <li>**"Debate: El Poder de la Pregunta" (30 min):** Discusión sobre la importancia de una buena pregunta de investigación como punto de partida.</li>
+                                <li>**Sesión de Preguntas y Respuestas (15 min):** Aclaración de dudas sobre el sílabo y la dinámica del curso.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Primer Paso del Explorador":** Leer la introducción del libro "Metodología de la Investigación" de Sampieri (Capítulo 1: La idea de investigación y el planteamiento del problema).</li>
+                                <li>**"Diario del Investigador":** Reflexionar y escribir en un documento personal (o digital) 3 preguntas iniciales que te gustaría responder a través de la investigación en diseño, basándote en tus intereses personales o profesionales.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: true // Siempre desbloqueada la primera semana
+                },
+                {
+                    week: 2,
+                    title: 'Misión de Enfoque - Brújulas Metodológicas y Ética del Explorador',
+                    badge: 'Badge de Brújula Ética',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Enfoques de la investigación: Cuantitativo (medición, estadísticas), Cualitativo (comprensión profunda, narrativas) y Mixto (combinación de ambos).</li>
+                                <li>Rutas metodológicas: Diseño de experimentos, estudios de caso, encuestas, etnografía, etc.</li>
+                                <li>Principios éticos en la investigación en diseño: Consentimiento informado, privacidad, anonimato, no maleficencia, justicia.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Diferenciando Rutas: Taller de Casos" (75 min):** Los estudiantes, en pequeños grupos, analizarán 3-4 resúmenes de investigaciones (se proporcionarán). Deberán identificar el enfoque principal (cualitativo, cuantitativo, mixto), justificar su elección y proponer una posible ruta metodológica. Presentación y debate grupal.</li>
+                                <li>**"El Dilema Ético: Discusión Abierta" (45 min):** Presentación de 2-3 escenarios hipotéticos de investigación en diseño con dilemas éticos. Los estudiantes discutirán en grupos cómo abordarían cada situación de manera ética, aplicando los principios aprendidos.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Análisis de Brújulas":** Leer un artículo de investigación cualitativa y uno cuantitativa en diseño (enlaces proporcionados). Para cada uno, identificar:
+                                    <ul className="list-circle list-inside ml-4">
+                                        <li>El enfoque principal y por qué lo clasificas así.</li>
+                                        <li>El tipo de datos recolectados.</li>
+                                        <li>Cómo se abordó (o debería haberse abordado) la ética en el estudio.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false // Se desbloquea con el badge anterior
+                },
+                {
+                    week: 3,
+                    title: 'Misión de Ideación - Sembrando Ideas, Cosechando Problemas',
+                    badge: 'Badge de Sembrador de Ideas',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Cómo surgen las ideas de investigación en el campo del diseño e innovación: observación, tendencias, necesidades no satisfechas, brechas en el conocimiento.</li>
+                                <li>Técnicas de problematización: "5 Porqués", Diagrama de Ishikawa (causa-efecto), Árbol de Problemas.</li>
+                                <li>Exploración de problemáticas relevantes en el contexto actual del diseño y la sociedad.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Tormenta de Ideas Creativa y Problemática" (60 min):** Los estudiantes, de forma individual o en parejas, usarán la herramienta de **"Generador de Ideas de Investigación ✨"** en la infografía del curso. Cada uno describirá 2-3 intereses amplios (ej. "sostenibilidad en moda", "gamificación en educación", "interfaz para personas mayores"). Luego, la IA generará ideas.</li>
+                                <li>**"Taller: Descomponiendo el Problema" (60 min):** Elegirán una de las ideas generadas (o una propia) y aplicarán la técnica de los "5 Porqués" o el Diagrama de Ishikawa para profundizar en la raíz del problema.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Problema del Héroe":** Seleccionar la problemática que más les interese para su proyecto. Realizar una búsqueda preliminar de información (noticias, blogs, informes, redes sociales) para entender el contexto, los actores involucrados y lo que ya se sabe sobre el problema.</li>
+                                <li>**"Mapa Mental del Problema":** Crear un mapa mental visual de la problemática elegida, incluyendo causas, efectos, actores y posibles áreas de intervención desde el diseño.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 4,
+                    title: 'Misión de Precisión - Afinando la Pregunta Correcta',
+                    badge: 'Badge de Artífice de Preguntas',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Análisis de problemas en diversos contextos: identificación de la población, el contexto y el alcance.</li>
+                                <li>Delimitación de problemas de investigación: de lo general a lo específico.</li>
+                                <li>Formulación de preguntas de investigación: características de una buena pregunta (clara, concisa, factible, relevante, ética). Tipos de preguntas (descriptivas, exploratorias, explicativas, predictivas).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Taller de Preguntas Poderosas" (90 min):** Basándose en su problemática definida, los estudiantes trabajarán en la formulación de al menos 3 preguntas de investigación tentativas. Se utilizará la técnica PICO (Población, Intervención/Exposición, Comparación, Outcome) o PECOT (Población, Exposición, Comparación, Outcome, Tiempo) como guía. Habrá rondas de retroalimentación entre pares y con el profesor para refinar las preguntas.</li>
+                                <li>**"El Embudo de la Investigación" (30 min):** Ejercicio práctico para pasar de una idea general a una pregunta de investigación muy específica, enfatizando la delimitación.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Enigma Resuelto":** Redactar el planteamiento del problema (descripción, contexto, justificación de su relevancia) y la pregunta de investigación final para su proyecto. Esta pregunta debe ser el eje central de su futura investigación.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 5,
+                    title: 'Misión de Fundamentación - Construyendo los Pilares del Conocimiento',
+                    badge: 'Badge de Bibliotecario Experto',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Revisión de literatura científica: importancia, tipos de fuentes (artículos, libros, tesis), bases de datos académicas (Scopus, Google Scholar, Dialnet, etc.).</li>
+                                <li>Estrategias de búsqueda sistemática: palabras clave, operadores booleanos, filtros.</li>
+                                <li>Gestión de referencias bibliográficas (Mendeley, Zotero, etc. - mención de herramientas).</li>
+                                <li>Formulación de objetivos de investigación: objetivos generales (qué se busca lograr) y específicos (pasos para lograr el general). Características SMART.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Cazadores de Conocimiento: Laboratorio de Búsqueda" (75 min):** Los estudiantes, con sus laptops, realizarán búsquedas de literatura en bases de datos académicas relevantes para sus temas. El profesor guiará en el uso de operadores y filtros avanzados.</li>
+                                <li>**"Objetivos SMART: Taller de Precisión" (45 min):** Los estudiantes redactarán sus objetivos generales y específicos, asegurándose de que sean SMART y estén directamente alineados con su pregunta de investigación. Retroalimentación en pequeños grupos.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"La Biblioteca del Investigador":** Realizar una revisión bibliográfica profunda. Identificar y leer al menos 5-7 fuentes clave (artículos de investigación, capítulos de libros) directamente relacionadas con su problemática y pregunta.</li>
+                                <li>**"Marco Conceptual Preliminar":** Comenzar a identificar y definir los conceptos clave que emergen de su revisión bibliográfica y que serán fundamentales para su investigación.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 6,
+                    title: 'Misión de Planificación - El Mapa del Tesoro de tu Proyecto',
+                    badge: 'Badge de Arquitecto de Proyectos',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Justificación de la investigación: ¿Por qué es importante este estudio? Relevancia teórica, práctica, social, metodológica.</li>
+                                <li>Alcance y limitaciones del estudio: ¿Qué abarcará y qué no?</li>
+                                <li>Estructura de la propuesta de investigación: Introducción, planteamiento del problema, justificación, objetivos, marco conceptual (preliminar), metodología (esquema), cronograma (tentativo), presupuesto (tentativo), referencias.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Argumento Persuasivo: Taller de Justificación" (60 min):** Los estudiantes trabajarán en la redacción de la justificación de su proyecto, enfocándose en convencer de su relevancia. Ejercicios de "elevator pitch" para sus ideas.</li>
+                                <li>**"Presentación Preliminar del Mapa" (60 min):** Cada estudiante (o pareja) realizará una presentación breve (5-7 min) de los avances de su propuesta de investigación (problema, pregunta, objetivos, justificación preliminar, posible alcance). Se fomentará la retroalimentación constructiva entre compañeros.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Borrador del Explorador":** Consolidar el primer borrador completo de la propuesta de investigación, incluyendo todas las secciones discutidas: Introducción, Planteamiento del Problema, Justificación, Objetivos, un Marco Conceptual preliminar y un esquema de la Metodología.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 7,
+                    title: 'Parcial 1 - El Primer Hito: Presentación de la Propuesta de Investigación (Avance)',
+                    badge: 'Badge de Navegante Experto',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Evaluación formal de los avances en la formulación de la propuesta de investigación.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Defensa del Mapa" (120 min):** Exposiciones individuales (o en pareja) formales de la propuesta de investigación. Cada estudiante tendrá un tiempo asignado para presentar y luego responder preguntas del profesor y compañeros.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Refinando el Mapa":** Incorporar la retroalimentación recibida durante el parcial para refinar y fortalecer la propuesta de investigación. Este documento será la base para las siguientes unidades.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Rúbrica Parcial 1: Propuesta de Investigación (30% de la nota final)</p>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full bg-white border border-gray-200">
+                                    <thead>
+                                        <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                            <th className="py-3 px-4 border-b">Criterio</th>
+                                            <th className="py-3 px-4 border-b">Excelente (5)</th>
+                                            <th className="py-3 px-4 border-b">Bueno (4)</th>
+                                            <th className="py-3 px-4 border-b">Regular (3)</th>
+                                            <th className="py-3 px-4 border-b">Insuficiente (2)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td className="py-2 px-4 border-b">Planteamiento del Problema</td><td className="py-2 px-4 border-b">El problema está claramente definido, contextualizado, su relevancia es convincente y se vincula al diseño/innovación.</td><td className="py-2 px-4 border-b">El problema está definido y contextualizado, pero la relevancia podría ser más fuerte o la conexión con el diseño menos explícita.</td><td className="py-2 px-4 border-b">El problema es identificable, pero le falta claridad, contextualización y/o una conexión clara con el campo de estudio.</td><td className="py-2 px-4 border-b">El problema no está claro, no es relevante o no se relaciona con las disciplinas del curso.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Pregunta de Investigación</td><td className="py-2 px-4 border-b">La pregunta es clara, concisa, específica, medible, directamente relacionada con el problema y orienta la investigación.</td><td className="py-2 px-4 border-b">La pregunta es clara y relevante, pero podría ser más específica, medible o menos orientadora para la investigación.</td><td className="py-2 px-4 border-b">La pregunta es vaga, ambigua o no se alinea completamente con el problema planteado.</td><td className="py-2 px-4 border-b">La pregunta es confusa, inexistente o no es una pregunta de investigación.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Objetivos de Investigación</td><td className="py-2 px-4 border-b">Los objetivos generales y específicos son SMART, coherentes con la pregunta y abordan el problema de forma integral.</td><td className="py-2 px-4 border-b">Los objetivos son claros, pero algunos podrían ser más específicos, medibles o no cubren completamente el alcance del problema.</td><td className="py-2 px-4 border-b">Los objetivos son generales, poco claros y/o no están completamente alineados con la pregunta de investigación.</td><td className="py-2 px-4 border-b">Los objetivos son inexistentes, incoherentes o no tienen relación con la investigación propuesta.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Justificación</td><td className="py-2 px-4 border-b">Demuestra una comprensión profunda de la relevancia del estudio, su contribución teórica, práctica y social.</td><td className="py-2 px-4 border-b">La justificación es adecuada, pero podría profundizar en la contribución del estudio o en su impacto.</td><td className="py-2 px-4 border-b">La justificación es superficial, no logra convencer de la importancia del estudio o es poco argumentada.</td><td className="py-2 px-4 border-b">No hay justificación o la presentada es irrelevante, incorrecta o sin sustento.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Estructura y Coherencia</td><td className="py-2 px-4 border-b">La propuesta está lógicamente estructurada, con una excelente coherencia y fluidez entre todos sus componentes.</td><td className="py-2 px-4 border-b">La propuesta está bien estructurada, con buena coherencia entre sus partes, aunque con transiciones ocasionales mejorables.</td><td className="py-2 px-4 border-b">La estructura es básica y la coherencia entre los componentes es débil o inconsistente.</td><td className="py-2 px-4 border-b">La propuesta carece de estructura, es desorganizada o incoherente en sus partes.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Presentación Oral</td><td className="py-2 px-4 border-b">Presentación clara, concisa, segura, con dominio del tema, excelente manejo del tiempo y respuesta efectiva a preguntas.</td><td className="py-2 px-4 border-b">Presentación clara y con buen dominio del tema, aunque podría mejorar el manejo del tiempo o la interacción con preguntas.</td><td className="py-2 px-4 border-b">Presentación con poca claridad, dominio limitado del tema y/o problemas de tiempo.</td><td className="py-2 px-4 border-b">Presentación confusa, sin dominio del tema, incompleta o incapacidad para responder preguntas.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 8,
+                    title: 'Misión de Diseño - Creando tu Estrategia de Recolección',
+                    badge: 'Badge de Estratega Metodológico',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Diseño metodológico: Selección del tipo de estudio (exploratorio, descriptivo, correlacional, explicativo).</li>
+                                <li>Población y muestra: Definición de los participantes del estudio, criterios de inclusión y exclusión, métodos de muestreo (probabilístico y no probabilístico).</li>
+                                <li>Definición de conceptos clave (marco conceptual): Operacionalización de variables y categorías de análisis.</li>
+                                <li>Consideraciones sobre la validez y fiabilidad en la recolección de datos.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Laboratorio Metodológico" (90 min):** En grupos, los estudiantes trabajarán en el diseño detallado de la metodología para su proyecto. Deberán definir el tipo de estudio, la población, el tamaño y tipo de muestra, y cómo operacionalizarán sus conceptos clave. El profesor proporcionará ejemplos y guiará la discusión.</li>
+                                <li>**"Debate: ¿Cuántos y Quiénes?" (30 min):** Discusión sobre los desafíos de definir la población y muestra en proyectos de diseño (ej. estudios con usuarios, pruebas de usabilidad).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Arsenal del Investigador":** Profundizar en el marco conceptual, definiendo claramente los conceptos principales de su investigación.</li>
+                                <li>**"Esquema Metodológico Detallado":** Desarrollar el esquema de su metodología, incluyendo: tipo de estudio, población objetivo, criterios de selección de la muestra, y una primera idea de las técnicas de recolección de datos que utilizarán.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 9,
+                    title: 'Misión de Herramientas - Construyendo tus Instrumentos',
+                    badge: 'Badge de Constructor de Instrumentos',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Técnicas e instrumentos de recolección de datos cualitativos: Entrevistas (estructuradas, semi-estructuradas, no estructuradas), grupos focales, observación (participante, no participante), diarios de campo, análisis de contenido.</li>
+                                <li>Técnicas e instrumentos de recolección de datos cuantitativos: Encuestas (diseño de preguntas, escalas de medición), experimentos (variables, grupos de control), pruebas de usabilidad (métricas).</li>
+                                <li>Diseño de instrumentos: Redacción de preguntas, estructura, validación (piloto).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Caja de Herramientas del Investigador: Taller de Diseño de Instrumentos" (90 min):** Los estudiantes, en sus grupos de proyecto, comenzarán a diseñar los borradores de sus instrumentos de recolección de datos (ej. guion de entrevista, cuestionario de encuesta, protocolo de observación para una prueba de usabilidad). Se realizarán ejercicios de "role-play" o pruebas rápidas entre compañeros para recibir retroalimentación inicial.</li>
+                                <li>**"Mini-Simulación de Recolección" (30 min):** Breve ejercicio práctico de aplicación de un fragmento de instrumento (ej. una serie de 3 preguntas de entrevista o un mini-cuestionario) para experimentar el proceso.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Kit de Recolección":** Desarrollar los borradores completos de los instrumentos de recolección de datos para su proyecto. Deben estar listos para una prueba piloto.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 10,
+                    title: 'Misión de Campo - Recolectando los Datos (¡La Aventura Comienza!)',
+                    badge: 'Badge de Recolector de Datos',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Ejecución de la recolección de datos: Preparación logística, gestión de participantes, ética en la práctica.</li>
+                                <li>Organización de datos cualitativos: Transcripción de entrevistas, sistematización de observaciones.</li>
+                                <li>Organización de datos cuantitativos: Creación de bases de datos (hojas de cálculo), codificación de respuestas.</li>
+                                <li>Manejo de imprevistos durante la recolección.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Expedición de Datos: Desafíos y Soluciones" (60 min):** Discusión sobre los desafíos comunes en la recolección de datos (ej. baja participación, sesgos, problemas técnicos). Se presentarán casos de estudio y estrategias para superarlos.</li>
+                                <li>**"Taller: Organizando el Tesoro" (60 min):** Los estudiantes trabajarán en la organización de una pequeña muestra de datos (simulados o reales si ya han avanzado) en el formato adecuado para su análisis (ej. tabla para datos cuantitativos, transcripción para cualitativos).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Diario del Explorador":** Iniciar la recolección de datos para el proyecto (si es factible y éticamente aprobado, con un grupo pequeño de prueba; si no, simular la recolección y organizar datos ficticios realistas). Documentar el proceso, los desafíos encontrados y las decisiones tomadas.</li>
+                                <li>**"Base de Datos Preliminar":** Organizar los datos recolectados (o simulados) en una estructura adecuada para el análisis.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 11,
+                    title: 'Misión de Descifrado - Análisis Cualitativo',
+                    badge: 'Badge de Intérprete Cualitativo',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Introducción al análisis de datos cualitativos: el proceso interpretativo.</li>
+                                <li>Técnicas de análisis cualitativo: Codificación (abierta, axial, selectiva), análisis temático, análisis de contenido, análisis de discurso.</li>
+                                <li>Herramientas para el análisis cualitativo (mención de software como Atlas.ti, NVivo, o métodos manuales con hojas de cálculo).</li>
+                                <li>Interpretación de resultados cualitativos: Construcción de narrativas y significados.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Detective Cualitativo: Taller de Codificación" (90 min):** Los estudiantes trabajarán con un fragmento de datos cualitativos (ej. transcripción de una entrevista simulada o real). Aplicarán técnicas de codificación abierta y axial para identificar categorías y temas emergentes.</li>
+                                <li>**"Discusión: Historias que los Datos Cuentan" (30 min):** Compartir los primeros temas identificados y discutir cómo las narrativas cualitativas aportan a la comprensión del problema.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Primeros Hallazgos Cualitativos":** Realizar el análisis preliminar de los datos cualitativos recolectados para su proyecto. Identificar al menos 3-5 temas o categorías emergentes clave que respondan a su pregunta de investigación.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 12,
+                    title: 'Misión de Cuantificación - Análisis Cuantitativo',
+                    badge: 'Badge de Analista Cuantitativo',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Introducción al análisis de datos cuantitativos: estadísticas descriptivas (frecuencias, promedios, desviación estándar, moda, mediana).</li>
+                                <li>Estadísticas inferenciales básicas (correlación, comparación de medias - conceptos generales).</li>
+                                <li>Herramientas para el análisis cuantitativo (Excel, Google Sheets, SPSS, R - mención de herramientas).</li>
+                                <li>Interpretación de resultados cuantitativos: Identificación de patrones, tendencias y relaciones.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Mago de los Números: Taller de Análisis Descriptivo" (90 min):** Los estudiantes trabajarán con una pequeña base de datos cuantitativos (simulados o reales). Calcularán estadísticas descriptivas y generarán gráficos básicos (barras, torta, líneas) para visualizar sus datos.</li>
+                                <li>**"Debate: ¿Qué Nos Dicen los Números?" (30 min):** Discusión sobre cómo los datos cuantitativos complementan o contrastan con los cualitativos en la investigación en diseño.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Primeros Hallazgos Cuantitativos":** Realizar el análisis preliminar de los datos cuantitativos recolectados para su proyecto. Generar al menos 3-5 gráficos o tablas que muestren sus hallazgos más interesantes y relevantes para su pregunta de investigación.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 13,
+                    title: 'Parcial 2 - El Segundo Hito: Presentación de Resultados de Análisis Preliminar',
+                    badge: 'Badge de Descubridor de Patrones',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Evaluación formal de la capacidad para analizar datos cualitativos y cuantitativos, y de la interpretación inicial de los resultados.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Relato de los Datos" (120 min):** Cada estudiante (o pareja) presentará los análisis preliminares de sus datos (cualitativos y/o cuantitativos). Deberán mostrar sus hallazgos más relevantes, explicar cómo los analizaron y discutir las primeras interpretaciones y las conexiones con su pregunta de investigación.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"Las Primeras Conclusiones":** Elaborar conclusiones argumentadas basadas en los resultados preliminares, conectándolas con los objetivos de investigación y la pregunta planteada. Identificar nuevas preguntas o áreas de profundización.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Rúbrica Parcial 2: Análisis Preliminar de Datos (30% de la nota final)</p>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full bg-white border border-gray-200">
+                                    <thead>
+                                        <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                            <th className="py-3 px-4 border-b">Criterio</th>
+                                            <th className="py-3 px-4 border-b">Excelente (5)</th>
+                                            <th className="py-3 px-4 border-b">Bueno (4)</th>
+                                            <th className="py-3 px-4 border-b">Regular (3)</th>
+                                            <th className="py-3 px-4 border-b">Insuficiente (2)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td className="py-2 px-4 border-b">Organización y Preparación de Datos</td><td className="py-2 px-4 border-b">Datos cualitativos y cuantitativos organizados de forma impecable, lógica y listos para el análisis.</td><td className="py-2 px-4 border-b">Datos bien organizados, con algunas áreas menores de mejora en la estructura o preparación.</td><td className="py-2 px-4 border-b">Datos con organización básica, pero con inconsistencias o dificultades para el análisis efectivo.</td><td className="py-2 px-4 border-b">Datos desorganizados, incompletos o incorrectos, imposibilitando el análisis.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Análisis Cualitativo (si aplica)</td><td className="py-2 px-4 border-b">Aplicación rigurosa y correcta de técnicas de codificación y análisis temático, identificando patrones y significados profundos.</td><td className="py-2 px-4 border-b">Buen análisis cualitativo, identificando temas relevantes, aunque podría profundizar en la interpretación o la conexión entre códigos.</td><td className="py-2 px-4 border-b">Análisis cualitativo superficial, con temas poco desarrollados, códigos inconsistentes o conexiones débiles.</td><td className="py-2 px-4 border-b">No se realizó análisis cualitativo, es incorrecto o no se basa en los datos.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Análisis Cuantitativo (si aplica)</td><td className="py-2 px-4 border-b">Aplicación correcta de técnicas descriptivas e inferenciales básicas, con interpretación clara y precisa de los resultados.</td><td className="py-2 px-4 border-b">Buen análisis cuantitativo, con resultados claros, aunque la interpretación podría ser más profunda o las técnicas más variadas.</td><td className="py-2 px-4 border-b">Análisis cuantitativo básico, con errores en la aplicación de técnicas o interpretación limitada/incorrecta.</td><td className="py-2 px-4 border-b">No se realizó análisis cuantitativo, es incorrecto o no se basa en los datos.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Conexión con Objetivos y Pregunta</td><td className="py-2 px-4 border-b">Los análisis están directamente vinculados con los objetivos de investigación, respondiendo de forma clara a la pregunta planteada.</td><td className="py-2 px-4 border-b">Los análisis se relacionan con los objetivos, pero la conexión podría ser más explícita o directa con la pregunta.</td><td className="py-2 px-4 border-b">La conexión entre los análisis y los objetivos/pregunta es débil, inconsistente o poco clara.</td><td className="py-2 px-4 border-b">Los análisis no tienen relación con los objetivos o la pregunta de investigación.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Interpretación y Conclusiones Preliminares</td><td className="py-2 px-4 border-b">Interpretaciones profundas, críticas y conclusiones preliminares argumentadas, basadas sólidamente en la evidencia de los datos.</td><td className="py-2 px-4 border-b">Interpretaciones adecuadas y conclusiones preliminares, aunque podrían ser más robustas o menos superficiales.</td><td className="py-2 px-4 border-b">Interpretaciones superficiales y conclusiones poco argumentadas, sin sustento claro en los datos o con inferencias incorrectas.</td><td className="py-2 px-4 border-b">No hay interpretaciones o conclusiones, o son incorrectas/irrelevantes.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Presentación Oral</td><td className="py-2 px-4 border-b">Presentación clara, concisa, con visualización efectiva de resultados, dominio del tema y excelente manejo del tiempo.</td><td className="py-2 px-4 border-b">Presentación clara, con buena visualización, aunque podría mejorar el manejo del tiempo o la fluidez.</td><td className="py-2 px-4 border-b">Presentación con poca claridad, visualización deficiente de resultados y/o problemas de tiempo.</td><td className="py-2 px-4 border-b">Presentación confusa, sin resultados claros o incompleta.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 14,
+                    title: 'Misión de Narrativa - Contando tu Historia con Datos',
+                    badge: 'Badge de Narrador Visual',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Principios de visualización de datos: Claridad, precisión, integridad, estética. Tipos de gráficos adecuados para diferentes tipos de datos y mensajes.</li>
+                                <li>Herramientas de visualización (Chart.js, Plotly.js - conceptos básicos).</li>
+                                <li>Estructura del informe final de investigación: Introducción, Marco Teórico, Metodología, Resultados, Discusión, Conclusiones, Recomendaciones, Referencias.</li>
+                                <li>Redacción académica y estilo.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Artista de Datos: Taller de Visualización" (90 min):** Los estudiantes trabajarán en la creación de visualizaciones impactantes para sus resultados (ej. infografías, gráficos avanzados). Se revisarán ejemplos de buenas y malas prácticas en visualización.</li>
+                                <li>**"Construyendo el Esqueleto del Informe" (30 min):** Discusión sobre la estructura del informe final, asignando secciones y responsabilidades (si es un trabajo en equipo).</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Primer Capítulo":** Empezar a redactar el informe final de investigación, prestando especial atención a la sección de Resultados. Asegurarse de que los hallazgos estén bien presentados y explicados, con el apoyo de las visualizaciones creadas.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 15,
+                    title: 'Misión de Impacto - Preparando tu Gran Revelación',
+                    badge: 'Badge de Comunicador Maestro',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Comunicación efectiva de resultados de investigación: Adaptación del mensaje a la audiencia, claridad y concisión.</li>
+                                <li>Diseño de presentaciones orales: Estructura, ayudas visuales, manejo del tiempo, técnicas de oratoria.</li>
+                                <li>Consideraciones éticas en la comunicación de resultados: No distorsionar datos, reconocer limitaciones, citar fuentes.</li>
+                                <li>Preparación para la defensa del proyecto.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"El Escenario del Investigador: Ensayo General" (120 min):** Cada estudiante (o pareja) realizará un ensayo de su presentación oral del proyecto final. Se cronometrará el tiempo y se proporcionará retroalimentación detallada sobre el contenido, la claridad, las ayudas visuales y la oratoria.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"La Obra Maestra":** Finalizar el informe de investigación, asegurando que todos los componentes estén completos, pulidos y coherentes.</li>
+                                <li>**"El Discurso Final":** Preparar la presentación oral final, ensayando hasta dominar el contenido y el tiempo.</li>
+                            </ul>
+                        </>
+                    ),
+                    isUnlockable: false
+                },
+                {
+                    week: 16,
+                    title: 'Parcial 3 - La Gran Final: Entrega Final de Proyecto Aplicado',
+                    badge: 'Badge de Investigador Élite',
+                    content: (
+                        <>
+                            <p className="font-semibold">Contenido:</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>Presentación y defensa formal del proyecto de investigación aplicado.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
+                            <ul className="list-disc list-inside ml-4">
+                                <li>**"La Defensa del Proyecto" (120 min):** Presentación y defensa de los proyectos finales de investigación ante el profesor y compañeros. Cada equipo/estudiante tendrá un tiempo asignado para su presentación y una sesión de preguntas y respuestas.</li>
+                            </ul>
+                            <p className="font-semibold mt-4">Rúbrica Parcial 3: Entrega Final de Proyecto Aplicado (40% de la nota final)</p>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full bg-white border border-gray-200">
+                                    <thead>
+                                        <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                            <th className="py-3 px-4 border-b">Criterio</th>
+                                            <th className="py-3 px-4 border-b">Excelente (5)</th>
+                                            <th className="py-3 px-4 border-b">Bueno (4)</th>
+                                            <th className="py-3 px-4 border-b">Regular (3)</th>
+                                            <th className="py-3 px-4 border-b">Insuficiente (2)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td className="py-2 px-4 border-b">Calidad del Informe Final</td><td className="py-2 px-4 border-b">Informe completo, bien estructurado, claro, conciso, con redacción impecable, formato profesional y referencias adecuadas.</td><td className="py-2 px-4 border-b">Informe completo y estructurado, con buena redacción, aunque con algunos detalles menores a pulir en formato o estilo.</td><td className="py-2 px-4 border-b">Informe con algunas secciones incompletas o poco claras, y/o con errores de redacción/formato significativos.</td><td className="py-2 px-4 border-b">Informe incompleto, desorganizado, con graves deficiencias de redacción o formato, o sin referencias.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Coherencia y Argumentación del Proyecto</td><td className="py-2 px-4 border-b">Coherencia total y explícita entre problema, objetivos, marco teórico, metodología, resultados y conclusiones. Argumentación sólida y basada en evidencia.</td><td className="py-2 px-4 border-b">Buena coherencia y argumentación, aunque algunos puntos podrían ser más robustos o la conexión más explícita.</td><td className="py-2 px-4 border-b">Coherencia limitada entre los componentes y/o argumentación débil, con algunas inconsistencias.</td><td className="py-2 px-4 border-b">Falta de coherencia y argumentación, o argumentos sin sustento en la investigación.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Análisis y Presentación de Resultados</td><td className="py-2 px-4 border-b">Análisis exhaustivo y profundo de datos cualitativos y cuantitativos. Presentación clara, efectiva y visualmente impactante de resultados.</td><td className="py-2 px-4 border-b">Análisis adecuado y presentación clara de resultados, con visualizaciones funcionales y comprensibles.</td><td className="py-2 px-4 border-b">Análisis superficial o incompleto. Resultados presentados de forma confusa o con visualizaciones deficientes/incorrectas.</td><td className="py-2 px-4 border-b">No hay análisis de datos o los resultados son incomprensibles, irrelevantes o no presentados.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Discusión y Conclusiones</td><td className="py-2 px-4 border-b">Discusión crítica de los hallazgos, conectándolos con la literatura y el contexto. Conclusiones claras, concisas, con implicaciones prácticas/teóricas y recomendaciones.</td><td className="py-2 px-4 border-b">Discusión y conclusiones adecuadas, aunque podrían ser más profundas, críticas o tener mayores implicaciones.</td><td className="py-2 px-4 border-b">Discusión superficial o conclusiones vagas, sin conexión clara con los hallazgos o sin recomendaciones pertinentes.</td><td className="py-2 px-4 border-b">No hay discusión o conclusiones, o son incorrectas/irrelevantes.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Contribución al Campo</td><td className="py-2 px-4 border-b">El proyecto demuestra una contribución significativa, original y relevante a la comprensión de problemáticas en diseño, innovación o UX.</td><td className="py-2 px-4 border-b">El proyecto realiza una contribución relevante al campo, aunque no necesariamente original o con un impacto limitado.</td><td className="py-2 px-4 border-b">La contribución del proyecto es limitada, poco clara o no se alinea bien con las disciplinas del curso.</td><td className="py-2 px-4 border-b">El proyecto no demuestra una contribución al campo o es irrelevante.</td></tr>
+                                        <tr><td className="py-2 px-4 border-b">Presentación Oral y Defensa</td><td className="py-2 px-4 border-b">Presentación excepcional, dominio total del tema, capacidad para responder preguntas de forma crítica, reflexiva y persuasiva.</td><td className="py-2 px-4 border-b">Presentación muy buena, buen dominio del tema y capacidad para responder la mayoría de las preguntas de forma adecuada.</td><td className="py-2 px-4 border-b">Presentación con debilidades (claridad, tiempo, visuales), dominio limitado del tema y dificultades para responder preguntas.</td><td className="py-2 px-4 border-b">Presentación deficiente, sin dominio del tema, incompleta o incapacidad para defender el proyecto.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ),
+                    isUnlockable: false
+                }
+            ];
+
+            if (loadingUserData) {
+                return <LoadingSpinner />;
             }
-        });
+
+            if (error) {
+                return <div className="text-center text-red-500 p-8">{error}</div>;
+            }
+
+            const studentName = userData?.fullName || currentUser?.email.split('@')[0];
+            const studentCodeDisplay = userData?.studentCode || currentUser?.email.split('@')[0];
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8">
+                    <header className="flex justify-between items-center bg-white rounded-lg shadow-md p-4 mb-8">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Seminario de Investigación</h1>
+                            <p className="text-sm text-gray-600 flex items-center">
+                                <User size={16} className="mr-1" />
+                                Hola, {studentName} (Código: {studentCodeDisplay})
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center"
+                        >
+                            <LogOut size={18} className="mr-2" /> Cerrar Sesión
+                        </button>
+                    </header>
+
+                    <main className="container mx-auto">
+                        <h2 className="text-3xl font-bold text-center mb-8">Tu Aventura Semanal</h2>
+                        {courseWeeks.map((weekData, index) => {
+                            const previousBadge = index > 0 ? courseWeeks[index - 1].badge : null;
+                            // La semana 1 siempre está desbloqueada, las demás dependen del badge anterior
+                            const isUnlocked = weekData.week === 1 || hasBadge(previousBadge);
+                            const hasCurrentBadge = hasBadge(weekData.badge);
+
+                            return (
+                                <CourseWeek
+                                    key={weekData.week}
+                                    weekNumber={weekData.week}
+                                    title={weekData.title}
+                                    content={weekData.content}
+                                    badgeName={weekData.badge}
+                                    isUnlocked={isUnlocked}
+                                    hasBadge={hasCurrentBadge}
+                                />
+                            );
+                        })}
+                    </main>
+                </div>
+            );
+        }
+
+        // Componente principal de la aplicación React
+        function App() {
+            const [firebaseApp, setFirebaseApp] = React.useState(null);
+            const [auth, setAuth] = React.useState(null);
+            const [currentUser, setCurrentUser] = React.useState(null);
+            const [authReady, setAuthReady] = React.useState(false);
+            const [firebaseConfigLoaded, setFirebaseConfigLoaded] = React.useState(false);
+
+            // --- ¡IMPORTANTE! PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
+            // Puedes encontrarla en la consola de Firebase, en "Configuración del proyecto" > "Tus apps" > "SDK setup and configuration" (selecciona "CDN")
+            const firebaseConfig = {
+                apiKey: "TU_API_KEY", // Reemplaza con tu API Key
+                authDomain: "TU_AUTH_DOMAIN", // Reemplaza con tu Auth Domain
+                projectId: "TU_PROJECT_ID", // Reemplaza con tu Project ID
+                storageBucket: "TU_STORAGE_BUCKET", // Reemplaza con tu Storage Bucket
+                messagingSenderId: "TU_MESSAGING_SENDER_ID", // Reemplaza con tu Messaging Sender ID
+                appId: "TU_APP_ID", // Reemplaza con tu App ID
+                // measurementId: "TU_MEASUREMENT_ID" // Opcional, si usas Google Analytics
+            };
+            // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
+
+            React.useEffect(() => {
+                if (firebaseConfig.apiKey && !firebaseApp) {
+                    const app = initializeApp(firebaseConfig);
+                    setFirebaseApp(app);
+                    const authInstance = getAuth(app);
+                    setAuth(authInstance);
+
+                    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+                        setCurrentUser(user);
+                        setAuthReady(true);
+                    });
+                    setFirebaseConfigLoaded(true); // La config se cargó y la app se inicializó
+
+                    return () => unsubscribe();
+                } else if (!firebaseConfig.apiKey) {
+                    console.error("Firebase config no está completa. Por favor, rellena los placeholders.");
+                    setAuthReady(true); // Marcar como listo para mostrar el error
+                }
+            }, [firebaseApp, firebaseConfig.apiKey]); // Dependencia en firebaseConfig.apiKey para re-evaluar si se actualiza
+
+            if (!firebaseConfigLoaded || !authReady) {
+                return <LoadingSpinner />;
+            }
+
+            return (
+                <AuthContext.Provider value={{ firebaseApp, currentUser }}>
+                    {currentUser ? (
+                        <CoursePage firebaseApp={firebaseApp} currentUser={currentUser} />
+                    ) : (
+                        <AuthPage firebaseApp={firebaseApp} />
+                    )}
+                </AuthContext.Provider>
+            );
+        }
+
+        // Montar la aplicación React en el div con id "root"
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
