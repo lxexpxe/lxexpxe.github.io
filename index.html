@@ -121,11 +121,14 @@
                 const email = `${studentCode}@icesi.edu`;
 
                 try {
+                    console.log('Intentando autenticación...', isLogin ? 'Login' : 'Registro');
                     if (isLogin) {
-                        await auth.signInWithEmailAndPassword(email, password);
+                        const result = await auth.signInWithEmailAndPassword(email, password);
+                        console.log('Login exitoso:', result.user.uid);
                     } else {
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
+                        console.log('Registro exitoso:', user.uid);
                         // Usamos un appId fijo para GitHub Pages
                         const appId = 'seminario-investigacion-app'; 
                         const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
@@ -135,7 +138,11 @@
                             badgesEarned: [], // Inicialmente sin badges
                             createdAt: new Date()
                         });
+                        console.log('Datos de usuario guardados en Firestore');
                     }
+                    // Si llegamos aquí, todo salió bien
+                    console.log('Autenticación completada exitosamente');
+                    setError('');
                 } catch (err) {
                     console.error("Error de autenticación:", err.code, err.message);
                     switch (err.code) {
@@ -897,12 +904,14 @@
 
             React.useEffect(() => {
                 if (firebaseConfig.apiKey && !firebaseApp) {
+                    console.log('Inicializando Firebase...');
                     const app = firebase.initializeApp(firebaseConfig);
                     setFirebaseApp(app);
                     const authInstance = firebase.auth();
                     setAuth(authInstance);
 
                     const unsubscribe = authInstance.onAuthStateChanged((user) => {
+                        console.log('Estado de autenticación cambió:', user ? 'Usuario logueado' : 'Usuario no logueado');
                         setCurrentUser(user);
                         setAuthReady(true);
                     });
@@ -918,6 +927,8 @@
             if (!firebaseConfigLoaded || !authReady) {
                 return <LoadingSpinner />;
             }
+
+            console.log('Estado actual - currentUser:', currentUser ? 'Logueado' : 'No logueado');
 
             return (
                 <AuthContext.Provider value={{ firebaseApp, currentUser }}>
