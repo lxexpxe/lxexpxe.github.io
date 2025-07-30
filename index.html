@@ -909,20 +909,29 @@
                     setFirebaseApp(app);
                     const authInstance = firebase.auth();
                     setAuth(authInstance);
-
-                    const unsubscribe = authInstance.onAuthStateChanged((user) => {
-                        console.log('Estado de autenticación cambió:', user ? 'Usuario logueado' : 'Usuario no logueado');
+                    setFirebaseConfigLoaded(true);
+                } else if (!firebaseConfig.apiKey) {
+                    console.error("Firebase config no está completa. Por favor, rellena los placeholders.");
+                    setAuthReady(true);
+                }
+            }, [firebaseApp, firebaseConfig.apiKey]);
+            
+            // useEffect separado para el listener de autenticación
+            React.useEffect(() => {
+                if (auth) {
+                    console.log('Configurando listener de autenticación...');
+                    const unsubscribe = auth.onAuthStateChanged((user) => {
+                        console.log('Estado de autenticación cambió:', user ? `Usuario logueado: ${user.uid}` : 'Usuario no logueado');
                         setCurrentUser(user);
                         setAuthReady(true);
                     });
-                    setFirebaseConfigLoaded(true); // La config se cargó y la app se inicializó
-
-                    return () => unsubscribe();
-                } else if (!firebaseConfig.apiKey) {
-                    console.error("Firebase config no está completa. Por favor, rellena los placeholders.");
-                    setAuthReady(true); // Marcar como listo para mostrar el error
+                    
+                    return () => {
+                        console.log('Limpiando listener de autenticación');
+                        unsubscribe();
+                    };
                 }
-            }, [firebaseApp, firebaseConfig.apiKey]); // Dependencia en firebaseConfig.apiKey para re-evaluar si se actualiza
+            }, [auth]);
 
             if (!firebaseConfigLoaded || !authReady) {
                 return <LoadingSpinner />;
