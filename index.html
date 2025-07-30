@@ -6,16 +6,16 @@
     <title>Seminario de Investigación</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM CDNs -->
+    <!-- React & ReactDOM CDNs (Deben cargarse primero) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Firebase CDNs -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    <!-- Lucide React Icons CDN -->
+    <!-- Firebase CDNs (Versiones compat para acceso global) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Lucide React Icons CDN (Debe cargarse después de React) -->
     <script src="https://unpkg.com/lucide-react@0.395.0/dist/umd/lucide-react.min.js"></script>
-    <!-- Babel CDN (for JSX transpilation in browser) -->
+    <!-- Babel CDN (Para transpilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,14 +65,12 @@
 <body class="bg-gray-50 text-gray-800">
     <div id="root"></div>
 
+    <!-- Todo el código React y la lógica de la aplicación van aquí, después de cargar todas las librerías -->
     <script type="text/babel">
-        // Importaciones de Firebase (se cargan globalmente por los CDNs, pero se usan aquí)
-        // Usamos la versión "compat" para compatibilidad con el estilo de importación global
+        // Acceso a las variables globales de las librerías cargadas por CDN
         const { initializeApp } = firebase;
         const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } = firebase.auth;
         const { getFirestore, doc, setDoc, getDoc, onSnapshot } = firebase.firestore;
-
-        // Importaciones de Lucide React (se cargan globalmente por el CDN)
         const { Home, Lock, Unlock, User, Award, BookOpen, ChevronRight, LogOut, Loader2, PlusCircle, CheckCircle } = lucideReact;
 
         // Contexto para el usuario y la base de datos
@@ -870,13 +868,13 @@
             // --- ¡IMPORTANTE! PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
             // Puedes encontrarla en la consola de Firebase, en "Configuración del proyecto" > "Tus apps" > "SDK setup and configuration" (selecciona "CDN")
             const firebaseConfig = {
-                apiKey: "TU_API_KEY", // Reemplaza con tu API Key
-                authDomain: "TU_AUTH_DOMAIN", // Reemplaza con tu Auth Domain
-                projectId: "TU_PROJECT_ID", // Reemplaza con tu Project ID
-                storageBucket: "TU_STORAGE_BUCKET", // Reemplaza con tu Storage Bucket
-                messagingSenderId: "TU_MESSAGING_SENDER_ID", // Reemplaza con tu Messaging Sender ID
-                appId: "TU_APP_ID", // Reemplaza con tu App ID
-                // measurementId: "TU_MEASUREMENT_ID" // Opcional, si usas Google Analytics
+                apiKey: "AIzaSyBEKzy25wj-qIVJcyqkCors2b8zPostu7E", // Reemplaza con tu API Key
+                authDomain: "seminario-de-investigaci-283c8.firebaseapp.com", // Reemplaza con tu Auth Domain
+                projectId: "seminario-de-investigaci-283c8", // Reemplaza con tu Project ID
+                storageBucket: "seminario-de-investigaci-283c8.firebasestorage.app", // Reemplaza con tu Storage Bucket
+                messagingSenderId: "253114435967", // Reemplaza con tu Messaging Sender ID
+                appId:"1:253114435967:web:b83b9413f663f283b7724a", // Reemplaza con tu App ID
+                 measurementId: "G-7J76P5D7Z3" // Opcional, si usas Google Analytics
             };
             // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
 
