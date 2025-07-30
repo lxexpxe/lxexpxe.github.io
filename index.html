@@ -13,8 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <!-- Lucide React Icons CDN (Debe cargarse después de React) -->
-    <script src="https://unpkg.com/lucide-react@0.395.0/dist/umd/lucide-react.min.js"></script>
+    <!-- Iconos simples con CSS -->
     <!-- Babel CDN (Para transpilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -60,6 +59,19 @@
         .prose ul.list-circle li {
             list-style-type: circle;
         }
+        /* Estilos para iconos simples */
+        .icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+        .chevron {
+            transition: transform 0.3s ease;
+            display: inline-block;
+        }
+        .chevron.rotate-90 {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -67,11 +79,16 @@
 
     <!-- Todo el código React y la lógica de la aplicación van aquí, después de cargar todas las librerías -->
     <script type="text/babel">
-        // Acceso a las variables globales de las librerías cargadas por CDN
-        const { initializeApp } = firebase;
-        const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } = firebase.auth;
-        const { getFirestore, doc, setDoc, getDoc, onSnapshot } = firebase.firestore;
-        const { Home, Lock, Unlock, User, Award, BookOpen, ChevronRight, LogOut, Loader2, PlusCircle, CheckCircle } = lucideReact;
+        // Las librerías Firebase compat se acceden directamente desde el objeto global firebase
+        
+        // Iconos simples como componentes React
+        const Lock = () => React.createElement('span', {}, '🔒');
+        const User = () => React.createElement('span', {}, '👤');
+        const LogOut = () => React.createElement('span', {}, '🚪');
+        const Loader2 = ({ className }) => React.createElement('div', { className: `spinner ${className || ''}` });
+        const ChevronRight = ({ className }) => React.createElement('span', { className }, '▶');
+        const CheckCircle = () => React.createElement('span', {}, '✅');
+        const Award = () => React.createElement('span', {}, '🏆');
 
         // Contexto para el usuario y la base de datos
         const AuthContext = React.createContext(null);
@@ -79,15 +96,15 @@
         // Componente para el spinner de carga
         const LoadingSpinner = () => (
           <div className="flex justify-center items-center py-4">
-            <Loader2 className="animate-spin text-[#4D96FF] h-8 w-8" />
+            <div className="spinner"></div>
             <p className="ml-2 text-gray-600">Cargando...</p>
           </div>
         );
 
         // Componente de Autenticación
         function AuthPage({ firebaseApp }) {
-            const auth = getAuth(firebaseApp);
-            const db = getFirestore(firebaseApp);
+            const auth = firebase.auth();
+            const db = firebase.firestore();
             const [isLogin, setIsLogin] = React.useState(true);
             const [studentCode, setStudentCode] = React.useState('');
             const [password, setPassword] = React.useState('');
@@ -105,14 +122,14 @@
 
                 try {
                     if (isLogin) {
-                        await signInWithEmailAndPassword(auth, email, password);
+                        await auth.signInWithEmailAndPassword(email, password);
                     } else {
-                        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
                         // Usamos un appId fijo para GitHub Pages
                         const appId = 'seminario-investigacion-app'; 
-                        const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}`);
-                        await setDoc(userDocRef, {
+                        const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
+                        await userDocRef.set({
                             studentCode: studentCode,
                             fullName: fullName,
                             badgesEarned: [], // Inicialmente sin badges
@@ -210,7 +227,7 @@
                                     type="submit"
                                     disabled={loading}
                                 >
-                                    {loading ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
+                                    {loading ? <div className="spinner mr-2" style={{width: '20px', height: '20px'}}></div> : null}
                                     {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
                                 </button>
                                 <button
@@ -244,11 +261,11 @@
                         <div className="flex items-center space-x-2">
                             {hasBadge ? (
                                 <span className="inline-flex items-center bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                                    <CheckCircle size={14} className="mr-1" /> Badge Obtenido
+                                    <CheckCircle /> Badge Obtenido
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                                    <Award size={14} className="mr-1" /> {badgeName}
+                                    <Award /> {badgeName}
                                 </span>
                             )}
                             {isUnlocked ? (
@@ -258,16 +275,16 @@
                                     aria-expanded={isExpanded}
                                     aria-controls={`week-content-${weekNumber}`}
                                 >
-                                    <ChevronRight className={`transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} size={20} />
+                                    <span className={`chevron ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
                                 </button>
                             ) : (
-                                <Lock size={24} className="text-gray-400" />
+                                <Lock />
                             )}
                         </div>
                     </div>
                     {!isUnlocked && (
                         <p className="text-gray-500 italic flex items-center">
-                            <Lock size={16} className="mr-2" /> Contenido bloqueado. Necesitas el badge de la semana anterior para desbloquear.
+                            <Lock /> Contenido bloqueado. Necesitas el badge de la semana anterior para desbloquear.
                         </p>
                     )}
                     {isUnlocked && isExpanded && (
@@ -281,8 +298,8 @@
 
         // Componente de la Página del Curso Principal
         function CoursePage({ firebaseApp, currentUser }) {
-            const auth = getAuth(firebaseApp);
-            const db = getFirestore(firebaseApp);
+            const auth = firebase.auth();
+            const db = firebase.firestore();
             const [userData, setUserData] = React.useState(null);
             const [loadingUserData, setLoadingUserData] = React.useState(true);
             const [error, setError] = React.useState('');
@@ -296,9 +313,9 @@
                     return;
                 }
 
-                const userDocRef = doc(db, `artifacts/${appId}/users/${currentUser.uid}`);
-                const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
+                const userDocRef = db.doc(`artifacts/${appId}/users/${currentUser.uid}`);
+                const unsubscribe = userDocRef.onSnapshot((docSnap) => {
+                    if (docSnap.exists) {
                         setUserData(docSnap.data());
                         setError('');
                     } else {
@@ -317,7 +334,7 @@
 
             const handleLogout = async () => {
                 try {
-                    await signOut(auth);
+                    await auth.signOut();
                 } catch (err) {
                     console.error("Error al cerrar sesión:", err);
                     setError("Error al cerrar sesión. Intenta de nuevo.");
@@ -820,7 +837,7 @@
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Seminario de Investigación</h1>
                             <p className="text-sm text-gray-600 flex items-center">
-                                <User size={16} className="mr-1" />
+                                <User />
                                 Hola, {studentName} (Código: {studentCodeDisplay})
                             </p>
                         </div>
@@ -828,7 +845,7 @@
                             onClick={handleLogout}
                             className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center"
                         >
-                            <LogOut size={18} className="mr-2" /> Cerrar Sesión
+                            <LogOut /> Cerrar Sesión
                         </button>
                     </header>
 
@@ -880,12 +897,12 @@
 
             React.useEffect(() => {
                 if (firebaseConfig.apiKey && !firebaseApp) {
-                    const app = initializeApp(firebaseConfig);
+                    const app = firebase.initializeApp(firebaseConfig);
                     setFirebaseApp(app);
-                    const authInstance = getAuth(app);
+                    const authInstance = firebase.auth();
                     setAuth(authInstance);
 
-                    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+                    const unsubscribe = authInstance.onAuthStateChanged((user) => {
                         setCurrentUser(user);
                         setAuthReady(true);
                     });
@@ -913,8 +930,9 @@
             );
         }
 
-        // Montar la aplicación React en el div con id "root"
-        ReactDOM.render(<App />, document.getElementById('root'));
+        // Montar la aplicación React en el div con id "root" usando React 18
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
