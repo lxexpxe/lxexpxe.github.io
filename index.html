@@ -16,8 +16,6 @@
     <!-- Iconos simples con CSS -->
     <!-- Babel CDN (Para transpilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Firebase Configuration (load before main script) -->
-    <script src="firebase-config.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -519,11 +517,29 @@
                     console.log('Intentando autenticación...', isLogin ? 'Login' : 'Registro');
                     if (isLogin) {
                         const result = await auth.signInWithEmailAndPassword(email, password);
+                        
+                        // Verificar si el email está verificado
+                        if (!result.user.emailVerified) {
+                            await auth.signOut();
+                            toast.showToast('Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.', 'error');
+                            return;
+                        }
+                        
                         console.log('Login exitoso:', result.user.uid);
+                        toast.showToast('¡Bienvenido de vuelta!', 'success');
                     } else {
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
                         console.log('Registro exitoso:', user.uid);
+                        
+                        // Enviar email de verificación
+                        await user.sendEmailVerification({
+                            url: window.location.href,
+                            handleCodeInApp: false
+                        });
+                        
+                        // Cerrar sesión hasta que verifique el email
+                        await auth.signOut();
                         
                         const appId = 'seminario-investigacion-app'; 
                         const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
@@ -532,6 +548,7 @@
                             email: email,
                             fullName: fullName,
                             userType: isProfessor(email) ? 'professor' : 'student',
+                            emailVerified: false,
                             createdAt: new Date()
                         };
 
@@ -542,12 +559,13 @@
                         
                         await userDocRef.set(userData);
                         console.log('Datos de usuario guardados en Firestore');
+                        
+                        toast.showToast(
+                            '¡Registro exitoso! Te hemos enviado un correo de verificación. Verifica tu email antes de iniciar sesión.',
+                            'success'
+                        );
                     }
                     console.log('Autenticación completada exitosamente');
-                    toast.showToast(
-                        isLogin ? '¡Bienvenido de vuelta!' : '¡Cuenta creada exitosamente!',
-                        'success'
-                    );
                     setErrors({});
                 } catch (err) {
                     console.error("Error de autenticación:", err.code, err.message);
@@ -650,13 +668,45 @@
                                     onClick={() => {
                                         setIsLogin(!isLogin);
                                         setErrors({});
-                                        setStudentCode('');
+                                        setEmail('');
                                         setPassword('');
                                         setFullName('');
                                     }}
                                 >
                                     {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
                                 </button>
+                                
+                                {isLogin && (
+                                    <button
+                                        className="btn btn-secondary w-full text-sm"
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!email || !validateEmail(email)) {
+                                                toast.showToast('Ingresa tu correo institucional primero', 'error');
+                                                return;
+                                            }
+                                            try {
+                                                // Crear usuario temporal para reenviar verificación
+                                                const tempUser = await auth.signInWithEmailAndPassword(email, password || 'temp');
+                                                if (tempUser.user && !tempUser.user.emailVerified) {
+                                                    await tempUser.user.sendEmailVerification();
+                                                    await auth.signOut();
+                                                    toast.showToast('Email de verificación reenviado', 'success');
+                                                } else {
+                                                    toast.showToast('Tu email ya está verificado', 'success');
+                                                }
+                                            } catch (error) {
+                                                if (error.code === 'auth/wrong-password') {
+                                                    toast.showToast('Ingresa tu contraseña correcta para reenviar la verificación', 'error');
+                                                } else {
+                                                    toast.showToast('Error reenviando verificación', 'error');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        ¿No recibiste el email de verificación?
+                                    </button>
+                                )}
                             </div>
                         </form>
                     </div>
@@ -1616,15 +1666,17 @@
             const [firebaseConfigLoaded, setFirebaseConfigLoaded] = React.useState(false);
             const [userDataLoaded, setUserDataLoaded] = React.useState(false);
 
-            // Configuración de Firebase desde variables de entorno o archivo externo
-            const firebaseConfig = window.FIREBASE_CONFIG || {
-                // Configuración por defecto vacía - debe ser configurada externamente
-                apiKey: "",
-                authDomain: "",
-                projectId: "",
-                storageBucket: "",
-                messagingSenderId: "",
-                appId: ""
+            // Configuración de Firebase
+            // NOTA: Estas credenciales son públicas por diseño de Firebase
+            // La seguridad real está en las reglas de Firestore, no en ocultar estas claves
+            const firebaseConfig = {
+                apiKey: "AIzaSyBEKzy25wj-qIVJcyqkCors2b8zPostu7E",
+                authDomain: "seminario-de-investigaci-283c8.firebaseapp.com",
+                projectId: "seminario-de-investigaci-283c8",
+                storageBucket: "seminario-de-investigaci-283c8.firebasestorage.app",
+                messagingSenderId: "253114435967",
+                appId: "1:253114435967:web:b83b9413f663f283b7724a",
+                measurementId: "G-7J76P5D7Z3"
             };
 
             React.useEffect(() => {
