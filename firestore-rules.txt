@@ -1,0 +1,22 @@
+// Reglas de Firestore para permitir acceso de profesores
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/seminario-investigacion-app/users/{userId} {
+      // Los usuarios pueden leer y escribir sus propios datos
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Los profesores pueden leer todos los documentos de usuarios
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.userType == 'professor';
+      
+      // Los profesores pueden actualizar badges de estudiantes
+      allow update: if request.auth != null && 
+        exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.userType == 'professor' &&
+        // Solo permitir actualizar campos específicos
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgesEarned', 'lastBadgeEarned']);
+    }
+  }
+}

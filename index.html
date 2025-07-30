@@ -16,61 +16,263 @@
     <!-- Iconos simples con CSS -->
     <!-- Babel CDN (Para transpilar JSX en el navegador) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Firebase Configuration (load before main script) -->
+    <script src="firebase-config.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #f9fafb;
+            --bg-secondary: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --accent-color: #4D96FF;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        [data-theme="dark"] {
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --border-color: #374151;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+        
         .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #4D96FF;
+            border: 4px solid rgba(77, 150, 255, 0.2);
+            border-left-color: var(--accent-color);
             border-radius: 50%;
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
         }
+        
         @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
-        /* Estilos para las tablas dentro del contenido de las semanas */
-        .prose table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            margin-bottom: 1rem;
+        
+        @keyframes slideDown {
+            from { opacity: 0; max-height: 0; }
+            to { opacity: 1; max-height: 1000px; }
         }
-        .prose th, .prose td {
-            border: 1px solid #e2e8f0; /* gray-200 */
-            padding: 0.75rem;
-            text-align: left;
+        
+        @keyframes slideUp {
+            from { opacity: 1; max-height: 1000px; }
+            to { opacity: 0; max-height: 0; }
         }
-        .prose th {
-            background-color: #f8fafc; /* gray-50 */
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .animate-slideDown { animation: slideDown 0.3s ease-out; }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
+        .animate-pulse { animation: pulse 2s infinite; }
+        
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .progress-bar {
+            background-color: var(--border-color);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.5s ease;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
             font-weight: 600;
+            transition: all 0.2s ease;
         }
-        .prose ul.list-disc, .prose ul.list-circle {
-            padding-left: 1.5rem;
+        
+        .badge-earned {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.2);
         }
-        .prose ul.list-circle li {
-            list-style-type: circle;
+        
+        .badge-pending {
+            background-color: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
         }
-        /* Estilos para iconos simples */
-        .icon {
-            display: inline-block;
-            margin-right: 0.5rem;
-            font-size: 1rem;
+        
+        .input-field {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
         }
+        
+        .input-field:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(77, 150, 255, 0.1);
+        }
+        
+        .input-field.error {
+            border-color: var(--error-color);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+        
+        .input-field.success {
+            border-color: var(--success-color);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-color), #3b82f6);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .btn-secondary {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+        
+        .theme-toggle {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 9999px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .theme-toggle:hover {
+            border-color: var(--accent-color);
+        }
+        
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .toast-success { background-color: var(--success-color); }
+        .toast-error { background-color: var(--error-color); }
+        
         .chevron {
             transition: transform 0.3s ease;
             display: inline-block;
         }
+        
         .chevron.rotate-90 {
             transform: rotate(90deg);
+        }
+        
+        .prose table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background-color: var(--bg-secondary);
+        }
+        
+        .prose th, .prose td {
+            border: 1px solid var(--border-color);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        .prose th {
+            background-color: var(--bg-primary);
+            font-weight: 600;
+        }
+        
+        .prose ul.list-disc, .prose ul.list-circle {
+            padding-left: 1.5rem;
+        }
+        
+        .prose ul.list-circle li {
+            list-style-type: circle;
+        }
+        
+        @media (max-width: 768px) {
+            .card {
+                margin: 0.5rem;
+                padding: 1rem;
+            }
+            
+            .btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+            
+            .toast {
+                left: 1rem;
+                right: 1rem;
+                top: auto;
+                bottom: 1rem;
+            }
         }
     </style>
 </head>
@@ -81,44 +283,237 @@
     <script type="text/babel">
         // Las librerías Firebase compat se acceden directamente desde el objeto global firebase
         
-        // Iconos simples como componentes React
-        const Lock = () => React.createElement('span', {}, '🔒');
-        const User = () => React.createElement('span', {}, '👤');
-        const LogOut = () => React.createElement('span', {}, '🚪');
-        const Loader2 = ({ className }) => React.createElement('div', { className: `spinner ${className || ''}` });
-        const ChevronRight = ({ className }) => React.createElement('span', { className }, '▶');
-        const CheckCircle = () => React.createElement('span', {}, '✅');
-        const Award = () => React.createElement('span', {}, '🏆');
+        // Sistema de notificaciones Toast
+        const ToastContext = React.createContext();
+        
+        function ToastProvider({ children }) {
+            const [toasts, setToasts] = React.useState([]);
+            
+            const showToast = (message, type = 'success') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+                setTimeout(() => {
+                    setToasts(prev => prev.filter(toast => toast.id !== id));
+                }, 3000);
+            };
+            
+            return React.createElement(ToastContext.Provider, { value: { showToast } }, [
+                children,
+                React.createElement('div', { key: 'toasts' }, 
+                    toasts.map(toast => 
+                        React.createElement('div', {
+                            key: toast.id,
+                            className: `toast toast-${toast.type}`
+                        }, toast.message)
+                    )
+                )
+            ]);
+        }
+        
+        // Hook para usar toast
+        const useToast = () => React.useContext(ToastContext);
+        
+        // Hook para tema oscuro/claro
+        function useTheme() {
+            const [theme, setTheme] = React.useState(() => 
+                localStorage.getItem('theme') || 'light'
+            );
+            
+            React.useEffect(() => {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            }, [theme]);
+            
+            const toggleTheme = () => {
+                setTheme(prev => prev === 'light' ? 'dark' : 'light');
+            };
+            
+            return { theme, toggleTheme };
+        }
+        
+        // Componente Toggle de Tema
+        function ThemeToggle() {
+            const { theme, toggleTheme } = useTheme();
+            return React.createElement('button', {
+                className: 'theme-toggle',
+                onClick: toggleTheme,
+                title: `Cambiar a tema ${theme === 'light' ? 'oscuro' : 'claro'}`
+            }, theme === 'light' ? '🌙' : '☀️');
+        }
+        
+        // Iconos mejorados
+        const Lock = ({ className = '' }) => React.createElement('span', { className }, '🔒');
+        const User = ({ className = '' }) => React.createElement('span', { className }, '👤');
+        const LogOut = ({ className = '' }) => React.createElement('span', { className }, '🚪');
+        const Loader2 = ({ className = '' }) => React.createElement('div', { className: `spinner ${className}` });
+        const ChevronRight = ({ className = '' }) => React.createElement('span', { className }, '▶');
+        const CheckCircle = ({ className = '' }) => React.createElement('span', { className }, '✅');
+        const Award = ({ className = '' }) => React.createElement('span', { className }, '🏆');
+        const Eye = ({ className = '' }) => React.createElement('span', { className }, '👁');
+        const EyeOff = ({ className = '' }) => React.createElement('span', { className }, '🙈');
 
         // Contexto para el usuario y la base de datos
         const AuthContext = React.createContext(null);
 
-        // Componente para el spinner de carga
+        // Componente para el spinner de carga mejorado
         const LoadingSpinner = () => (
-          <div className="flex justify-center items-center py-4">
+          <div className="flex justify-center items-center py-8 animate-fadeIn">
             <div className="spinner"></div>
-            <p className="ml-2 text-gray-600">Cargando...</p>
+            <p className="ml-3" style={{color: 'var(--text-secondary)'}}>Cargando...</p>
           </div>
         );
+        
+        // Componente de barra de progreso
+        function ProgressBar({ current, total, className = '' }) {
+            const percentage = Math.round((current / total) * 100);
+            return React.createElement('div', { className: `w-full ${className}` }, [
+                React.createElement('div', {
+                    key: 'bar',
+                    className: 'progress-bar h-3 mb-2'
+                }, React.createElement('div', {
+                    className: 'progress-fill',
+                    style: { width: `${percentage}%` }
+                })),
+                React.createElement('div', {
+                    key: 'text',
+                    className: 'flex justify-between text-sm',
+                    style: { color: 'var(--text-secondary)' }
+                }, [
+                    React.createElement('span', { key: 'progress' }, `${current} de ${total} semanas`),
+                    React.createElement('span', { key: 'percent' }, `${percentage}%`)
+                ])
+            ]);
+        }
+        
+        // Dashboard de badges con funcionalidad para otorgar badges
+        function BadgesDashboard({ courseWeeks, userData, onEarnBadge }) {
+            const earnedBadges = userData?.badgesEarned || [];
+            const totalBadges = courseWeeks.length;
+            
+            return React.createElement('div', {
+                className: 'card rounded-xl p-6 mb-6 animate-fadeIn'
+            }, [
+                React.createElement('h3', {
+                    key: 'title',
+                    className: 'text-xl font-bold mb-4 flex items-center gap-2'
+                }, [React.createElement(Award), 'Tus Badges']),
+                React.createElement(ProgressBar, {
+                    key: 'progress',
+                    current: earnedBadges.length,
+                    total: totalBadges,
+                    className: 'mb-4'
+                }),
+                React.createElement('div', {
+                    key: 'badges',
+                    className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'
+                }, courseWeeks.map((week, index) => {
+                    const hasEarned = earnedBadges.includes(week.badge);
+                    const canEarn = !hasEarned && (week.week === 1 || earnedBadges.includes(courseWeeks[index - 1]?.badge));
+                    
+                    return React.createElement('div', {
+                        key: week.week,
+                        className: `badge ${hasEarned ? 'badge-earned' : canEarn ? 'badge-pending cursor-pointer hover:scale-105' : 'badge-pending opacity-50'} justify-between transition-all`,
+                        onClick: canEarn ? () => onEarnBadge(week.badge) : undefined,
+                        title: canEarn ? 'Haz clic para obtener este badge' : hasEarned ? 'Badge obtenido' : 'Completa la semana anterior primero'
+                    }, [
+                        React.createElement('span', { key: 'text' }, week.badge),
+                        hasEarned ? React.createElement(CheckCircle, { key: 'icon' }) : React.createElement('span', { key: 'week' }, `S${week.week}`)
+                    ]);
+                }))
+            ]);
+        }
 
-        // Componente de Autenticación
+        // Componente de campo de entrada mejorado
+        function InputField({ label, type = 'text', value, onChange, required = false, placeholder, error, success }) {
+            const [showPassword, setShowPassword] = React.useState(false);
+            const inputType = type === 'password' && showPassword ? 'text' : type;
+            
+            return React.createElement('div', { className: 'mb-4' }, [
+                React.createElement('label', {
+                    key: 'label',
+                    className: 'block text-sm font-bold mb-2',
+                    style: { color: 'var(--text-primary)' }
+                }, label),
+                React.createElement('div', { key: 'input-container', className: 'relative' }, [
+                    React.createElement('input', {
+                        key: 'input',
+                        className: `input-field w-full py-3 px-4 rounded-lg focus:outline-none ${error ? 'error' : success ? 'success' : ''}`,
+                        type: inputType,
+                        placeholder,
+                        value,
+                        onChange,
+                        required
+                    }),
+                    type === 'password' && React.createElement('button', {
+                        key: 'toggle',
+                        type: 'button',
+                        className: 'absolute right-3 top-1/2 transform -translate-y-1/2 text-lg',
+                        onClick: () => setShowPassword(!showPassword)
+                    }, showPassword ? React.createElement(EyeOff) : React.createElement(Eye))
+                ]),
+                error && React.createElement('p', {
+                    key: 'error',
+                    className: 'text-sm mt-1',
+                    style: { color: 'var(--error-color)' }
+                }, error)
+            ]);
+        }
+        
+        // Componente de Autenticación mejorado
         function AuthPage({ firebaseApp }) {
+            const toast = useToast();
             const auth = firebase.auth();
             const db = firebase.firestore();
             const [isLogin, setIsLogin] = React.useState(true);
-            const [studentCode, setStudentCode] = React.useState('');
+            const [email, setEmail] = React.useState('');
             const [password, setPassword] = React.useState('');
             const [fullName, setFullName] = React.useState('');
-            const [error, setError] = React.useState('');
+            const [errors, setErrors] = React.useState({});
             const [loading, setLoading] = React.useState(false);
+            
+            const validateEmail = (email) => {
+                const studentPattern = /^[a-zA-Z0-9._%+-]+@icesi\.edu\.co$/;
+                const professorPattern = /^[a-zA-Z0-9._%+-]+@u\.icesi\.edu\.co$/;
+                return studentPattern.test(email) || professorPattern.test(email);
+            };
+
+            const isProfessor = (email) => {
+                return email.endsWith('@u.icesi.edu.co');
+            };
+            
+            const validateField = (name, value) => {
+                const newErrors = { ...errors };
+                
+                switch (name) {
+                    case 'email':
+                        if (!value) newErrors.email = 'El correo es requerido';
+                        else if (!validateEmail(value)) newErrors.email = 'Usa tu correo institucional (@icesi.edu.co o @u.icesi.edu.co)';
+                        else delete newErrors.email;
+                        break;
+                    case 'password':
+                        if (!value) newErrors.password = 'La contraseña es requerida';
+                        else if (value.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+                        else delete newErrors.password;
+                        break;
+                    case 'fullName':
+                        if (!isLogin && !value) newErrors.fullName = 'El nombre es requerido';
+                        else delete newErrors.fullName;
+                        break;
+                }
+                
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
 
             const handleAuth = async (e) => {
                 e.preventDefault();
-                setError('');
                 setLoading(true);
 
-                // Firebase Auth requiere un formato de email, mapeamos el código de estudiante a un email ficticio
-                const email = `${studentCode}@icesi.edu`;
+                if (!validateEmail(email)) {
+                    toast.showToast('Usa tu correo institucional', 'error');
+                    setLoading(false);
+                    return;
+                }
 
                 try {
                     console.log('Intentando autenticación...', isLogin ? 'Login' : 'Registro');
@@ -129,120 +524,132 @@
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
                         console.log('Registro exitoso:', user.uid);
-                        // Usamos un appId fijo para GitHub Pages
+                        
                         const appId = 'seminario-investigacion-app'; 
                         const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
-                        await userDocRef.set({
-                            studentCode: studentCode,
+                        
+                        const userData = {
+                            email: email,
                             fullName: fullName,
-                            badgesEarned: [], // Inicialmente sin badges
+                            userType: isProfessor(email) ? 'professor' : 'student',
                             createdAt: new Date()
-                        });
+                        };
+
+                        if (!isProfessor(email)) {
+                            userData.badgesEarned = [];
+                            userData.lastBadgeEarned = null;
+                        }
+                        
+                        await userDocRef.set(userData);
                         console.log('Datos de usuario guardados en Firestore');
                     }
-                    // Si llegamos aquí, todo salió bien
                     console.log('Autenticación completada exitosamente');
-                    setError('');
+                    toast.showToast(
+                        isLogin ? '¡Bienvenido de vuelta!' : '¡Cuenta creada exitosamente!',
+                        'success'
+                    );
+                    setErrors({});
                 } catch (err) {
                     console.error("Error de autenticación:", err.code, err.message);
+                    let errorMessage;
                     switch (err.code) {
                         case 'auth/invalid-email':
-                            setError('El código de estudiante no tiene un formato válido.');
+                            errorMessage = 'El correo electrónico no tiene un formato válido.';
                             break;
                         case 'auth/user-disabled':
-                            setError('Tu cuenta ha sido deshabilitada.');
+                            errorMessage = 'Tu cuenta ha sido deshabilitada.';
                             break;
                         case 'auth/user-not-found':
-                            setError('Usuario no encontrado. Verifica tu código de estudiante o crea una cuenta.');
+                            errorMessage = 'Usuario no encontrado. Verifica tu correo o crea una cuenta.';
                             break;
                         case 'auth/wrong-password':
-                            setError('Contraseña incorrecta.');
+                            errorMessage = 'Contraseña incorrecta.';
                             break;
                         case 'auth/email-already-in-use':
-                            setError('Este código de estudiante ya está registrado.');
+                            errorMessage = 'Este correo ya está registrado.';
                             break;
                         case 'auth/weak-password':
-                            setError('La contraseña es demasiado débil. Debe tener al menos 6 caracteres.');
+                            errorMessage = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
                             break;
                         default:
-                            setError('Error de autenticación. Por favor, intenta de nuevo.');
+                            errorMessage = 'Error de autenticación. Por favor, intenta de nuevo.';
                     }
+                    toast.showToast(errorMessage, 'error');
                 } finally {
                     setLoading(false);
                 }
             };
 
             return (
-                <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-                    <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-                        <h2 className="text-3xl font-bold text-center text-gray-900 mb-6">
-                            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-                        </h2>
-                        {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                                <span className="block sm:inline">{error}</span>
-                            </div>
-                        )}
+                <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                                {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                            </h2>
+                            <ThemeToggle />
+                        </div>
+                        
                         <form onSubmit={handleAuth}>
-                            <div className="mb-4">
-                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="studentCode">
-                                    Código de Estudiante
-                                </label>
-                                <input
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                    id="studentCode"
-                                    type="text"
-                                    placeholder="Ej. DIS12345"
-                                    value={studentCode}
-                                    onChange={(e) => setStudentCode(e.target.value)}
-                                    required
-                                />
-                            </div>
+                            <InputField
+                                label="Correo Institucional"
+                                type="email"
+                                placeholder="correo@icesi.edu.co"
+                                value={email}
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    validateField('email', e.target.value);
+                                }}
+                                error={errors.email}
+                                success={email && !errors.email}
+                                required
+                            />
+                            
                             {!isLogin && (
-                                <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="fullName">
-                                        Nombre Completo
-                                    </label>
-                                    <input
-                                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                        id="fullName"
-                                        type="text"
-                                        placeholder="Tu Nombre Completo"
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                        required={!isLogin}
-                                    />
-                                </div>
-                            )}
-                            <div className="mb-6">
-                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-                                    Contraseña
-                                </label>
-                                <input
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-                                    id="password"
-                                    type="password"
-                                    placeholder="********"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
+                                <InputField
+                                    label="Nombre Completo"
+                                    placeholder="Tu Nombre Completo"
+                                    value={fullName}
+                                    onChange={(e) => {
+                                        setFullName(e.target.value);
+                                        validateField('fullName', e.target.value);
+                                    }}
+                                    error={errors.fullName}
+                                    success={fullName && !errors.fullName}
+                                    required={!isLogin}
                                 />
-                            </div>
-                            <div className="flex items-center justify-between">
+                            )}
+                            
+                            <InputField
+                                label="Contraseña"
+                                type="password"
+                                placeholder="Mínimo 6 caracteres"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    validateField('password', e.target.value);
+                                }}
+                                error={errors.password}
+                                success={password && !errors.password}
+                                required
+                            />
+                            
+                            <div className="flex flex-col gap-4 mt-6">
                                 <button
-                                    className="bg-[#4D96FF] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center justify-center"
+                                    className="btn btn-primary w-full"
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={loading || Object.keys(errors).length > 0}
                                 >
-                                    {loading ? <div className="spinner mr-2" style={{width: '20px', height: '20px'}}></div> : null}
+                                    {loading && <Loader2 className="w-5 h-5" />}
                                     {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
                                 </button>
+                                
                                 <button
-                                    className="inline-block align-baseline font-bold text-sm text-[#FF6B6B] hover:text-red-800"
+                                    className="btn btn-secondary w-full"
                                     type="button"
                                     onClick={() => {
                                         setIsLogin(!isLogin);
-                                        setError('');
+                                        setErrors({});
                                         setStudentCode('');
                                         setPassword('');
                                         setFullName('');
@@ -257,45 +664,63 @@
             );
         }
 
-        // Componente de Tarjeta de Semana del Curso
+        // Componente de Tarjeta de Semana del Curso mejorado
         function CourseWeek({ weekNumber, title, content, badgeName, isUnlocked, hasBadge }) {
             const [isExpanded, setIsExpanded] = React.useState(false);
 
             return (
-                <div className={`bg-white rounded-lg shadow-md p-6 mb-6 transition-all duration-300 ${isUnlocked ? 'border-l-8 border-[#4D96FF]' : 'border-l-8 border-gray-300'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">Semana {weekNumber}: {title}</h3>
-                        <div className="flex items-center space-x-2">
-                            {hasBadge ? (
-                                <span className="inline-flex items-center bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                                    <CheckCircle /> Badge Obtenido
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center bg-gray-100 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                                    <Award /> {badgeName}
-                                </span>
-                            )}
+                <div className={`card rounded-xl p-6 mb-6 animate-fadeIn transition-all duration-300 ${
+                    isUnlocked ? 'border-l-4' : 'border-l-4 opacity-75'
+                }`} style={{
+                    borderLeftColor: isUnlocked ? 'var(--accent-color)' : 'var(--border-color)'
+                }}>
+                    <div className="mb-4">
+                        <h3 className="text-xl font-bold mb-3" style={{color: 'var(--text-primary)'}}>
+                            Semana {weekNumber}: {title}
+                        </h3>
+                        <div className="flex justify-between items-center">
+                            <span className={`badge ${
+                                hasBadge ? 'badge-earned' : 'badge-pending'
+                            } flex items-center gap-2`}>
+                                {hasBadge ? <CheckCircle /> : <Award />}
+                                {hasBadge ? 'Badge Obtenido' : badgeName}
+                            </span>
                             {isUnlocked ? (
                                 <button
                                     onClick={() => setIsExpanded(!isExpanded)}
-                                    className="p-2 rounded-full bg-blue-100 text-[#4D96FF] hover:bg-blue-200 focus:outline-none"
+                                    className="btn-secondary p-3 rounded-full transition-all duration-200 hover:scale-105"
                                     aria-expanded={isExpanded}
                                     aria-controls={`week-content-${weekNumber}`}
+                                    title={isExpanded ? 'Contraer contenido' : 'Expandir contenido'}
                                 >
                                     <span className={`chevron ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
                                 </button>
                             ) : (
-                                <Lock />
+                                <div className="p-3 rounded-full" style={{backgroundColor: 'var(--bg-primary)'}}>
+                                    <Lock className="opacity-50" />
+                                </div>
                             )}
                         </div>
                     </div>
+                    
                     {!isUnlocked && (
-                        <p className="text-gray-500 italic flex items-center">
-                            <Lock /> Contenido bloqueado. Necesitas el badge de la semana anterior para desbloquear.
-                        </p>
+                        <div className="flex items-center gap-2 p-4 rounded-lg" style={{
+                            backgroundColor: 'var(--bg-primary)',
+                            color: 'var(--text-secondary)'
+                        }}>
+                            <Lock />
+                            <p className="italic">
+                                Contenido bloqueado. Necesitas el badge de la semana anterior para desbloquear.
+                            </p>
+                        </div>
                     )}
+                    
                     {isUnlocked && isExpanded && (
-                        <div id={`week-content-${weekNumber}`} className="mt-4 text-gray-700 prose max-w-none">
+                        <div 
+                            id={`week-content-${weekNumber}`} 
+                            className="mt-6 prose max-w-none animate-slideDown"
+                            style={{color: 'var(--text-primary)'}}
+                        >
                             {content}
                         </div>
                     )}
@@ -303,10 +728,201 @@
             );
         }
 
-        // Componente de la Página del Curso Principal
+        // Componente de administración para profesores
+        function AdminDashboard({ currentUser }) {
+            const auth = firebase.auth();
+            const db = firebase.firestore();
+            const toast = useToast();
+            const [students, setStudents] = React.useState([]);
+            const [userData, setUserData] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const appId = 'seminario-investigacion-app';
+
+            React.useEffect(() => {
+                loadUserData();
+                loadStudents();
+            }, []);
+
+            const loadUserData = async () => {
+                try {
+                    const userDoc = await db.doc(`artifacts/${appId}/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        setUserData(userDoc.data());
+                    }
+                } catch (error) {
+                    console.error('Error cargando datos del profesor:', error);
+                }
+            };
+
+            const loadStudents = async () => {
+                try {
+                    const snapshot = await db.collection('artifacts').doc(appId)
+                        .collection('users')
+                        .where('userType', '==', 'student')
+                        .get();
+                    
+                    const studentsData = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    setStudents(studentsData);
+                } catch (error) {
+                    console.error('Error cargando estudiantes:', error);
+                    toast.showToast('Error cargando estudiantes', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const assignBadge = async (studentId, badgeName) => {
+                try {
+                    const student = students.find(s => s.id === studentId);
+                    if (!student) return;
+
+                    const updatedBadges = [...(student.badgesEarned || []), badgeName];
+                    
+                    await db.doc(`artifacts/${appId}/users/${studentId}`).update({
+                        badgesEarned: updatedBadges,
+                        lastBadgeEarned: new Date()
+                    });
+                    
+                    setStudents(prev => prev.map(s => 
+                        s.id === studentId 
+                            ? { ...s, badgesEarned: updatedBadges }
+                            : s
+                    ));
+                    
+                    toast.showToast(`Badge "${badgeName}" asignado a ${student.fullName}`, 'success');
+                } catch (error) {
+                    console.error('Error asignando badge:', error);
+                    toast.showToast('Error asignando badge', 'error');
+                }
+            };
+
+            const handleLogout = async () => {
+                try {
+                    await auth.signOut();
+                    toast.showToast('¡Hasta luego!', 'success');
+                } catch (err) {
+                    console.error("Error al cerrar sesión:", err);
+                    toast.showToast("Error al cerrar sesión. Intenta de nuevo.", 'error');
+                }
+            };
+
+            const courseWeeks = [
+                { week: 1, badge: 'Badge de Iniciación' },
+                { week: 2, badge: 'Badge de Brújula Ética' },
+                { week: 3, badge: 'Badge de Sembrador de Ideas' },
+                { week: 4, badge: 'Badge de Artífice de Preguntas' },
+                { week: 5, badge: 'Badge de Bibliotecario Experto' },
+                { week: 6, badge: 'Badge de Arquitecto de Proyectos' },
+                { week: 7, badge: 'Badge de Navegante Experto' },
+                { week: 8, badge: 'Badge de Estratega Metodológico' },
+                { week: 9, badge: 'Badge de Constructor de Instrumentos' },
+                { week: 10, badge: 'Badge de Recolector de Datos' },
+                { week: 11, badge: 'Badge de Intérprete Cualitativo' },
+                { week: 12, badge: 'Badge de Analista Cuantitativo' },
+                { week: 13, badge: 'Badge de Descubridor de Patrones' },
+                { week: 14, badge: 'Badge de Narrador Visual' },
+                { week: 15, badge: 'Badge de Comunicador Maestro' },
+                { week: 16, badge: 'Badge de Investigador Élite' }
+            ];
+
+            return React.createElement('div', { className: 'min-h-screen p-4 md:p-8', style: { backgroundColor: 'var(--bg-primary)' } }, [
+                React.createElement('header', {
+                    key: 'header',
+                    className: 'card rounded-xl p-6 mb-8 animate-fadeIn'
+                }, [
+                    React.createElement('div', {
+                        key: 'header-content',
+                        className: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-4'
+                    }, [
+                        React.createElement('div', { key: 'title-section' }, [
+                            React.createElement('h1', { className: 'text-3xl font-bold mb-2' }, 'Panel de Administración'),
+                            React.createElement('p', { 
+                                className: 'text-sm',
+                                style: { color: 'var(--text-secondary)' }
+                            }, `Profesor: ${userData?.fullName || currentUser.email}`)
+                        ]),
+                        React.createElement('div', { key: 'actions', className: 'flex items-center gap-3' }, [
+                            React.createElement(ThemeToggle, { key: 'theme' }),
+                            React.createElement('button', {
+                                key: 'logout',
+                                onClick: handleLogout,
+                                className: 'btn btn-secondary flex items-center gap-2'
+                            }, [React.createElement(LogOut), 'Cerrar Sesión'])
+                        ])
+                    ])
+                ]),
+                loading ? React.createElement(LoadingSpinner, { key: 'loading' }) :
+                React.createElement('div', { key: 'content', className: 'card rounded-xl p-6' }, [
+                    React.createElement('h2', {
+                        key: 'students-title',
+                        className: 'text-xl font-bold mb-4'
+                    }, `Estudiantes Registrados (${students.length})`),
+                    React.createElement('div', {
+                        key: 'students-list',
+                        className: 'space-y-4'
+                    }, students.map(student => 
+                        React.createElement('div', {
+                            key: student.id,
+                            className: 'border rounded-lg p-4',
+                            style: { borderColor: 'var(--border-color)' }
+                        }, [
+                            React.createElement('div', {
+                                key: 'info',
+                                className: 'flex justify-between items-start mb-3'
+                            }, [
+                                React.createElement('div', { key: 'details' }, [
+                                    React.createElement('h3', { className: 'font-semibold' }, student.fullName),
+                                    React.createElement('p', {
+                                        className: 'text-sm',
+                                        style: { color: 'var(--text-secondary)' }
+                                    }, student.email)
+                                ]),
+                                React.createElement('div', {
+                                    key: 'progress',
+                                    className: 'text-right'
+                                }, [
+                                    React.createElement('p', { className: 'text-sm font-medium' }, 
+                                        `${(student.badgesEarned || []).length}/${courseWeeks.length} badges`
+                                    )
+                                ])
+                            ]),
+                            React.createElement('div', {
+                                key: 'badges',
+                                className: 'grid grid-cols-2 md:grid-cols-4 gap-2'
+                            }, courseWeeks.map(week => {
+                                const hasEarned = (student.badgesEarned || []).includes(week.badge);
+                                const canAssign = !hasEarned;
+                                
+                                return React.createElement('button', {
+                                    key: week.week,
+                                    onClick: canAssign ? () => assignBadge(student.id, week.badge) : undefined,
+                                    disabled: hasEarned,
+                                    className: `text-xs p-2 rounded transition-all ${
+                                        hasEarned 
+                                            ? 'bg-green-100 text-green-800 cursor-default' 
+                                            : 'bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-800 cursor-pointer'
+                                    }`
+                                }, [
+                                    React.createElement('div', { className: 'font-medium' }, `S${week.week}`),
+                                    React.createElement('div', { className: 'truncate' }, week.badge),
+                                    hasEarned && React.createElement(CheckCircle, { className: 'inline ml-1' })
+                                ]);
+                            }))
+                        ])
+                    ))
+                ])
+            ]);
+        }
+
+        // Componente de la Página del Curso Principal mejorado
         function CoursePage({ firebaseApp, currentUser }) {
             const auth = firebase.auth();
             const db = firebase.firestore();
+            const toast = useToast();
             const [userData, setUserData] = React.useState(null);
             const [loadingUserData, setLoadingUserData] = React.useState(true);
             const [error, setError] = React.useState('');
@@ -320,19 +936,50 @@
                     return;
                 }
 
+                // Verificar si es profesor y redirigir
+                const checkUserType = async () => {
+                    try {
+                        const userDoc = await db.doc(`artifacts/${appId}/users/${currentUser.uid}`).get();
+                        if (userDoc.exists && userDoc.data().userType === 'professor') {
+                            // No cargar datos de estudiante para profesores
+                            setLoadingUserData(false);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error verificando tipo de usuario:', error);
+                    }
+                };
+
+                checkUserType();
+
+                // Crear datos por defecto si no se pueden cargar desde Firestore
+                const defaultUserData = {
+                    email: currentUser.email,
+                    fullName: currentUser.email.split('@')[0],
+                    badgesEarned: [] // Sin badges inicialmente
+                };
+                
                 const userDocRef = db.doc(`artifacts/${appId}/users/${currentUser.uid}`);
                 const unsubscribe = userDocRef.onSnapshot((docSnap) => {
                     if (docSnap.exists) {
-                        setUserData(docSnap.data());
+                        const data = docSnap.data();
+                        if (data.userType === 'professor') {
+                            setLoadingUserData(false);
+                            return;
+                        }
+                        setUserData(data);
                         setError('');
                     } else {
-                        console.warn("No se encontró el documento del usuario en Firestore.");
-                        setError("No se encontró tu perfil de estudiante. Contacta al profesor.");
+                        console.warn("No se encontró el documento del usuario en Firestore. Usando datos por defecto.");
+                        setUserData(defaultUserData);
+                        setError('');
                     }
                     setLoadingUserData(false);
                 }, (err) => {
                     console.error("Error al obtener datos del usuario:", err);
-                    setError("Error al cargar tu perfil. Intenta recargar la página.");
+                    console.log("Usando datos por defecto debido a error de permisos");
+                    setUserData(defaultUserData);
+                    setError('');
                     setLoadingUserData(false);
                 });
 
@@ -342,13 +989,38 @@
             const handleLogout = async () => {
                 try {
                     await auth.signOut();
+                    toast.showToast('¡Hasta luego!', 'success');
                 } catch (err) {
                     console.error("Error al cerrar sesión:", err);
-                    setError("Error al cerrar sesión. Intenta de nuevo.");
+                    toast.showToast("Error al cerrar sesión. Intenta de nuevo.", 'error');
                 }
             };
 
             const hasBadge = (badgeName) => userData?.badgesEarned?.includes(badgeName) || false;
+            
+            // Función para otorgar un badge
+            const earnBadge = async (badgeName) => {
+                if (hasBadge(badgeName)) {
+                    toast.showToast('Ya tienes este badge', 'error');
+                    return;
+                }
+                
+                try {
+                    const userDocRef = db.doc(`artifacts/${appId}/users/${currentUser.uid}`);
+                    const currentBadges = userData?.badgesEarned || [];
+                    const newBadges = [...currentBadges, badgeName];
+                    
+                    await userDocRef.update({
+                        badgesEarned: newBadges,
+                        lastBadgeEarned: new Date()
+                    });
+                    
+                    toast.showToast(`¡Felicidades! Has obtenido: ${badgeName}`, 'success');
+                } catch (error) {
+                    console.error('Error al otorgar badge:', error);
+                    toast.showToast('Error al otorgar el badge', 'error');
+                }
+            };
 
             const courseWeeks = [
                 {
@@ -357,25 +1029,31 @@
                     badge: 'Badge de Iniciación',
                     content: (
                         <>
-                            <p className="font-semibold">Contenido:</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>Presentación del curso: objetivos, metodología (teórico-práctica, gamificada), sistema de "badges" y evaluación.</li>
-                                <li>Acuerdos sobre el uso ético, crítico y transparente de la Inteligencia Artificial Generativa (IAG) en el curso.</li>
-                                <li>Introducción a la investigación aplicada en diseño, innovación y experiencia de usuario: ¿Por qué investigamos en diseño?</li>
-                                <li>Identificación de los diferentes campos y tipos de investigación desde la disciplina del diseño (investigación para el diseño, a través del diseño, sobre el diseño).</li>
-                            </ul>
-                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>**"Círculo de Expectativas" (15 min):** Cada estudiante comparte qué espera del curso y qué le gustaría investigar.</li>
-                                <li>**"Exploración de Casos Inspiradores" (60 min):** Análisis grupal de 2-3 proyectos de investigación en diseño (ej. estudios de usabilidad, investigación de mercado para un nuevo producto, diseño participativo). Discusión guiada: ¿Qué problema abordaron? ¿Qué métodos usaron? ¿Cuál fue su impacto?</li>
-                                <li>**"Debate: El Poder de la Pregunta" (30 min):** Discusión sobre la importancia de una buena pregunta de investigación como punto de partida.</li>
-                                <li>**Sesión de Preguntas y Respuestas (15 min):** Aclaración de dudas sobre el sílabo y la dinámica del curso.</li>
-                            </ul>
-                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>**"Primer Paso del Explorador":** Leer la introducción del libro "Metodología de la Investigación" de Sampieri (Capítulo 1: La idea de investigación y el planteamiento del problema).</li>
-                                <li>**"Diario del Investigador":** Reflexionar y escribir en un documento personal (o digital) 3 preguntas iniciales que te gustaría responder a través de la investigación en diseño, basándote en tus intereses personales o profesionales.</li>
-                            </ul>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>📚 Contenido</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-2">
+                                    <li>Presentación del curso: objetivos, metodología (teórico-práctica, gamificada), sistema de "badges" y evaluación.</li>
+                                    <li>Acuerdos sobre el uso ético, crítico y transparente de la Inteligencia Artificial Generativa (IAG) en el curso.</li>
+                                    <li>Introducción a la investigación aplicada en diseño, innovación y experiencia de usuario: ¿Por qué investigamos en diseño?</li>
+                                    <li>Identificación de los diferentes campos y tipos de investigación desde la disciplina del diseño (investigación para el diseño, a través del diseño, sobre el diseño).</li>
+                                </ul>
+                            </div>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>🎯 Actividad en Clase (2 horas)</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-3">
+                                    <li><strong>"Círculo de Expectativas" (15 min):</strong> Cada estudiante comparte qué espera del curso y qué le gustaría investigar.</li>
+                                    <li><strong>"Exploración de Casos Inspiradores" (60 min):</strong> Análisis grupal de 2-3 proyectos de investigación en diseño (ej. estudios de usabilidad, investigación de mercado para un nuevo producto, diseño participativo). Discusión guiada: ¿Qué problema abordaron? ¿Qué métodos usaron? ¿Cuál fue su impacto?</li>
+                                    <li><strong>"Debate: El Poder de la Pregunta" (30 min):</strong> Discusión sobre la importancia de una buena pregunta de investigación como punto de partida.</li>
+                                    <li><strong>Sesión de Preguntas y Respuestas (15 min):</strong> Aclaración de dudas sobre el sílabo y la dinámica del curso.</li>
+                                </ul>
+                            </div>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>📝 Tarea (Desafío Post-Clase)</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-3">
+                                    <li><strong>"Primer Paso del Explorador":</strong> Leer la introducción del libro "Metodología de la Investigación" de Sampieri (Capítulo 1: La idea de investigación y el planteamiento del problema).</li>
+                                    <li><strong>"Diario del Investigador":</strong> Reflexionar y escribir en un documento personal (o digital) 3 preguntas iniciales que te gustaría responder a través de la investigación en diseño, basándote en tus intereses personales o profesionales.</li>
+                                </ul>
+                            </div>
                         </>
                     ),
                     isUnlockable: true // Siempre desbloqueada la primera semana
@@ -386,27 +1064,33 @@
                     badge: 'Badge de Brújula Ética',
                     content: (
                         <>
-                            <p className="font-semibold">Contenido:</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>Enfoques de la investigación: Cuantitativo (medición, estadísticas), Cualitativo (comprensión profunda, narrativas) y Mixto (combinación de ambos).</li>
-                                <li>Rutas metodológicas: Diseño de experimentos, estudios de caso, encuestas, etnografía, etc.</li>
-                                <li>Principios éticos en la investigación en diseño: Consentimiento informado, privacidad, anonimato, no maleficencia, justicia.</li>
-                            </ul>
-                            <p className="font-semibold mt-4">Actividad en Clase (2 horas):</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>**"Diferenciando Rutas: Taller de Casos" (75 min):** Los estudiantes, en pequeños grupos, analizarán 3-4 resúmenes de investigaciones (se proporcionarán). Deberán identificar el enfoque principal (cualitativo, cuantitativo, mixto), justificar su elección y proponer una posible ruta metodológica. Presentación y debate grupal.</li>
-                                <li>**"El Dilema Ético: Discusión Abierta" (45 min):** Presentación de 2-3 escenarios hipotéticos de investigación en diseño con dilemas éticos. Los estudiantes discutirán en grupos cómo abordarían cada situación de manera ética, aplicando los principios aprendidos.</li>
-                            </ul>
-                            <p className="font-semibold mt-4">Tarea (Desafío Post-Clase):</p>
-                            <ul className="list-disc list-inside ml-4">
-                                <li>**"Análisis de Brújulas":** Leer un artículo de investigación cualitativa y uno cuantitativa en diseño (enlaces proporcionados). Para cada uno, identificar:
-                                    <ul className="list-circle list-inside ml-4">
-                                        <li>El enfoque principal y por qué lo clasificas así.</li>
-                                        <li>El tipo de datos recolectados.</li>
-                                        <li>Cómo se abordó (o debería haberse abordado) la ética en el estudio.</li>
-                                    </ul>
-                                </li>
-                            </ul>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>📚 Contenido</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-2">
+                                    <li><strong>Enfoques de la investigación:</strong> Cuantitativo (medición, estadísticas), Cualitativo (comprensión profunda, narrativas) y Mixto (combinación de ambos).</li>
+                                    <li><strong>Rutas metodológicas:</strong> Diseño de experimentos, estudios de caso, encuestas, etnografía, etc.</li>
+                                    <li><strong>Principios éticos:</strong> Consentimiento informado, privacidad, anonimato, no maleficencia, justicia.</li>
+                                </ul>
+                            </div>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>🎯 Actividad en Clase (2 horas)</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-3">
+                                    <li><strong>"Diferenciando Rutas: Taller de Casos" (75 min):</strong> Los estudiantes, en pequeños grupos, analizarán 3-4 resúmenes de investigaciones (se proporcionarán). Deberán identificar el enfoque principal (cualitativo, cuantitativo, mixto), justificar su elección y proponer una posible ruta metodológica. Presentación y debate grupal.</li>
+                                    <li><strong>"El Dilema Ético: Discusión Abierta" (45 min):</strong> Presentación de 2-3 escenarios hipotéticos de investigación en diseño con dilemas éticos. Los estudiantes discutirán en grupos cómo abordarían cada situación de manera ética, aplicando los principios aprendidos.</li>
+                                </ul>
+                            </div>
+                            <div className="mb-6">
+                                <h4 className="font-bold text-lg mb-3" style={{color: 'var(--accent-color)'}}>📝 Tarea (Desafío Post-Clase)</h4>
+                                <ul className="list-disc list-inside ml-4 space-y-3">
+                                    <li><strong>"Análisis de Brújulas":</strong> Leer un artículo de investigación cualitativa y uno cuantitativa en diseño (enlaces proporcionados). Para cada uno, identificar:
+                                        <ul className="list-circle list-inside ml-6 mt-2 space-y-1">
+                                            <li>El enfoque principal y por qué lo clasificas así</li>
+                                            <li>El tipo de datos recolectados</li>
+                                            <li>Cómo se abordó (o debería haberse abordado) la ética en el estudio</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
                         </>
                     ),
                     isUnlockable: false // Se desbloquea con el badge anterior
@@ -832,50 +1516,91 @@
             }
 
             if (error) {
-                return <div className="text-center text-red-500 p-8">{error}</div>;
+                return (
+                    <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: 'var(--bg-primary)'}}>
+                        <div className="card rounded-xl p-8 text-center animate-fadeIn">
+                            <p style={{color: 'var(--error-color)'}} className="text-lg font-semibold">{error}</p>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="btn btn-primary mt-4"
+                            >
+                                Reintentar
+                            </button>
+                        </div>
+                    </div>
+                );
             }
 
             const studentName = userData?.fullName || currentUser?.email.split('@')[0];
-            const studentCodeDisplay = userData?.studentCode || currentUser?.email.split('@')[0];
+            const studentEmailDisplay = userData?.email || currentUser?.email;
+            const earnedBadges = userData?.badgesEarned || [];
+            const completedWeeks = earnedBadges.length;
 
             return (
-                <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8">
-                    <header className="flex justify-between items-center bg-white rounded-lg shadow-md p-4 mb-8">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Seminario de Investigación</h1>
-                            <p className="text-sm text-gray-600 flex items-center">
-                                <User />
-                                Hola, {studentName} (Código: {studentCodeDisplay})
-                            </p>
+                <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex-1">
+                                <h1 className="text-3xl font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                    Seminario de Investigación
+                                </h1>
+                                <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                    <User />
+                                    <span>Hola, <strong>{studentName}</strong> ({studentEmailDisplay})</span>
+                                </div>
+                                <div className="mt-3">
+                                    <ProgressBar current={completedWeeks} total={courseWeeks.length} />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <ThemeToggle />
+                                <button
+                                    onClick={handleLogout}
+                                    className="btn btn-secondary flex items-center gap-2"
+                                    title="Cerrar sesión"
+                                >
+                                    <LogOut />
+                                    <span className="hidden md:inline">Cerrar Sesión</span>
+                                </button>
+                            </div>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline flex items-center"
-                        >
-                            <LogOut /> Cerrar Sesión
-                        </button>
                     </header>
 
-                    <main className="container mx-auto">
-                        <h2 className="text-3xl font-bold text-center mb-8">Tu Aventura Semanal</h2>
-                        {courseWeeks.map((weekData, index) => {
-                            const previousBadge = index > 0 ? courseWeeks[index - 1].badge : null;
-                            // La semana 1 siempre está desbloqueada, las demás dependen del badge anterior
-                            const isUnlocked = weekData.week === 1 || hasBadge(previousBadge);
-                            const hasCurrentBadge = hasBadge(weekData.badge);
+                    <main className="container mx-auto max-w-6xl">
+                        <BadgesDashboard 
+                            courseWeeks={courseWeeks} 
+                            userData={userData} 
+                            onEarnBadge={earnBadge}
+                        />
+                        
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-bold text-center mb-2" style={{color: 'var(--text-primary)'}}>
+                                Tu Aventura Semanal
+                            </h2>
+                            <p className="text-center" style={{color: 'var(--text-secondary)'}}>
+                                Completa cada semana para desbloquear la siguiente y obtener badges
+                            </p>
+                        </div>
+                        
+                        <div className="space-y-6">
+                            {courseWeeks.map((weekData, index) => {
+                                const previousBadge = index > 0 ? courseWeeks[index - 1].badge : null;
+                                const isUnlocked = weekData.week === 1 || hasBadge(previousBadge);
+                                const hasCurrentBadge = hasBadge(weekData.badge);
 
-                            return (
-                                <CourseWeek
-                                    key={weekData.week}
-                                    weekNumber={weekData.week}
-                                    title={weekData.title}
-                                    content={weekData.content}
-                                    badgeName={weekData.badge}
-                                    isUnlocked={isUnlocked}
-                                    hasBadge={hasCurrentBadge}
-                                />
-                            );
-                        })}
+                                return (
+                                    <CourseWeek
+                                        key={weekData.week}
+                                        weekNumber={weekData.week}
+                                        title={weekData.title}
+                                        content={weekData.content}
+                                        badgeName={weekData.badge}
+                                        isUnlocked={isUnlocked}
+                                        hasBadge={hasCurrentBadge}
+                                    />
+                                );
+                            })}
+                        </div>
                     </main>
                 </div>
             );
@@ -886,21 +1611,21 @@
             const [firebaseApp, setFirebaseApp] = React.useState(null);
             const [auth, setAuth] = React.useState(null);
             const [currentUser, setCurrentUser] = React.useState(null);
+            const [userData, setUserData] = React.useState(null);
             const [authReady, setAuthReady] = React.useState(false);
             const [firebaseConfigLoaded, setFirebaseConfigLoaded] = React.useState(false);
+            const [userDataLoaded, setUserDataLoaded] = React.useState(false);
 
-            // --- ¡IMPORTANTE! PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
-            // Puedes encontrarla en la consola de Firebase, en "Configuración del proyecto" > "Tus apps" > "SDK setup and configuration" (selecciona "CDN")
-            const firebaseConfig = {
-                apiKey: "AIzaSyBEKzy25wj-qIVJcyqkCors2b8zPostu7E", // Reemplaza con tu API Key
-                authDomain: "seminario-de-investigaci-283c8.firebaseapp.com", // Reemplaza con tu Auth Domain
-                projectId: "seminario-de-investigaci-283c8", // Reemplaza con tu Project ID
-                storageBucket: "seminario-de-investigaci-283c8.firebasestorage.app", // Reemplaza con tu Storage Bucket
-                messagingSenderId: "253114435967", // Reemplaza con tu Messaging Sender ID
-                appId:"1:253114435967:web:b83b9413f663f283b7724a", // Reemplaza con tu App ID
-                 measurementId: "G-7J76P5D7Z3" // Opcional, si usas Google Analytics
+            // Configuración de Firebase desde variables de entorno o archivo externo
+            const firebaseConfig = window.FIREBASE_CONFIG || {
+                // Configuración por defecto vacía - debe ser configurada externamente
+                apiKey: "",
+                authDomain: "",
+                projectId: "",
+                storageBucket: "",
+                messagingSenderId: "",
+                appId: ""
             };
-            // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
 
             React.useEffect(() => {
                 if (firebaseConfig.apiKey && !firebaseApp) {
@@ -920,9 +1645,29 @@
             React.useEffect(() => {
                 if (auth) {
                     console.log('Configurando listener de autenticación...');
-                    const unsubscribe = auth.onAuthStateChanged((user) => {
+                    const unsubscribe = auth.onAuthStateChanged(async (user) => {
                         console.log('Estado de autenticación cambió:', user ? `Usuario logueado: ${user.uid}` : 'Usuario no logueado');
                         setCurrentUser(user);
+                        
+                        if (user) {
+                            // Cargar datos del usuario para determinar el tipo
+                            try {
+                                const db = firebase.firestore();
+                                const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${user.uid}`).get();
+                                if (userDoc.exists) {
+                                    setUserData(userDoc.data());
+                                } else {
+                                    setUserData(null);
+                                }
+                            } catch (error) {
+                                console.error('Error cargando datos del usuario:', error);
+                                setUserData(null);
+                            }
+                        } else {
+                            setUserData(null);
+                        }
+                        
+                        setUserDataLoaded(true);
                         setAuthReady(true);
                     });
                     
@@ -933,20 +1678,27 @@
                 }
             }, [auth]);
 
-            if (!firebaseConfigLoaded || !authReady) {
+            if (!firebaseConfigLoaded || !authReady || (currentUser && !userDataLoaded)) {
                 return <LoadingSpinner />;
             }
 
             console.log('Estado actual - currentUser:', currentUser ? 'Logueado' : 'No logueado');
+            console.log('Tipo de usuario:', userData?.userType || 'No definido');
 
             return (
-                <AuthContext.Provider value={{ firebaseApp, currentUser }}>
-                    {currentUser ? (
-                        <CoursePage firebaseApp={firebaseApp} currentUser={currentUser} />
-                    ) : (
-                        <AuthPage firebaseApp={firebaseApp} />
-                    )}
-                </AuthContext.Provider>
+                <ToastProvider>
+                    <AuthContext.Provider value={{ firebaseApp, currentUser, userData }}>
+                        {currentUser ? (
+                            userData?.userType === 'professor' ? (
+                                <AdminDashboard currentUser={currentUser} />
+                            ) : (
+                                <CoursePage firebaseApp={firebaseApp} currentUser={currentUser} />
+                            )
+                        ) : (
+                            <AuthPage firebaseApp={firebaseApp} />
+                        )}
+                    </AuthContext.Provider>
+                </ToastProvider>
             );
         }
 

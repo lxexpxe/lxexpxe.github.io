@@ -1,0 +1,18 @@
+# Firebase configuration with sensitive data
+firebase-config.js
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
