@@ -815,6 +815,8 @@
             const auth = firebase.auth();
             const db = firebase.firestore();
             const toast = useToast();
+            const { theme } = useTheme();
+            const isDarkMode = theme === 'dark';
             const [userData, setUserData] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
             const [expandedWeek, setExpandedWeek] = React.useState(null);
@@ -1124,8 +1126,11 @@
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                         <div 
-                                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                                            style={{width: `${getProgressPercentage()}%`}}
+                                            className="h-2 rounded-full transition-all duration-300" 
+                                            style={{
+                                                width: `${getProgressPercentage()}%`,
+                                                background: 'linear-gradient(90deg, #ef4444 0%, #f97316 25%, #eab308 50%, #22c55e 75%, #3b82f6 100%)'
+                                            }}
                                         ></div>
                                     </div>
                                 </div>
@@ -1147,9 +1152,11 @@
                     <main className="container mx-auto max-w-6xl">
                         <div className="grid gap-6">
                             {/* Tarjeta de Información General del Curso */}
-                            <div className="card rounded-xl overflow-hidden bg-gradient-to-r from-blue-50 to-indigo-50" style={{borderColor: 'var(--accent-color)'}}>
+                            <div className="card rounded-xl overflow-hidden bg-slate-100" style={{
+                                borderColor: 'var(--accent-color)'
+                            }}>
                                 <div 
-                                    className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                                    className="p-6 cursor-pointer transition-colors"
                                     onClick={() => setExpandedWeek(expandedWeek === 'info' ? null : 'info')}
                                 >
                                     <div className="flex items-center justify-between">
@@ -1158,10 +1165,10 @@
                                                 📚
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold" style={{color: 'var(--accent-color)'}}>
+                                                <h2 className="text-xl font-bold text-blue-600">
                                                     Información General del Curso
                                                 </h2>
-                                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                <p className="text-sm text-gray-600">
                                                     Datos del curso y badges disponibles
                                                 </p>
                                             </div>
@@ -1173,12 +1180,12 @@
                                 </div>
                                 
                                 {expandedWeek === 'info' && (
-                                    <div className="px-6 pb-6 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                    <div className="px-6 pb-6 border-t" style={{borderColor: isDarkMode ? '#475569' : 'var(--border-color)'}}>
                                         <div className="mt-4">
                                             <div className="grid md:grid-cols-2 gap-6 mb-6">
                                                 <div>
-                                                    <h3 className="font-semibold mb-2">Datos del Curso</h3>
-                                                    <ul className="space-y-1 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                    <h3 className="font-semibold mb-2 text-gray-800">Datos del Curso</h3>
+                                                    <ul className="space-y-1 text-sm text-gray-600">
                                                         <li><strong>Nombre:</strong> Seminario de Investigación</li>
                                                         <li><strong>Código:</strong> 12266-DIS</li>
                                                         <li><strong>Periodo:</strong> 202520</li>
@@ -1191,15 +1198,22 @@
                                                     </ul>
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-semibold mb-2">Introducción</h3>
-                                                    <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                    <h3 className="font-semibold mb-2 text-gray-800">Introducción</h3>
+                                                    <p className="text-sm text-gray-600">
                                                         El Seminario de Investigación está diseñado para que los estudiantes desarrollen capacidades en investigación aplicada al campo del diseño, la innovación y la experiencia de usuario. Este curso integra la exploración de problemáticas con el desarrollo de habilidades en investigación, preparando a los estudiantes para abordar desafíos desde una perspectiva académica y práctica.
                                                     </p>
                                                 </div>
                                             </div>
                                             
+                                            <div className="mb-6">
+                                                <h3 className="font-semibold mb-2 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h3>
+                                                <p className="text-sm text-gray-600">
+                                                    Este curso promueve un uso ético, crítico y transparente de las tecnologías de IAG, permitiendo su aplicación en las actividades formativas y evaluativas de acuerdo con los niveles de uso que especifique el profesor. Se debe tener en cuenta que la clasificación de cada mecanismo o actividad se refiere al máximo nivel posible de uso de IAG que se espera de los estudiantes en dicho mecanismo o actividad. Durante el desarrollo de la asignatura, cuando se le indique, el estudiante deberá aplicar y declarar el nivel de uso de la IAG según la escala establecida, verificando la calidad, veracidad y pertinencia del contenido generado. Este acuerdo tiene como propósito fortalecer una relación formativa, reflexiva y dialógica con la IAG, orientada al desarrollo de capacidades creativas, investigativas y colaborativas.
+                                                </p>
+                                            </div>
+                                            
                                             <div>
-                                                <h3 className="font-semibold mb-3">🏆 Badges Disponibles en el Curso</h3>
+                                                <h3 className="font-semibold mb-3 text-gray-800">🏆 Badges Disponibles en el Curso</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                                                     <div className="p-2 bg-white rounded border">
                                                         <div className="font-medium text-blue-600">Badge de Iniciación</div>
@@ -1245,7 +1259,7 @@
                                     }`}>
                                         <div 
                                             className={`p-6 transition-colors ${
-                                                unlocked ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed'
+                                                unlocked ? 'cursor-pointer' : 'cursor-not-allowed'
                                             }`}
                                             onClick={() => unlocked && setExpandedWeek(isExpanded ? null : content.id)}
                                         >
@@ -1327,41 +1341,41 @@
                                                                 <table className="w-full text-sm border-collapse border" style={{borderColor: 'var(--border-color)'}}>
                                                                     <thead>
                                                                         <tr className="bg-gray-50">
-                                                                            <th className="border p-2 text-left font-semibold" style={{borderColor: 'var(--border-color)'}}></th>
-                                                                            <th className="border p-2 text-center font-semibold bg-green-100" style={{borderColor: 'var(--border-color)'}}>Excelente</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-yellow-100" style={{borderColor: 'var(--border-color)'}}>Bueno</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-orange-100" style={{borderColor: 'var(--border-color)'}}>Regular</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-red-100" style={{borderColor: 'var(--border-color)'}}>Necesita Mejorar</th>
+                                                                            <th className="border p-2 text-left font-semibold text-gray-800" style={{borderColor: 'var(--border-color)'}}></th>
+                                                                            <th className="border p-2 text-center font-semibold bg-green-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Excelente</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-yellow-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Bueno</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-orange-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Regular</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-red-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Necesita Mejorar</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Creatividad</td>
-                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Presenta el contenido de manera altamente innovadora y original. Utiliza recursos visuales y/o interactivos únicos que captan la atención. Demuestra un pensamiento fuera de lo convencional.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Demuestra creatividad en la presentación del contenido. Utiliza algunos recursos originales. Las ideas se presentan de forma interesante.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>La presentación es convencional pero correcta. Utiliza recursos comunes. Hay algunos intentos de originalidad.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>La presentación carece de elementos creativos. Utiliza métodos muy básicos o repetitivos. No hay originalidad en el enfoque.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Creatividad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Presenta el contenido de manera altamente innovadora y original. Utiliza recursos visuales y/o interactivos únicos que captan la atención. Demuestra un pensamiento fuera de lo convencional.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Demuestra creatividad en la presentación del contenido. Utiliza algunos recursos originales. Las ideas se presentan de forma interesante.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La presentación es convencional pero correcta. Utiliza recursos comunes. Hay algunos intentos de originalidad.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La presentación carece de elementos creativos. Utiliza métodos muy básicos o repetitivos. No hay originalidad en el enfoque.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Claridad</td>
-                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>La exposición es extraordinariamente clara y bien estructurada. Las ideas fluyen de manera lógica y coherente. El lenguaje es preciso y adecuado. La información se transmite de forma efectiva.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>La exposición es clara y comprensible. La mayoría de las ideas están bien organizadas. El lenguaje es apropiado aunque con algunas imprecisiones.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>La exposición es algo confusa en ciertos puntos. Algunas ideas no están bien conectadas. El lenguaje puede ser impreciso o inadecuado ocasionalmente.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>La exposición es difícil de seguir. Las ideas están desorganizadas. El lenguaje es confuso o inapropiado frecuentemente.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Claridad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es extraordinariamente clara y bien estructurada. Las ideas fluyen de manera lógica y coherente. El lenguaje es preciso y adecuado. La información se transmite de forma efectiva.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es clara y comprensible. La mayoría de las ideas están bien organizadas. El lenguaje es apropiado aunque con algunas imprecisiones.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es algo confusa en ciertos puntos. Algunas ideas no están bien conectadas. El lenguaje puede ser impreciso o inadecuado ocasionalmente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es difícil de seguir. Las ideas están desorganizadas. El lenguaje es confuso o inapropiado frecuentemente.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Conclusiones</td>
-                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son profundas y bien fundamentadas. Formula preguntas originales y estimulantes que generan discusión significativa. Demuestra una comprensión excepcional del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son válidas y están bien presentadas. Las preguntas son relevantes y promueven cierta discusión. Demuestra buena comprensión del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son básicas o superficiales. Las preguntas son simples o poco elaboradas. Demuestra comprensión parcial del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son débiles o ausentes. Las preguntas son irrelevantes o no se formulan. Demuestra poca comprensión del tema.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Conclusiones</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son profundas y bien fundamentadas. Formula preguntas originales y estimulantes que generan discusión significativa. Demuestra una comprensión excepcional del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son válidas y están bien presentadas. Las preguntas son relevantes y promueven cierta discusión. Demuestra buena comprensión del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son básicas o superficiales. Las preguntas son simples o poco elaboradas. Demuestra comprensión parcial del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son débiles o ausentes. Las preguntas son irrelevantes o no se formulan. Demuestra poca comprensión del tema.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Preguntas</td>
-                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Participa activamente en todas las exposiciones. Hace comentarios constructivos y preguntas relevantes. Demuestra interés genuino y respeto por el trabajo de otros.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Participa regularmente en las exposiciones. Hace algunos comentarios y preguntas útiles. Muestra interés por el trabajo de otros.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>Participa ocasionalmente en las exposiciones. Los comentarios son limitados o poco elaborados. Muestra interés intermitente.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>Raramente participa en las exposiciones. No hace comentarios ni preguntas. Muestra poco interés por el trabajo de otros.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Preguntas</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa activamente en todas las exposiciones. Hace comentarios constructivos y preguntas relevantes. Demuestra interés genuino y respeto por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa regularmente en las exposiciones. Hace algunos comentarios y preguntas útiles. Muestra interés por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa ocasionalmente en las exposiciones. Los comentarios son limitados o poco elaborados. Muestra interés intermitente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Raramente participa en las exposiciones. No hace comentarios ni preguntas. Muestra poco interés por el trabajo de otros.</td>
                                                                         </tr>
                                                                     </tbody>
                                                                 </table>
