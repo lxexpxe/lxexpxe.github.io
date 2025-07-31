@@ -84,41 +84,6 @@
             transform: translateY(-2px);
         }
         
-        .progress-bar {
-            background-color: var(--border-color);
-            border-radius: 9999px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
-            height: 100%;
-            border-radius: 9999px;
-            transition: width 0.5s ease;
-        }
-        
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-        
-        .badge-earned {
-            background-color: rgba(16, 185, 129, 0.1);
-            color: var(--success-color);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .badge-pending {
-            background-color: rgba(107, 114, 128, 0.1);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-        }
-        
         .input-field {
             background-color: var(--bg-secondary);
             border: 2px solid var(--border-color);
@@ -129,16 +94,6 @@
         .input-field:focus {
             border-color: var(--accent-color);
             box-shadow: 0 0 0 3px rgba(77, 150, 255, 0.1);
-        }
-        
-        .input-field.error {
-            border-color: var(--error-color);
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-        }
-        
-        .input-field.success {
-            border-color: var(--success-color);
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
         
         .btn {
@@ -202,15 +157,7 @@
         
         .toast-success { background-color: var(--success-color); }
         .toast-error { background-color: var(--error-color); }
-        
-        .chevron {
-            transition: transform 0.3s ease;
-            display: inline-block;
-        }
-        
-        .chevron.rotate-90 {
-            transform: rotate(90deg);
-        }
+        .toast-info { background-color: var(--accent-color); }
     </style>
 </head>
 <body>
@@ -271,14 +218,9 @@
             }, theme === 'light' ? '🌙' : '☀️');
         }
         
-        const Lock = ({ className = '' }) => React.createElement('span', { className }, '🔒');
         const User = ({ className = '' }) => React.createElement('span', { className }, '👤');
         const LogOut = ({ className = '' }) => React.createElement('span', { className }, '🚪');
         const Loader2 = ({ className = '' }) => React.createElement('div', { className: `spinner ${className}` });
-        const CheckCircle = ({ className = '' }) => React.createElement('span', { className }, '✅');
-        const Award = ({ className = '' }) => React.createElement('span', { className }, '🏆');
-        const Eye = ({ className = '' }) => React.createElement('span', { className }, '👁');
-        const EyeOff = ({ className = '' }) => React.createElement('span', { className }, '🙈');
 
         const LoadingSpinner = () => (
           <div className="flex justify-center items-center py-8 animate-fadeIn">
@@ -287,7 +229,7 @@
           </div>
         );
         
-        function AuthPage({ firebaseApp }) {
+        function AuthPage() {
             const toast = useToast();
             const auth = firebase.auth();
             const db = firebase.firestore();
@@ -312,7 +254,6 @@
 
             const sendVerificationEmail = async (email, code, fullName) => {
                 try {
-                    // Inicializar EmailJS
                     emailjs.init('145MnHTSSDkBVKZAU');
                     
                     const templateParams = {
@@ -322,20 +263,17 @@
                         from_name: 'Seminario de Investigación'
                     };
                     
-                    console.log('Enviando email con parámetros:', templateParams);
-                    
                     const result = await emailjs.send(
                         'service_7u1zcni',
                         'template_1129sv3',
                         templateParams
                     );
                     
-                    console.log('Email enviado exitosamente:', result);
                     toast.showToast('Código enviado a tu correo', 'success');
                 } catch (error) {
                     console.error('Error enviando email:', error);
                     console.log(`Código de verificación para ${email}: ${code}`);
-                    toast.showToast(`Error enviando email. Código (desarrollo): ${code}`, 'error');
+                    toast.showToast(`Error enviando email. Código (desarrollo): ${code}`, 'info');
                 }
             };
 
@@ -354,11 +292,9 @@
                         const result = await auth.signInWithEmailAndPassword(email, password);
                         toast.showToast('¡Bienvenido de vuelta!', 'success');
                     } else {
-                        // Generar código y guardar datos temporalmente
                         const code = generateCode();
                         setGeneratedCode(code);
                         
-                        // Validar código de curso
                         if (userRole === 'student' && !courseCode.startsWith('#')) {
                             toast.showToast('Los estudiantes deben ingresar un código de curso válido (#codigo)', 'error');
                             setLoading(false);
@@ -371,19 +307,6 @@
                             return;
                         }
                         
-                        // Para estudiantes, verificar que el código existe
-                        if (userRole === 'student') {
-                            const courseQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
-                                .where('courseCode', '==', courseCode)
-                                .get();
-                            
-                            if (courseQuery.empty) {
-                                toast.showToast('Código de curso no válido. Verifica con tu profesor.', 'error');
-                                setLoading(false);
-                                return;
-                            }
-                        }
-                        
                         setPendingUserData({
                             email,
                             password,
@@ -392,32 +315,25 @@
                             courseCode
                         });
                         
-                        // Enviar código por email
                         await sendVerificationEmail(email, code, fullName);
-                        
                         setShowCodeVerification(true);
                     }
                 } catch (err) {
-                    let errorMessage;
-                    switch (err.code) {
-                        case 'auth/invalid-email':
-                            errorMessage = 'El correo electrónico no tiene un formato válido.';
-                            break;
-                        case 'auth/user-not-found':
-                            errorMessage = 'Usuario no encontrado. Verifica tu correo o crea una cuenta.';
-                            break;
-                        case 'auth/wrong-password':
-                            errorMessage = 'Contraseña incorrecta.';
-                            break;
-                        case 'auth/email-already-in-use':
-                            errorMessage = 'Este correo ya está registrado.';
-                            break;
-                        case 'auth/weak-password':
-                            errorMessage = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
-                            break;
-                        default:
-                            errorMessage = 'Error de autenticación. Por favor, intenta de nuevo.';
+                    console.error('Error en handleAuth:', err);
+                    let errorMessage = 'Error de autenticación. Por favor, intenta de nuevo.';
+                    
+                    if (err.code === 'auth/invalid-email') {
+                        errorMessage = 'El correo electrónico no tiene un formato válido.';
+                    } else if (err.code === 'auth/user-not-found') {
+                        errorMessage = 'Usuario no encontrado. Verifica tu correo o crea una cuenta.';
+                    } else if (err.code === 'auth/wrong-password') {
+                        errorMessage = 'Contraseña incorrecta.';
+                    } else if (err.code === 'auth/email-already-in-use') {
+                        errorMessage = 'Este correo ya está registrado.';
+                    } else if (err.code === 'auth/weak-password') {
+                        errorMessage = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
                     }
+                    
                     toast.showToast(errorMessage, 'error');
                 } finally {
                     setLoading(false);
@@ -435,14 +351,12 @@
                 }
 
                 try {
-                    // Crear usuario en Firebase Auth
                     const userCredential = await auth.createUserWithEmailAndPassword(
                         pendingUserData.email,
                         pendingUserData.password
                     );
                     const user = userCredential.user;
                     
-                    // Crear documento en Firestore
                     const appId = 'seminario-investigacion-app';
                     const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
                     
@@ -451,16 +365,14 @@
                         fullName: pendingUserData.fullName,
                         userType: pendingUserData.userType,
                         emailVerified: true,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        courseCode: pendingUserData.courseCode
                     };
 
                     if (pendingUserData.userType === 'student') {
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
-                        userData.courseCode = pendingUserData.courseCode;
                     } else {
-                        userData.courseCode = pendingUserData.courseCode;
-                        
                         // Crear documento del curso si es profesor
                         const courseDocRef = db.collection('artifacts/seminario-investigacion-app/courses').doc();
                         await courseDocRef.set({
@@ -477,14 +389,21 @@
                     
                     toast.showToast('¡Cuenta creada exitosamente! Bienvenido.', 'success');
                     
-                    // Limpiar estados
                     setShowCodeVerification(false);
                     setVerificationCode('');
                     setGeneratedCode('');
                     setPendingUserData(null);
                 } catch (err) {
                     console.error('Error creando cuenta:', err);
-                    toast.showToast('Error creando la cuenta', 'error');
+                    let errorMessage = 'Error creando la cuenta';
+                    
+                    if (err.code === 'auth/email-already-in-use') {
+                        errorMessage = 'Este correo ya está registrado';
+                    } else if (err.code === 'permission-denied') {
+                        errorMessage = 'Error de permisos en Firestore. Verifica las reglas de seguridad.';
+                    }
+                    
+                    toast.showToast(errorMessage, 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -680,7 +599,105 @@
 
         function AdminDashboard({ currentUser }) {
             const auth = firebase.auth();
+            const db = firebase.firestore();
             const toast = useToast();
+            const [students, setStudents] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            const [userData, setUserData] = React.useState(null);
+            const [expandedStudent, setExpandedStudent] = React.useState(null);
+
+            const badges = [
+                { id: 1, name: 'Badge de Iniciación', description: 'Por completar la primera lectura, reflexionar sobre tus intereses iniciales y formar parte de un equipo (Semana 1)' },
+                { id: 2, name: 'Badge de Maestro Expositor', description: 'Por exponer sobre tu tema asignado en las Semanas 2-5 (se gana una sola vez al realizar tu exposición grupal)' },
+                { id: 3, name: 'Badge de Participación Activa: Novato', description: 'Por participar activamente en el debate y taller de la Semana 2' },
+                { id: 4, name: 'Badge de Participación Activa: Aprendiz', description: 'Por participar activamente en el debate y taller de la Semana 3' },
+                { id: 5, name: 'Badge de Participación Activa: Avanzado', description: 'Por participar activamente en el debate y taller de la Semana 4' },
+                { id: 6, name: 'Badge de Participación Activa: Máster', description: 'Por participar activamente en el debate y reflexión de la Semana 5' },
+                { id: 7, name: 'Badge de Cuestionador Perspicaz', description: 'Por formular preguntas desafiantes y relevantes durante el periodo de exposiciones (Semanas 2-5)' },
+                { id: 8, name: 'Badge de Clarificador del Saber', description: 'Por responder correctamente y con claridad a las preguntas de los compañeros durante el periodo de exposiciones (Semanas 2-5)' },
+                { id: 9, name: 'Badge de Conector de Conceptos', description: 'Por sintetizar y establecer conexiones perspicaces entre los diferentes temas expuestos durante el periodo de exposiciones (Semanas 2-5)' },
+                { id: 10, name: 'Badge de Sembrador de Ideas', description: 'Por identificar una problemática y comenzar tu búsqueda preliminar (Semana 6)' },
+                { id: 11, name: 'Badge de Artífice de Preguntas', description: 'Por formular una pregunta de investigación bien definida y su planteamiento (Semana 7)' },
+                { id: 12, name: 'Badge de Bibliotecario Experto', description: 'Por iniciar tu revisión bibliográfica y definir objetivos claros (Semana 8)' },
+                { id: 13, name: 'Badge de Arquitecto de Proyectos', description: 'Por consolidar tu primera propuesta de investigación (Semana 9)' },
+                { id: 14, name: 'Badge de Estratega Metodológico', description: 'Por diseñar tu metodología y definir conceptos clave (Semana 10)' },
+                { id: 15, name: 'Badge de Constructor de Instrumentos', description: 'Por desarrollar tus herramientas de recolección de datos (Semana 11)' },
+                { id: 16, name: 'Badge de Recolector de Datos', description: 'Por iniciar y organizar tu recolección de datos (Semana 12)' },
+                { id: 17, name: 'Badge de Intérprete Cualitativo', description: 'Por realizar tu primer análisis cualitativo (Semana 13)' },
+                { id: 18, name: 'Badge de Analista Cuantitativo', description: 'Por realizar tu primer análisis cuantitativo (Semana 14)' },
+                { id: 19, name: 'Badge de Narrador Visual', description: 'Por diseñar tus visualizaciones y empezar a redactar tu informe (Semana 15)' },
+                { id: 20, name: 'Badge de Investigador Élite', description: 'Por completar y presentar tu proyecto final de investigación (Semana 16)' }
+            ];
+
+            React.useEffect(() => {
+                loadStudents();
+                loadUserData();
+            }, []);
+
+            const loadUserData = async () => {
+                try {
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        setUserData(userDoc.data());
+                    }
+                } catch (error) {
+                    console.error('Error cargando datos del usuario:', error);
+                }
+            };
+
+            const loadStudents = async () => {
+                try {
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        const professorData = userDoc.data();
+                        const courseCode = professorData.courseCode;
+                        
+                        const studentsQuery = await db.collection('artifacts/seminario-investigacion-app/users')
+                            .where('userType', '==', 'student')
+                            .where('courseCode', '==', courseCode)
+                            .get();
+                        
+                        const studentsData = studentsQuery.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        
+                        setStudents(studentsData);
+                    }
+                } catch (error) {
+                    console.error('Error cargando estudiantes:', error);
+                    toast.showToast('Error cargando estudiantes', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const assignBadge = async (studentId, badgeId) => {
+                try {
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
+                    const studentDoc = await studentRef.get();
+                    
+                    if (studentDoc.exists) {
+                        const studentData = studentDoc.data();
+                        const currentBadges = studentData.badgesEarned || [];
+                        
+                        if (!currentBadges.includes(badgeId)) {
+                            await studentRef.update({
+                                badgesEarned: [...currentBadges, badgeId],
+                                lastBadgeEarned: new Date()
+                            });
+                            
+                            toast.showToast('Badge asignado exitosamente', 'success');
+                            loadStudents();
+                        } else {
+                            toast.showToast('El estudiante ya tiene este badge', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error asignando badge:', error);
+                    toast.showToast('Error asignando badge', 'error');
+                }
+            };
 
             const handleLogout = async () => {
                 try {
@@ -691,47 +708,369 @@
                 }
             };
 
-            return React.createElement('div', { className: 'min-h-screen p-4 md:p-8', style: { backgroundColor: 'var(--bg-primary)' } }, [
-                React.createElement('header', {
-                    key: 'header',
-                    className: 'card rounded-xl p-6 mb-8 animate-fadeIn'
-                }, [
-                    React.createElement('div', {
-                        key: 'header-content',
-                        className: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-4'
-                    }, [
-                        React.createElement('div', { key: 'title-section' }, [
-                            React.createElement('h1', { className: 'text-3xl font-bold mb-2' }, 'Panel de Administración'),
-                            React.createElement('p', { 
-                                className: 'text-sm',
-                                style: { color: 'var(--text-secondary)' }
-                            }, `Profesor: ${currentUser.email}`)
-                        ]),
-                        React.createElement('div', { key: 'actions', className: 'flex items-center gap-3' }, [
-                            React.createElement(ThemeToggle, { key: 'theme' }),
-                            React.createElement('button', {
-                                key: 'logout',
-                                onClick: handleLogout,
-                                className: 'btn btn-secondary flex items-center gap-2'
-                            }, [React.createElement(LogOut), 'Cerrar Sesión'])
-                        ])
-                    ])
-                ]),
-                React.createElement('div', { key: 'content', className: 'card rounded-xl p-6' }, [
-                    React.createElement('h2', {
-                        key: 'title',
-                        className: 'text-xl font-bold mb-4'
-                    }, 'Panel de Profesor'),
-                    React.createElement('p', {
-                        key: 'description'
-                    }, 'Funcionalidades de administración en desarrollo...')
-                ])
-            ]);
+            if (loading) {
+                return <LoadingSpinner />;
+            }
+
+            return (
+                <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
+                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                    Profesor: {currentUser.email}
+                                </p>
+                                <p className="text-xs" style={{color: 'var(--text-secondary)'}}>
+                                    Código de curso: {userData?.courseCode}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <ThemeToggle />
+                                <button
+                                    onClick={handleLogout}
+                                    className="btn btn-secondary flex items-center gap-2"
+                                >
+                                    <LogOut />
+                                    Cerrar Sesión
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <div className="grid gap-6">
+                        <div className="card rounded-xl p-6">
+                            <h2 className="text-xl font-bold mb-4">Estudiantes Registrados ({students.length})</h2>
+                            
+                            {students.length === 0 ? (
+                                <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {students.map(student => {
+                                        const isExpanded = expandedStudent === student.id;
+                                        return (
+                                            <div key={student.id} className="border rounded-lg overflow-hidden" style={{borderColor: 'var(--border-color)'}}>
+                                                <div 
+                                                    className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                                                    onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <h3 className="font-semibold">{student.fullName}</h3>
+                                                            <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{student.email}</p>
+                                                            <div className="text-sm mt-1" style={{color: 'var(--text-secondary)'}}>
+                                                                Badges: {(student.badgesEarned || []).length}/20
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-gray-400">
+                                                            {isExpanded ? '▲' : '▼'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {isExpanded && (
+                                                    <div className="px-4 pb-4 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                                        <div className="mt-4">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                                                                {badges.map(badge => {
+                                                                    const hasEarned = (student.badgesEarned || []).includes(badge.id);
+                                                                    return (
+                                                                        <button
+                                                                            key={badge.id}
+                                                                            onClick={() => !hasEarned && assignBadge(student.id, badge.id)}
+                                                                            className={`p-3 rounded text-left text-sm transition-colors ${
+                                                                                hasEarned 
+                                                                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                                                                    : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-blue-50'
+                                                                            }`}
+                                                                            disabled={hasEarned}
+                                                                            title={badge.description}
+                                                                        >
+                                                                            <div className="flex items-start gap-2">
+                                                                                <span className="text-lg">{hasEarned ? '✓' : '+'}</span>
+                                                                                <div>
+                                                                                    <div className="font-medium">{badge.name}</div>
+                                                                                    <div className="text-xs opacity-75 mt-1">{badge.description}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
         }
 
         function CoursePage({ currentUser }) {
             const auth = firebase.auth();
+            const db = firebase.firestore();
             const toast = useToast();
+            const [userData, setUserData] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [expandedWeek, setExpandedWeek] = React.useState(null);
+            const [professorName, setProfessorName] = React.useState('');
+
+            const courseContent = [
+                {
+                    id: 1,
+                    week: 1,
+                    title: "Misión de Inicio - Descubriendo el Territorio de la Investigación",
+                    description: "Fundamentos de la investigación en diseño e innovación",
+                    content: "Presentación del curso, acuerdos sobre IA, introducción a la investigación aplicada en diseño, innovación y experiencia de usuario. Identificación de diferentes campos y tipos de investigación desde la disciplina del diseño.",
+                    activities: [
+                        "Círculo de Expectativas: Compartir expectativas del curso",
+                        "Exploración de Casos Inspiradores: Análisis de proyectos de investigación en diseño",
+                        "Formación de Equipos: Organización en grupos para exposiciones",
+                        "Diario del Investigador: Reflexionar sobre 3 preguntas de investigación"
+                    ],
+                    badge: "Iniciación",
+                    unlocked: true
+                },
+                {
+                    id: 2,
+                    weeks: "2-5",
+                    title: "Unidad 1: Reconocer los enfoques y rutas de investigación",
+                    description: "Fundamentos científicos y metodológicos",
+                    content: "Exposiciones grupales sobre conceptos fundamentales: Ciencia, Investigación científica, Tipos de investigación científica, Método científico, Hipótesis, Experimento científico, e Investigación en Diseño. Cada equipo tendrá 15 minutos para presentar de manera creativa e innovadora. La evaluación se realizará mediante una rúbrica que considera creatividad, claridad, conclusiones y participación.",
+                    activities: [
+                        "Semana 2: Exposiciones sobre 'Ciencia' e 'Investigación Científica'",
+                        "Semana 3: Exposiciones sobre 'Tipos de Investigación' y 'Método Científico'",
+                        "Semana 4: Exposiciones sobre 'Hipótesis' y 'Experimento Científico'",
+                        "Semana 5: Exposición sobre 'Investigación en Diseño' y síntesis",
+                        "Debates y reflexiones después de cada exposición",
+                        "Análisis de conexiones con ejemplos de diseño"
+                    ],
+                    badges: ["Maestro Expositor", "Participación Activa: Novato", "Participación Activa: Aprendiz", "Participación Activa: Avanzado", "Participación Activa: Máster", "Cuestionador Perspicaz", "Clarificador del Saber", "Conector de Conceptos"],
+                    unlocked: false,
+                    requiredBadge: 1
+                },
+                {
+                    id: 6,
+                    week: 6,
+                    title: "Misión de Ideación - Sembrando Ideas, Cosechando Problemas",
+                    description: "Unidad 2: Planteamiento de la investigación",
+                    content: "Cómo surgen las ideas de investigación en el campo del diseño e innovación: observación, tendencias, necesidades no satisfechas, brechas en el conocimiento. Técnicas de problematización: '5 Porqués', Diagrama de Ishikawa, Árbol de Problemas.",
+                    activities: [
+                        "Tormenta de Ideas Creativa y Problemática (60 min)",
+                        "Taller: Descomponiendo el Problema (60 min)",
+                        "El Problema del Héroe: Seleccionar problemática para proyecto",
+                        "Mapa Mental del Problema: Visualizar causas, efectos y actores"
+                    ],
+                    badge: "Sembrador de Ideas",
+                    unlocked: false,
+                    requiredBadge: 2
+                },
+                {
+                    id: 7,
+                    week: 7,
+                    title: "Misión de Precisión - Afinando la Pregunta Correcta",
+                    description: "Formulación de preguntas de investigación",
+                    content: "Análisis de problemas en diversos contextos: identificación de la población, el contexto y el alcance. Delimitación de problemas de investigación: de lo general a lo específico. Formulación de preguntas de investigación con características claras, concisas, factibles, relevantes y éticas.",
+                    activities: [
+                        "Taller de Preguntas Poderosas (90 min)",
+                        "El Embudo de la Investigación (30 min)",
+                        "El Enigma Resuelto: Redactar planteamiento del problema",
+                        "Definir pregunta de investigación final"
+                    ],
+                    badge: "Artífice de Preguntas",
+                    unlocked: false,
+                    requiredBadge: 10
+                },
+                {
+                    id: 8,
+                    week: 8,
+                    title: "Misión de Fundamentación - Construyendo los Pilares del Conocimiento",
+                    description: "Revisión de literatura y objetivos de investigación",
+                    content: "Revisión de literatura científica: importancia, tipos de fuentes, bases de datos académicas. Estrategias de búsqueda sistemática: palabras clave, operadores booleanos, filtros. Formulación de objetivos de investigación SMART.",
+                    activities: [
+                        "Cazadores de Conocimiento: Laboratorio de Búsqueda (75 min)",
+                        "Objetivos SMART: Taller de Precisión (45 min)",
+                        "La Biblioteca del Investigador: Revisión bibliográfica profunda",
+                        "Marco Conceptual Preliminar: Identificar conceptos clave"
+                    ],
+                    badge: "Bibliotecario Experto",
+                    unlocked: false,
+                    requiredBadge: 11
+                },
+                {
+                    id: 9,
+                    week: 9,
+                    title: "Misión de Planificación - El Mapa del Tesoro de tu Proyecto",
+                    description: "Estructura de la propuesta de investigación",
+                    content: "Justificación de la investigación: relevancia teórica, práctica, social, metodológica. Alcance y limitaciones del estudio. Estructura completa de la propuesta de investigación con todos sus componentes.",
+                    activities: [
+                        "El Argumento Persuasivo: Taller de Justificación (60 min)",
+                        "Presentación Preliminar del Mapa (60 min)",
+                        "El Borrador del Explorador: Consolidar propuesta completa",
+                        "Retroalimentación constructiva entre compañeros"
+                    ],
+                    badge: "Arquitecto de Proyectos",
+                    unlocked: false,
+                    requiredBadge: 12
+                },
+                {
+                    id: 10,
+                    week: 10,
+                    title: "Misión de Diseño - Creando tu Estrategia de Recolección",
+                    description: "Diseño metodológico y población de estudio",
+                    content: "Diseño metodológico: Selección del tipo de estudio. Población y muestra: criterios de inclusión y exclusión, métodos de muestreo. Definición de conceptos clave y operacionalización de variables. Consideraciones sobre validez y fiabilidad.",
+                    activities: [
+                        "El Laboratorio Metodológico (90 min)",
+                        "Debate: ¿Cuántos y Quiénes? (30 min)",
+                        "El Arsenal del Investigador: Profundizar marco conceptual",
+                        "Esquema Metodológico Detallado: Desarrollar metodología completa"
+                    ],
+                    badge: "Estratega Metodológico",
+                    unlocked: false,
+                    requiredBadge: 13
+                },
+                {
+                    id: 11,
+                    week: 11,
+                    title: "Misión de Herramientas - Construyendo tus Instrumentos",
+                    description: "Técnicas e instrumentos de recolección de datos",
+                    content: "Técnicas de recolección de datos cualitativos: entrevistas, grupos focales, observación, diarios de campo. Técnicas cuantitativas: encuestas, experimentos, pruebas de usabilidad. Diseño de instrumentos: redacción de preguntas, estructura, validación.",
+                    activities: [
+                        "Caja de Herramientas del Investigador: Taller de Diseño de Instrumentos (90 min)",
+                        "Mini-Simulación de Recolección (30 min)",
+                        "El Kit de Recolección: Desarrollar borradores completos",
+                        "Ejercicios de role-play y pruebas entre compañeros"
+                    ],
+                    badge: "Constructor de Instrumentos",
+                    unlocked: false,
+                    requiredBadge: 14
+                },
+                {
+                    id: 12,
+                    week: 12,
+                    title: "Misión de Campo - Recolectando los Datos (¡La Aventura Comienza!)",
+                    description: "Ejecución de la recolección de datos",
+                    content: "Ejecución de la recolección de datos: preparación logística, gestión de participantes, ética en la práctica. Organización de datos cualitativos y cuantitativos. Manejo de imprevistos durante la recolección.",
+                    activities: [
+                        "Expedición de Datos: Desafíos y Soluciones (60 min)",
+                        "Taller: Organizando el Tesoro (60 min)",
+                        "El Diario del Explorador: Iniciar recolección de datos",
+                        "Base de Datos Preliminar: Organizar datos recolectados"
+                    ],
+                    badge: "Recolector de Datos",
+                    unlocked: false,
+                    requiredBadge: 15
+                },
+                {
+                    id: 13,
+                    week: 13,
+                    title: "Misión de Descifrado - Análisis Cualitativo",
+                    description: "Unidad 3: Ejecución de la investigación",
+                    content: "Introducción al análisis de datos cualitativos: el proceso interpretativo. Técnicas de análisis cualitativo: codificación, análisis temático, análisis de contenido. Herramientas para el análisis cualitativo. Interpretación de resultados cualitativos.",
+                    activities: [
+                        "El Detective Cualitativo: Taller de Codificación (90 min)",
+                        "Discusión: Historias que los Datos Cuentan (30 min)",
+                        "Primeros Hallazgos Cualitativos: Análisis preliminar",
+                        "Identificar 3-5 temas o categorías emergentes clave"
+                    ],
+                    badge: "Intérprete Cualitativo",
+                    unlocked: false,
+                    requiredBadge: 16
+                },
+                {
+                    id: 14,
+                    week: 14,
+                    title: "Misión de Cuantificación - Análisis Cuantitativo",
+                    description: "Análisis de datos cuantitativos",
+                    content: "Introducción al análisis de datos cuantitativos: estadísticas descriptivas. Estadísticas inferenciales básicas. Herramientas para el análisis cuantitativo. Interpretación de resultados cuantitativos: patrones, tendencias y relaciones.",
+                    activities: [
+                        "El Mago de los Números: Taller de Análisis Descriptivo (90 min)",
+                        "Debate: ¿Qué Nos Dicen los Números? (30 min)",
+                        "Primeros Hallazgos Cuantitativos: Análisis preliminar",
+                        "Generar 3-5 gráficos o tablas con hallazgos relevantes"
+                    ],
+                    badge: "Analista Cuantitativo",
+                    unlocked: false,
+                    requiredBadge: 17
+                },
+                {
+                    id: 15,
+                    week: 15,
+                    title: "Misión de Narrativa - Contando tu Historia con Datos",
+                    description: "Unidad 4: Presentación de resultados",
+                    content: "Principios de visualización de datos: claridad, precisión, integridad, estética. Herramientas de visualización. Estructura del informe final de investigación. Redacción académica y estilo.",
+                    activities: [
+                        "El Artista de Datos: Taller de Visualización (90 min)",
+                        "Construyendo el Esqueleto del Informe (30 min)",
+                        "El Primer Capítulo: Empezar a redactar informe final",
+                        "Crear visualizaciones impactantes para resultados"
+                    ],
+                    badge: "Narrador Visual",
+                    unlocked: false,
+                    requiredBadge: 18
+                },
+                {
+                    id: 16,
+                    week: 16,
+                    title: "Misión de Impacto - Preparando tu Gran Revelación (Entrega Final)",
+                    description: "Presentación y defensa del proyecto final",
+                    content: "Comunicación efectiva de resultados de investigación: adaptación del mensaje a la audiencia, claridad y concisión. Diseño de presentaciones orales. Consideraciones éticas en la comunicación de resultados. Presentación y defensa formal del proyecto.",
+                    activities: [
+                        "La Defensa del Proyecto (120 min)",
+                        "Presentación ante profesor y compañeros",
+                        "Sesión de preguntas y respuestas",
+                        "¡Disfruta de tu éxito y celebra tus logros!"
+                    ],
+                    badge: "Investigador Élite",
+                    unlocked: false,
+                    requiredBadge: 19
+                }
+            ];
+
+            React.useEffect(() => {
+                loadUserData();
+                loadProfessorName();
+            }, []);
+
+            const loadUserData = async () => {
+                try {
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        setUserData(userDoc.data());
+                    }
+                } catch (error) {
+                    console.error('Error cargando datos del usuario:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const loadProfessorName = async () => {
+                try {
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        const studentData = userDoc.data();
+                        const courseCode = studentData.courseCode;
+                        
+                        const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                            .where('courseCode', '==', courseCode)
+                            .limit(1)
+                            .get();
+                        
+                        if (!coursesQuery.empty) {
+                            const courseData = coursesQuery.docs[0].data();
+                            setProfessorName(courseData.professorName || 'No asignado');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error cargando nombre del profesor:', error);
+                }
+            };
 
             const handleLogout = async () => {
                 try {
@@ -741,6 +1080,31 @@
                     toast.showToast("Error al cerrar sesión. Intenta de nuevo.", 'error');
                 }
             };
+
+            const getBadgeStatus = (badgeId) => {
+                if (!userData || !userData.badgesEarned) return false;
+                return userData.badgesEarned.includes(badgeId);
+            };
+
+            const getProgressPercentage = () => {
+                if (!userData || !userData.badgesEarned) return 0;
+                return Math.round((userData.badgesEarned.length / 20) * 100);
+            };
+
+            const isContentUnlocked = (content) => {
+                if (content.unlocked) return true;
+                if (!content.requiredBadge) return true;
+                if (content.requiredBadge === 2) {
+                    // Week 6 unlocks only after getting badges 1-9 (all from weeks 1-5)
+                    const requiredBadges = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+                    return requiredBadges.every(badgeId => getBadgeStatus(badgeId));
+                }
+                return getBadgeStatus(content.requiredBadge);
+            };
+
+            if (loading) {
+                return <LoadingSpinner />;
+            }
 
             return (
                 <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
@@ -752,7 +1116,18 @@
                                 </h1>
                                 <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
                                     <User />
-                                    <span>Hola, <strong>{currentUser.email.split('@')[0]}</strong> ({currentUser.email})</span>
+                                    <span>Hola, <strong>{userData?.fullName || currentUser.email.split('@')[0]}</strong></span>
+                                </div>
+                                <div className="mt-2">
+                                    <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                        <span>Progreso: {getProgressPercentage()}% ({userData?.badgesEarned?.length || 0}/20 badges)</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                        <div 
+                                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                            style={{width: `${getProgressPercentage()}%`}}
+                                        ></div>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -770,9 +1145,235 @@
                     </header>
 
                     <main className="container mx-auto max-w-6xl">
-                        <div className="card rounded-xl p-6">
-                            <h2 className="text-xl font-bold mb-4">Bienvenido al curso</h2>
-                            <p>Contenido del curso en desarrollo...</p>
+                        <div className="grid gap-6">
+                            {/* Tarjeta de Información General del Curso */}
+                            <div className="card rounded-xl overflow-hidden bg-gradient-to-r from-blue-50 to-indigo-50" style={{borderColor: 'var(--accent-color)'}}>
+                                <div 
+                                    className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                                    onClick={() => setExpandedWeek(expandedWeek === 'info' ? null : 'info')}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold bg-blue-500">
+                                                📚
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-bold" style={{color: 'var(--accent-color)'}}>
+                                                    Información General del Curso
+                                                </h2>
+                                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                    Datos del curso y badges disponibles
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-gray-400">
+                                            {expandedWeek === 'info' ? '▲' : '▼'}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {expandedWeek === 'info' && (
+                                    <div className="px-6 pb-6 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                        <div className="mt-4">
+                                            <div className="grid md:grid-cols-2 gap-6 mb-6">
+                                                <div>
+                                                    <h3 className="font-semibold mb-2">Datos del Curso</h3>
+                                                    <ul className="space-y-1 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                        <li><strong>Nombre:</strong> Seminario de Investigación</li>
+                                                        <li><strong>Código:</strong> 12266-DIS</li>
+                                                        <li><strong>Periodo:</strong> 202520</li>
+                                                        <li><strong>NRE:</strong> 12318</li>
+                                                        <li><strong>Grupo:</strong> 001</li>
+                                                        <li><strong>Programas:</strong> DIS 03, DMI 03</li>
+                                                        <li><strong>Intensidad:</strong> 2 horas semanales</li>
+                                                        <li><strong>Créditos:</strong> 2</li>
+                                                        <li><strong>Docente:</strong> {professorName}</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-semibold mb-2">Introducción</h3>
+                                                    <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                        El Seminario de Investigación está diseñado para que los estudiantes desarrollen capacidades en investigación aplicada al campo del diseño, la innovación y la experiencia de usuario. Este curso integra la exploración de problemáticas con el desarrollo de habilidades en investigación, preparando a los estudiantes para abordar desafíos desde una perspectiva académica y práctica.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div>
+                                                <h3 className="font-semibold mb-3">🏆 Badges Disponibles en el Curso</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-blue-600">Badge de Iniciación</div>
+                                                        <div className="text-gray-600">Semana 1 - Inicio del curso</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-purple-600">Badge de Maestro Expositor</div>
+                                                        <div className="text-gray-600">Semanas 2-5 - Exposición grupal</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-green-600">Badges de Participación Activa</div>
+                                                        <div className="text-gray-600">Novato, Aprendiz, Avanzado, Máster</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-orange-600">Badge de Cuestionador Perspicaz</div>
+                                                        <div className="text-gray-600">Preguntas desafiantes</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-teal-600">Badge de Clarificador del Saber</div>
+                                                        <div className="text-gray-600">Respuestas claras</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-indigo-600">Badge de Conector de Conceptos</div>
+                                                        <div className="text-gray-600">Síntesis y conexiones</div>
+                                                    </div>
+                                                    <div className="p-2 bg-white rounded border">
+                                                        <div className="font-medium text-red-600">Badges de Investigación</div>
+                                                        <div className="text-gray-600">Semanas 6-16 - Proyecto final</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {courseContent.map((content) => {
+                                const unlocked = isContentUnlocked(content);
+                                const isExpanded = expandedWeek === content.id;
+                                
+                                return (
+                                    <div key={content.id} className={`card rounded-xl overflow-hidden ${
+                                        !unlocked ? 'opacity-50' : ''
+                                    }`}>
+                                        <div 
+                                            className={`p-6 transition-colors ${
+                                                unlocked ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed'
+                                            }`}
+                                            onClick={() => unlocked && setExpandedWeek(isExpanded ? null : content.id)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold ${
+                                                        unlocked ? 'bg-blue-500' : 'bg-gray-400'
+                                                    }`}>
+                                                        {unlocked ? (content.week || (content.weeks === '2-5' ? '2' : content.weeks)) : '🔒'}
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-lg font-semibold">
+                                                            {content.week ? `Semana ${content.week}` : `Semanas ${content.weeks}`}: {content.title}
+                                                        </h3>
+                                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                            {content.description}
+                                                        </p>
+                                                        {!unlocked && (
+                                                            <span className="inline-block mt-1 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                                                Bloqueado - Completa badge anterior
+                                                            </span>
+                                                        )}
+                                                        {unlocked && content.badge && (
+                                                            <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
+                                                                getBadgeStatus(content.id === 1 ? 1 : content.id + 4) 
+                                                                    ? 'bg-green-100 text-green-800' 
+                                                                    : 'bg-gray-100 text-gray-600'
+                                                            }`}>
+                                                                {getBadgeStatus(content.id === 1 ? 1 : content.id + 4) ? '🏆' : '○'} {content.badge}
+                                                            </span>
+                                                        )}
+                                                        {unlocked && content.badges && (
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                {content.badges.map((badge, index) => {
+                                                                    const badgeId = content.weeks === "2-5" ? index + 2 : index + 1;
+                                                                    const badgeEarned = getBadgeStatus(badgeId);
+                                                                    return (
+                                                                        <span key={index} className={`px-2 py-1 text-xs rounded-full ${
+                                                                            badgeEarned 
+                                                                                ? 'bg-green-100 text-green-800' 
+                                                                                : 'bg-gray-100 text-gray-600'
+                                                                        }`}>
+                                                                            {badgeEarned ? '✓' : '○'} {badge}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-gray-400">
+                                                    {unlocked ? (isExpanded ? '▲' : '▼') : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {isExpanded && unlocked && (
+                                            <div className="px-6 pb-6 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                                <div className="mt-4">
+                                                    <h4 className="font-semibold mb-2">Contenido:</h4>
+                                                    <p className="mb-4" style={{color: 'var(--text-secondary)'}}>
+                                                        {content.content}
+                                                    </p>
+                                                    
+                                                    <h4 className="font-semibold mb-2">Actividades:</h4>
+                                                    <ul className="space-y-1 mb-6">
+                                                        {content.activities.map((activity, index) => (
+                                                            <li key={index} className="flex items-start gap-2">
+                                                                <span className="text-blue-500 mt-1">•</span>
+                                                                <span style={{color: 'var(--text-secondary)'}}>{activity}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    
+                                                    {content.weeks === "2-5" && (
+                                                        <div className="mt-6">
+                                                            <h4 className="font-semibold mb-3">📋 Rúbrica de Evaluación</h4>
+                                                            <div className="overflow-x-auto">
+                                                                <table className="w-full text-sm border-collapse border" style={{borderColor: 'var(--border-color)'}}>
+                                                                    <thead>
+                                                                        <tr className="bg-gray-50">
+                                                                            <th className="border p-2 text-left font-semibold" style={{borderColor: 'var(--border-color)'}}></th>
+                                                                            <th className="border p-2 text-center font-semibold bg-green-100" style={{borderColor: 'var(--border-color)'}}>Excelente</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-yellow-100" style={{borderColor: 'var(--border-color)'}}>Bueno</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-orange-100" style={{borderColor: 'var(--border-color)'}}>Regular</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-red-100" style={{borderColor: 'var(--border-color)'}}>Necesita Mejorar</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        <tr>
+                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Creatividad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Presenta el contenido de manera altamente innovadora y original. Utiliza recursos visuales y/o interactivos únicos que captan la atención. Demuestra un pensamiento fuera de lo convencional.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Demuestra creatividad en la presentación del contenido. Utiliza algunos recursos originales. Las ideas se presentan de forma interesante.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>La presentación es convencional pero correcta. Utiliza recursos comunes. Hay algunos intentos de originalidad.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>La presentación carece de elementos creativos. Utiliza métodos muy básicos o repetitivos. No hay originalidad en el enfoque.</td>
+                                                                        </tr>
+                                                                        <tr>
+                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Claridad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>La exposición es extraordinariamente clara y bien estructurada. Las ideas fluyen de manera lógica y coherente. El lenguaje es preciso y adecuado. La información se transmite de forma efectiva.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>La exposición es clara y comprensible. La mayoría de las ideas están bien organizadas. El lenguaje es apropiado aunque con algunas imprecisiones.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>La exposición es algo confusa en ciertos puntos. Algunas ideas no están bien conectadas. El lenguaje puede ser impreciso o inadecuado ocasionalmente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>La exposición es difícil de seguir. Las ideas están desorganizadas. El lenguaje es confuso o inapropiado frecuentemente.</td>
+                                                                        </tr>
+                                                                        <tr>
+                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Conclusiones</td>
+                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son profundas y bien fundamentadas. Formula preguntas originales y estimulantes que generan discusión significativa. Demuestra una comprensión excepcional del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son válidas y están bien presentadas. Las preguntas son relevantes y promueven cierta discusión. Demuestra buena comprensión del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son básicas o superficiales. Las preguntas son simples o poco elaboradas. Demuestra comprensión parcial del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son débiles o ausentes. Las preguntas son irrelevantes o no se formulan. Demuestra poca comprensión del tema.</td>
+                                                                        </tr>
+                                                                        <tr>
+                                                                            <td className="border p-2 font-semibold bg-gray-50" style={{borderColor: 'var(--border-color)'}}>Preguntas</td>
+                                                                            <td className="border p-2 text-xs bg-green-50" style={{borderColor: 'var(--border-color)'}}>Participa activamente en todas las exposiciones. Hace comentarios constructivos y preguntas relevantes. Demuestra interés genuino y respeto por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50" style={{borderColor: 'var(--border-color)'}}>Participa regularmente en las exposiciones. Hace algunos comentarios y preguntas útiles. Muestra interés por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50" style={{borderColor: 'var(--border-color)'}}>Participa ocasionalmente en las exposiciones. Los comentarios son limitados o poco elaborados. Muestra interés intermitente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50" style={{borderColor: 'var(--border-color)'}}>Raramente participa en las exposiciones. No hace comentarios ni preguntas. Muestra poco interés por el trabajo de otros.</td>
+                                                                        </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </main>
                 </div>
@@ -798,12 +1399,6 @@
             React.useEffect(() => {
                 firebase.initializeApp(firebaseConfig);
                 const auth = firebase.auth();
-                
-                // Limpiar URL si hay parámetros de verificación
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('mode') || urlParams.has('oobCode')) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
                 
                 const unsubscribe = auth.onAuthStateChanged(async (user) => {
                     setCurrentUser(user);
