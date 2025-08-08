@@ -158,6 +158,31 @@
         .toast-success { background-color: var(--success-color); }
         .toast-error { background-color: var(--error-color); }
         .toast-info { background-color: var(--accent-color); }
+        
+        .fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-color), #3b82f6);
+            color: white;
+            border: none;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(77, 150, 255, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -295,25 +320,26 @@
                         const code = generateCode();
                         setGeneratedCode(code);
                         
-                        if (userRole === 'student' && !courseCode.startsWith('#')) {
-                            toast.showToast('Los estudiantes deben ingresar un código de curso válido (#codigo)', 'error');
-                            setLoading(false);
-                            return;
+                        if (userRole === 'student') {
+                            if (!courseCode.startsWith('#')) {
+                                toast.showToast('Los estudiantes deben ingresar un código de curso válido (#codigo)', 'error');
+                                setLoading(false);
+                                return;
+                            }
                         }
                         
-                        if (userRole === 'professor' && !courseCode.startsWith('#')) {
-                            toast.showToast('Los profesores deben crear un código de curso (#codigo)', 'error');
-                            setLoading(false);
-                            return;
-                        }
-                        
-                        setPendingUserData({
+                        const pendingData = {
                             email,
                             password,
                             fullName,
-                            userType: userRole,
-                            courseCode
-                        });
+                            userType: userRole
+                        };
+                        
+                        if (userRole === 'student') {
+                            pendingData.courseCode = courseCode;
+                        }
+                        
+                        setPendingUserData(pendingData);
                         
                         await sendVerificationEmail(email, code, fullName);
                         setShowCodeVerification(true);
@@ -365,24 +391,13 @@
                         fullName: pendingUserData.fullName,
                         userType: pendingUserData.userType,
                         emailVerified: true,
-                        createdAt: new Date(),
-                        courseCode: pendingUserData.courseCode
+                        createdAt: new Date()
                     };
 
                     if (pendingUserData.userType === 'student') {
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
-                    } else {
-                        // Crear documento del curso si es profesor
-                        const courseDocRef = db.collection('artifacts/seminario-investigacion-app/courses').doc();
-                        await courseDocRef.set({
-                            courseCode: pendingUserData.courseCode,
-                            professorId: user.uid,
-                            professorEmail: pendingUserData.email,
-                            professorName: pendingUserData.fullName,
-                            createdAt: new Date(),
-                            studentsCount: 0
-                        });
+                        userData.courseCode = pendingUserData.courseCode;
                     }
                     
                     await userDocRef.set(userData);
@@ -527,31 +542,30 @@
                                         </select>
                                     </div>
                                     
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
-                                            {userRole === 'professor' ? 'Crear Código de Curso' : 'Código de Curso'}
-                                        </label>
-                                        <input
-                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                            type="text"
-                                            placeholder={userRole === 'professor' ? '#MI_CURSO_2024' : '#codigo_del_profesor'}
-                                            value={courseCode}
-                                            onChange={(e) => {
-                                                let value = e.target.value;
-                                                if (value && !value.startsWith('#')) {
-                                                    value = '#' + value;
-                                                }
-                                                setCourseCode(value);
-                                            }}
-                                            required
-                                        />
-                                        <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
-                                            {userRole === 'professor' 
-                                                ? 'Crea un código único para tu curso (ej: #SEMINARIO_2024)'
-                                                : 'Ingresa el código que te proporcionó tu profesor'
-                                            }
-                                        </p>
-                                    </div>
+                                    {userRole === 'student' && (
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                                Código de Curso
+                                            </label>
+                                            <input
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                type="text"
+                                                placeholder="#codigo_del_profesor"
+                                                value={courseCode}
+                                                onChange={(e) => {
+                                                    let value = e.target.value;
+                                                    if (value && !value.startsWith('#')) {
+                                                        value = '#' + value;
+                                                    }
+                                                    setCourseCode(value);
+                                                }}
+                                                required
+                                            />
+                                            <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                                                Ingresa el código que te proporcionó tu profesor
+                                            </p>
+                                        </div>
+                                    )}
                                 </>
                             )}
                             
@@ -607,38 +621,46 @@
             const auth = firebase.auth();
             const db = firebase.firestore();
             const toast = useToast();
+            const [courses, setCourses] = React.useState([]);
+            const [selectedCourse, setSelectedCourse] = React.useState(null);
             const [students, setStudents] = React.useState([]);
             const [loading, setLoading] = React.useState(true);
             const [userData, setUserData] = React.useState(null);
             const [expandedStudent, setExpandedStudent] = React.useState(null);
+            const [showCreateCourse, setShowCreateCourse] = React.useState(false);
+            const [showEditContent, setShowEditContent] = React.useState(false);
+            const [editingWeek, setEditingWeek] = React.useState(null);
+            const [newCourse, setNewCourse] = React.useState({
+                name: '',
+                code: '',
+                university: '',
+                description: '',
+                weeks: 16,
+                weeklyContent: []
+            });
+            const [showContentPreview, setShowContentPreview] = React.useState(false);
+            const [previewContent, setPreviewContent] = React.useState(null);
+            const [showRanking, setShowRanking] = React.useState(false);
+            const [weekContent, setWeekContent] = React.useState({
+                title: '',
+                description: '',
+                content: '',
+                activities: [''],
+                badges: [{ name: '', description: '' }]
+            });
 
-            const badges = [
-                { id: 1, name: 'Badge de Iniciación', description: 'Por completar la primera lectura, reflexionar sobre tus intereses iniciales y formar parte de un equipo (Semana 1)' },
-                { id: 2, name: 'Badge de Maestro Expositor', description: 'Por exponer sobre tu tema asignado en las Semanas 2-5 (se gana una sola vez al realizar tu exposición grupal)' },
-                { id: 3, name: 'Badge de Participación Activa: Novato', description: 'Por participar activamente en el debate y taller de la Semana 2' },
-                { id: 4, name: 'Badge de Participación Activa: Aprendiz', description: 'Por participar activamente en el debate y taller de la Semana 3' },
-                { id: 5, name: 'Badge de Participación Activa: Avanzado', description: 'Por participar activamente en el debate y taller de la Semana 4' },
-                { id: 6, name: 'Badge de Participación Activa: Máster', description: 'Por participar activamente en el debate y reflexión de la Semana 5' },
-                { id: 7, name: 'Badge de Cuestionador Perspicaz', description: 'Por formular preguntas desafiantes y relevantes durante el periodo de exposiciones (Semanas 2-5)' },
-                { id: 8, name: 'Badge de Clarificador del Saber', description: 'Por responder correctamente y con claridad a las preguntas de los compañeros durante el periodo de exposiciones (Semanas 2-5)' },
-                { id: 9, name: 'Badge de Conector de Conceptos', description: 'Por sintetizar y establecer conexiones perspicaces entre los diferentes temas expuestos durante el periodo de exposiciones (Semanas 2-5)' },
-                { id: 10, name: 'Badge de Sembrador de Ideas', description: 'Por identificar una problemática y comenzar tu búsqueda preliminar (Semana 6)' },
-                { id: 11, name: 'Badge de Artífice de Preguntas', description: 'Por formular una pregunta de investigación bien definida y su planteamiento (Semana 7)' },
-                { id: 12, name: 'Badge de Bibliotecario Experto', description: 'Por iniciar tu revisión bibliográfica y definir objetivos claros (Semana 8)' },
-                { id: 13, name: 'Badge de Arquitecto de Proyectos', description: 'Por consolidar tu primera propuesta de investigación (Semana 9)' },
-                { id: 14, name: 'Badge de Estratega Metodológico', description: 'Por diseñar tu metodología y definir conceptos clave (Semana 10)' },
-                { id: 15, name: 'Badge de Constructor de Instrumentos', description: 'Por desarrollar tus herramientas de recolección de datos (Semana 11)' },
-                { id: 16, name: 'Badge de Recolector de Datos', description: 'Por iniciar y organizar tu recolección de datos (Semana 12)' },
-                { id: 17, name: 'Badge de Intérprete Cualitativo', description: 'Por realizar tu primer análisis cualitativo (Semana 13)' },
-                { id: 18, name: 'Badge de Analista Cuantitativo', description: 'Por realizar tu primer análisis cuantitativo (Semana 14)' },
-                { id: 19, name: 'Badge de Narrador Visual', description: 'Por diseñar tus visualizaciones y empezar a redactar tu informe (Semana 15)' },
-                { id: 20, name: 'Badge de Investigador Élite', description: 'Por completar y presentar tu proyecto final de investigación (Semana 16)' }
-            ];
+
 
             React.useEffect(() => {
-                loadStudents();
                 loadUserData();
+                loadCourses();
             }, []);
+            
+            React.useEffect(() => {
+                if (selectedCourse) {
+                    loadStudents();
+                }
+            }, [selectedCourse]);
 
             const loadUserData = async () => {
                 try {
@@ -651,34 +673,102 @@
                 }
             };
 
-            const loadStudents = async () => {
+            const loadCourses = async () => {
                 try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
-                    if (userDoc.exists) {
-                        const professorData = userDoc.data();
-                        const courseCode = professorData.courseCode;
-                        
-                        const studentsQuery = await db.collection('artifacts/seminario-investigacion-app/users')
-                            .where('userType', '==', 'student')
-                            .where('courseCode', '==', courseCode)
-                            .get();
-                        
-                        const studentsData = studentsQuery.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        
-                        setStudents(studentsData);
+                    const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                        .where('professorId', '==', currentUser.uid)
+                        .get();
+                    
+                    const coursesData = coursesQuery.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    setCourses(coursesData);
+                    if (coursesData.length > 0 && !selectedCourse) {
+                        setSelectedCourse(coursesData[0]);
                     }
                 } catch (error) {
-                    console.error('Error cargando estudiantes:', error);
-                    toast.showToast('Error cargando estudiantes', 'error');
+                    console.error('Error cargando cursos:', error);
+                    toast.showToast('Error cargando cursos', 'error');
                 } finally {
                     setLoading(false);
                 }
             };
+            
+            const loadStudents = async () => {
+                if (!selectedCourse) return;
+                
+                try {
+                    const studentsQuery = await db.collection('artifacts/seminario-investigacion-app/users')
+                        .where('userType', '==', 'student')
+                        .where('courseCode', '==', selectedCourse.courseCode)
+                        .get();
+                    
+                    const studentsData = studentsQuery.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    setStudents(studentsData);
+                } catch (error) {
+                    console.error('Error cargando estudiantes:', error);
+                    toast.showToast('Error cargando estudiantes', 'error');
+                }
+            };
 
-            const assignBadge = async (studentId, badgeId) => {
+            const createCourse = async () => {
+                if (!newCourse.name || !newCourse.code || !newCourse.university) {
+                    toast.showToast('Nombre, código y universidad son requeridos', 'error');
+                    return;
+                }
+                
+                try {
+                    const courseCode = newCourse.code.startsWith('#') ? newCourse.code : '#' + newCourse.code;
+                    
+                    const courseData = {
+                        name: newCourse.name,
+                        courseCode: courseCode,
+                        university: newCourse.university,
+                        description: newCourse.description,
+                        weeks: newCourse.weeks,
+                        professorId: currentUser.uid,
+                        professorEmail: currentUser.email,
+                        professorName: userData?.fullName || currentUser.email,
+                        createdAt: new Date(),
+                        studentsCount: 0,
+                        weeklyContent: [],
+                        badges: []
+                    };
+                    
+                    const docRef = await db.collection('artifacts/seminario-investigacion-app/courses').add(courseData);
+                    
+                    // Crear estructura inicial de semanas
+                    const weeklyContent = [];
+                    for (let i = 1; i <= newCourse.weeks; i++) {
+                        weeklyContent.push({
+                            week: i,
+                            title: `Semana ${i}`,
+                            description: '',
+                            content: '',
+                            activities: [],
+                            badges: []
+                        });
+                    }
+                    
+                    await docRef.update({ weeklyContent });
+                    
+                    toast.showToast('Curso creado exitosamente', 'success');
+                    setShowCreateCourse(false);
+                    setNewCourse({ name: '', code: '', university: '', description: '', weeks: 16, weeklyContent: [] });
+                    loadCourses();
+                } catch (error) {
+                    console.error('Error creando curso:', error);
+                    toast.showToast('Error creando curso', 'error');
+                }
+            };
+            
+            const assignBadge = async (studentId, badgeId, earned = true) => {
                 try {
                     const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
                     const studentDoc = await studentRef.get();
@@ -686,14 +776,19 @@
                     if (studentDoc.exists) {
                         const studentData = studentDoc.data();
                         const currentBadges = studentData.badgesEarned || [];
+                        const currentBadgeStatus = studentData.badgeStatus || {};
                         
                         if (!currentBadges.includes(badgeId)) {
                             await studentRef.update({
                                 badgesEarned: [...currentBadges, badgeId],
+                                badgeStatus: {
+                                    ...currentBadgeStatus,
+                                    [badgeId]: earned ? 'earned' : 'assigned'
+                                },
                                 lastBadgeEarned: new Date()
                             });
                             
-                            toast.showToast('Badge asignado exitosamente', 'success');
+                            toast.showToast(`Badge ${earned ? 'ganado' : 'asignado'} exitosamente`, 'success');
                             loadStudents();
                         } else {
                             toast.showToast('El estudiante ya tiene este badge', 'error');
@@ -701,7 +796,177 @@
                     }
                 } catch (error) {
                     console.error('Error asignando badge:', error);
-                    toast.showToast('Error asignando badge', 'error');
+                    if (error.code === 'permission-denied') {
+                        toast.showToast('Error de permisos. Aplica las reglas de Firestore del README.', 'error');
+                    } else {
+                        toast.showToast('Error asignando badge', 'error');
+                    }
+                }
+            };
+            
+            const [showPasswordModal, setShowPasswordModal] = React.useState(false);
+            const [passwordData, setPasswordData] = React.useState({ password: '', showPassword: false, studentId: '', badgeId: '', newStatus: '' });
+            const [isUpdatingBadge, setIsUpdatingBadge] = React.useState(false);
+            const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(null);
+            const [deletePassword, setDeletePassword] = React.useState('');
+            const [showDeletePassword, setShowDeletePassword] = React.useState(false);
+            
+            const changeBadgeStatus = (studentId, badgeId, newStatus) => {
+                if (confirm(`¿Estás seguro de cambiar el badge a ${newStatus === 'earned' ? 'ganado' : 'asignado'}?`)) {
+                    updateBadgeStatus(studentId, badgeId, newStatus);
+                }
+            };
+            
+
+            
+            const updateBadgeStatus = async (studentId, badgeId, newStatus) => {
+                try {
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
+                    const studentDoc = await studentRef.get();
+                    
+                    if (studentDoc.exists) {
+                        const studentData = studentDoc.data();
+                        const currentBadgeStatus = studentData.badgeStatus || {};
+                        
+                        await studentRef.update({
+                            badgeStatus: {
+                                ...currentBadgeStatus,
+                                [badgeId]: newStatus
+                            }
+                        });
+                        
+                        toast.showToast(`Badge cambiado a ${newStatus === 'earned' ? 'ganado' : 'asignado'}`, 'success');
+                        loadStudents();
+                    }
+                } catch (error) {
+                    console.error('Error actualizando badge:', error);
+                    toast.showToast('Error actualizando badge', 'error');
+                }
+            };
+            
+            const removeStudent = async (studentId) => {
+                if (!confirm('¿Estás seguro de que quieres remover este estudiante del curso?')) {
+                    return;
+                }
+                
+                try {
+                    await db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`).delete();
+                    toast.showToast('Estudiante removido exitosamente', 'success');
+                    loadStudents();
+                } catch (error) {
+                    console.error('Error removiendo estudiante:', error);
+                    toast.showToast('Error removiendo estudiante', 'error');
+                }
+            };
+            
+            const deleteCourse = async () => {
+                if (!deletePassword) return;
+                
+                try {
+                    const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, deletePassword);
+                    await currentUser.reauthenticateWithCredential(credential);
+                    
+                    await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
+                    
+                    toast.showToast('Curso eliminado exitosamente', 'success');
+                    setShowDeleteConfirm(null);
+                    setDeletePassword('');
+                    loadCourses();
+                    setSelectedCourse(null);
+                } catch (error) {
+                    if (error.code === 'auth/wrong-password') {
+                        toast.showToast('Contraseña incorrecta', 'error');
+                    } else {
+                        console.error('Error eliminando curso:', error);
+                        toast.showToast('Error eliminando curso', 'error');
+                    }
+                }
+            };
+            
+            const editWeekContent = (weekNumber) => {
+                if (weekNumber === 0) {
+                    // Editar información general
+                    setWeekContent({
+                        university: selectedCourse.university || '',
+                        courseName: selectedCourse.name || '',
+                        courseCode: selectedCourse.courseCode || '',
+                        period: selectedCourse.period || '',
+                        group: selectedCourse.group || '',
+                        programs: selectedCourse.programs || '',
+                        intensity: selectedCourse.intensity || '',
+                        credits: selectedCourse.credits || '',
+                        introduction: selectedCourse.introduction || '',
+                        iagAgreements: selectedCourse.iagAgreements || '',
+                        availableBadges: selectedCourse.availableBadges || []
+                    });
+                } else {
+                    const week = selectedCourse.weeklyContent?.find(w => w.week === weekNumber) || {
+                        title: `Semana ${weekNumber}`,
+                        description: '',
+                        content: '',
+                        activities: [''],
+                        badges: [{ name: '', description: '' }]
+                    };
+                    setWeekContent(week);
+                }
+                setEditingWeek(weekNumber);
+                setShowEditContent(true);
+            };
+            
+            const saveWeekContent = async () => {
+                try {
+                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`);
+                    
+                    if (editingWeek === 0) {
+                        // Guardar información general
+                        await courseRef.update({
+                            university: weekContent.university,
+                            name: weekContent.courseName,
+                            courseCode: weekContent.courseCode,
+                            period: weekContent.period,
+                            group: weekContent.group,
+                            programs: weekContent.programs,
+                            intensity: weekContent.intensity,
+                            credits: weekContent.credits,
+                            introduction: weekContent.introduction,
+                            iagAgreements: weekContent.iagAgreements,
+                            availableBadges: weekContent.availableBadges || []
+                        });
+                    } else {
+                        // Guardar contenido de semana
+                        const courseDoc = await courseRef.get();
+                        const courseData = courseDoc.data();
+                        
+                        let weeklyContent = courseData.weeklyContent || [];
+                        const weekIndex = weeklyContent.findIndex(w => w.week === editingWeek);
+                        
+                        const updatedWeek = {
+                            ...weekContent,
+                            week: editingWeek,
+                            activities: weekContent.activities?.filter(a => a.trim()) || [],
+                            badges: weekContent.badges?.filter(b => b.name?.trim()) || []
+                        };
+                        
+                        if (weekIndex >= 0) {
+                            weeklyContent[weekIndex] = updatedWeek;
+                        } else {
+                            weeklyContent.push(updatedWeek);
+                        }
+                        
+                        await courseRef.update({ weeklyContent });
+                    }
+                    
+                    toast.showToast('Contenido guardado exitosamente', 'success');
+                    setShowEditContent(false);
+                    await loadCourses();
+                    // Actualizar el curso seleccionado con los nuevos datos
+                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`).get();
+                    if (updatedCourseData.exists) {
+                        setSelectedCourse({id: selectedCourse.id, ...updatedCourseData.data()});
+                    }
+                } catch (error) {
+                    console.error('Error guardando contenido:', error);
+                    toast.showToast('Error guardando contenido', 'error');
                 }
             };
 
@@ -717,19 +982,441 @@
             if (loading) {
                 return <LoadingSpinner />;
             }
+            
+            if (showDeleteConfirm) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="card rounded-xl p-6 w-full max-w-md mx-4">
+                            <h3 className="text-lg font-bold mb-4">Eliminar Curso</h3>
+                            <p className="text-sm mb-4" style={{color: 'var(--text-secondary)'}}>
+                                Ingresa tu contraseña para confirmar la eliminación del curso:
+                            </p>
+                            <div className="relative mb-4">
+                                <input
+                                    className="input-field w-full py-3 px-4 pr-12 rounded-lg focus:outline-none"
+                                    type={showDeletePassword ? 'text' : 'password'}
+                                    placeholder="Contraseña"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && deleteCourse()}
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                                >
+                                    {showDeletePassword ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteConfirm(null);
+                                        setDeletePassword('');
+                                    }}
+                                    className="btn btn-secondary flex-1"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={deleteCourse}
+                                    className="btn btn-primary flex-1 bg-red-500 hover:bg-red-600"
+                                    disabled={!deletePassword}
+                                >
+                                    Eliminar Curso
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (showEditContent) {
+                return (
+                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                        <div className="max-w-4xl mx-auto">
+                            <div className="card rounded-xl p-6">
+                                <h2 className="text-2xl font-bold mb-6">{editingWeek === 0 ? 'Editar Información General' : `Editar Contenido - Semana ${editingWeek}`}</h2>
+                                
+                                {editingWeek === 0 ? (
+                                    <div className="space-y-6">
+                                        <div>
+                                            <h4 className="font-semibold text-lg mb-4 text-gray-800">Datos del Curso</h4>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Universidad</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.university || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, university: e.target.value})}
+                                                        placeholder="Universidad Icesi"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Nombre</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.courseName || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, courseName: e.target.value})}
+                                                        placeholder="Seminario de Investigación"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Código</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.courseCode || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, courseCode: e.target.value})}
+                                                        placeholder="INGE-3032"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Periodo</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.period || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, period: e.target.value})}
+                                                        placeholder="2024-2"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Grupo</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.group || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, group: e.target.value})}
+                                                        placeholder="01"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Programa/s</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.programs || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, programs: e.target.value})}
+                                                        placeholder="Ingeniería de Sistemas"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Intensidad Horaria</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.intensity || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, intensity: e.target.value})}
+                                                        placeholder="4 horas semanales"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold mb-2">Créditos</label>
+                                                    <input
+                                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={weekContent.credits || ''}
+                                                        onChange={(e) => setWeekContent({...weekContent, credits: e.target.value})}
+                                                        placeholder="3"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 className="font-semibold text-lg mb-4 text-gray-800">Introducción</h4>
+                                            <textarea
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                rows="4"
+                                                value={weekContent.introduction || ''}
+                                                onChange={(e) => setWeekContent({...weekContent, introduction: e.target.value})}
+                                                placeholder="Introducción del curso..."
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 className="font-semibold text-lg mb-4 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h4>
+                                            <textarea
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                rows="6"
+                                                value={weekContent.iagAgreements || ''}
+                                                onChange={(e) => setWeekContent({...weekContent, iagAgreements: e.target.value})}
+                                                placeholder="Acuerdos sobre el uso de Inteligencia Artificial Generativa..."
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 className="font-semibold text-lg mb-4 text-gray-800">Badges Disponibles en el Curso</h4>
+                                            <div className="space-y-3">
+                                                {(weekContent.availableBadges || []).map((badge, index) => (
+                                                    <div key={index} className="border rounded p-3 bg-gray-50">
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                            <div>
+                                                                <label className="block text-sm font-medium mb-1">Nombre del Badge:</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={badge.name || ''}
+                                                                    onChange={(e) => {
+                                                                        const newBadges = [...(weekContent.availableBadges || [])];
+                                                                        newBadges[index] = {...badge, name: e.target.value};
+                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                    }}
+                                                                    className="input-field w-full p-2 rounded"
+                                                                    placeholder="Badge de Iniciación"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-sm font-medium mb-1">Descripción:</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={badge.description || ''}
+                                                                    onChange={(e) => {
+                                                                        const newBadges = [...(weekContent.availableBadges || [])];
+                                                                        newBadges[index] = {...badge, description: e.target.value};
+                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                    }}
+                                                                    className="input-field w-full p-2 rounded"
+                                                                    placeholder="Descripción del badge"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-sm font-medium mb-1">Semana Máxima:</label>
+                                                                <select
+                                                                    value={badge.maxWeek || 1}
+                                                                    onChange={(e) => {
+                                                                        const newBadges = [...(weekContent.availableBadges || [])];
+                                                                        newBadges[index] = {...badge, maxWeek: parseInt(e.target.value)};
+                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                    }}
+                                                                    className="input-field w-full p-2 rounded"
+                                                                >
+                                                                    {Array.from({length: selectedCourse?.weeks || 16}, (_, i) => i + 1).map(week => (
+                                                                        <option key={week} value={week}>Semana {week}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                const newBadges = (weekContent.availableBadges || []).filter((_, i) => i !== index);
+                                                                setWeekContent({...weekContent, availableBadges: newBadges});
+                                                            }}
+                                                            className="mt-2 text-red-600 text-sm hover:text-red-800"
+                                                        >
+                                                            Eliminar Badge
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button
+                                                    onClick={() => {
+                                                        const newBadges = [...(weekContent.availableBadges || []), {name: '', description: '', maxWeek: 1}];
+                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                    }}
+                                                    className="w-full p-3 border-2 border-dashed border-gray-300 rounded text-gray-600 hover:border-gray-400 hover:text-gray-800"
+                                                >
+                                                    + Agregar Badge
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Título</label>
+                                            <input
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                type="text"
+                                                value={weekContent.title || ''}
+                                                onChange={(e) => setWeekContent({...weekContent, title: e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Descripción</label>
+                                            <input
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                type="text"
+                                                value={weekContent.description || ''}
+                                                onChange={(e) => setWeekContent({...weekContent, description: e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Contenido</label>
+                                            <textarea
+                                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                                rows="4"
+                                                value={weekContent.content || ''}
+                                                onChange={(e) => setWeekContent({...weekContent, content: e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Actividades</label>
+                                            {(weekContent.activities || ['']).map((activity, index) => (
+                                                <div key={index} className="flex gap-2 mb-2">
+                                                    <input
+                                                        className="input-field flex-1 py-2 px-3 rounded-lg focus:outline-none"
+                                                        type="text"
+                                                        value={activity}
+                                                        onChange={(e) => {
+                                                            const newActivities = [...(weekContent.activities || [''])];
+                                                            newActivities[index] = e.target.value;
+                                                            setWeekContent({...weekContent, activities: newActivities});
+                                                        }}
+                                                        placeholder="Actividad..."
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const newActivities = (weekContent.activities || ['']).filter((_, i) => i !== index);
+                                                            setWeekContent({...weekContent, activities: newActivities});
+                                                        }}
+                                                        className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            <button
+                                                onClick={() => setWeekContent({...weekContent, activities: [...(weekContent.activities || ['']), '']})}
+                                                className="btn btn-secondary text-sm"
+                                            >
+                                                + Agregar Actividad
+                                            </button>
+                                        </div>
+                                        
+
+                                    </div>
+                                )}
+                                
+                                <div className="flex gap-4 mt-6">
+                                    <button
+                                        onClick={() => setShowEditContent(false)}
+                                        className="btn btn-secondary"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={saveWeekContent}
+                                        className="btn btn-primary"
+                                    >
+                                        Guardar Contenido
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (showCreateCourse) {
+                return (
+                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                        <div className="max-w-2xl mx-auto">
+                            <div className="card rounded-xl p-6">
+                                <h2 className="text-2xl font-bold mb-6">Crear Nuevo Curso</h2>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Universidad</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="text"
+                                            placeholder="Universidad Icesi"
+                                            value={newCourse.university}
+                                            onChange={(e) => setNewCourse({...newCourse, university: e.target.value})}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Nombre del Curso</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="text"
+                                            placeholder="Seminario de Investigación"
+                                            value={newCourse.name}
+                                            onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Código del Curso</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="text"
+                                            placeholder="#SEMINARIO_2024"
+                                            value={newCourse.code}
+                                            onChange={(e) => {
+                                                let value = e.target.value;
+                                                if (value && !value.startsWith('#')) {
+                                                    value = '#' + value;
+                                                }
+                                                setNewCourse({...newCourse, code: value});
+                                            }}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Descripción</label>
+                                        <textarea
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            rows="3"
+                                            placeholder="Descripción del curso..."
+                                            value={newCourse.description}
+                                            onChange={(e) => setNewCourse({...newCourse, description: e.target.value})}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Número de Semanas</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="number"
+                                            min="1"
+                                            max="20"
+                                            value={newCourse.weeks}
+                                            onChange={(e) => setNewCourse({...newCourse, weeks: parseInt(e.target.value)})}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-4 mt-6">
+                                    <button
+                                        onClick={() => setShowCreateCourse(false)}
+                                        className="btn btn-secondary"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={createCourse}
+                                        className="btn btn-primary"
+                                    >
+                                        Crear Curso
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
+                            <div className="flex-1">
                                 <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
                                 <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
                                     Profesor: {currentUser.email}
                                 </p>
-                                <p className="text-xs" style={{color: 'var(--text-secondary)'}}>
-                                    Código de curso: {userData?.courseCode}
-                                </p>
+                                {selectedCourse && (
+                                    <p className="text-xs" style={{color: 'var(--text-secondary)'}}>
+                                        Curso actual: {selectedCourse.name} ({selectedCourse.courseCode})
+                                    </p>
+                                )}
                             </div>
                             <div className="flex items-center gap-3">
                                 <ThemeToggle />
@@ -744,75 +1431,332 @@
                         </div>
                     </header>
                     
-                    <div className="grid gap-6">
-                        <div className="card rounded-xl p-6">
-                            <h2 className="text-xl font-bold mb-4">Estudiantes Registrados ({students.length})</h2>
-                            
-                            {students.length === 0 ? (
-                                <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
-                            ) : (
-                                <div className="space-y-4">
-                                    {students.map(student => {
-                                        const isExpanded = expandedStudent === student.id;
+                    {/* Pills de cursos */}
+                    <div className="card rounded-xl p-6 mb-6">
+                        <h2 className="text-xl font-bold mb-4">Mis Cursos</h2>
+                        <div className="flex flex-wrap gap-3">
+                            {courses.map(course => (
+                                <div key={course.id} className="relative group">
+                                    <button
+                                        onClick={() => setSelectedCourse(course)}
+                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                                            selectedCourse?.id === course.id 
+                                                ? 'bg-blue-500 text-white' 
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {course.name}
+                                    </button>
+                                    {selectedCourse?.id === course.id && (
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(course.id)}
+                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 flex items-center justify-center"
+                                            title="Eliminar curso"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                onClick={() => setShowCreateCourse(true)}
+                                className="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-all"
+                            >
+                                + Crear Nuevo Curso
+                            </button>
+                        </div>
+                        {courses.length === 0 && (
+                            <p className="text-center py-8" style={{color: 'var(--text-secondary)'}}>No tienes cursos creados aún.</p>
+                        )}
+                    </div>
+                    
+                    {selectedCourse && (
+                        <div className="grid gap-6">
+                            {/* Vista de contenido del curso */}
+                            <div className="card rounded-xl p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold">Contenido del Curso</h2>
+                                    <button
+                                        onClick={() => editWeekContent(0)}
+                                        className="btn btn-secondary text-sm"
+                                    >
+                                        ✏️ Editar Información General
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {Array.from({ length: selectedCourse.weeks }, (_, i) => i + 1).map(weekNum => {
+                                        const weekData = selectedCourse.weeklyContent?.find(w => w.week === weekNum);
                                         return (
-                                            <div key={student.id} className="border rounded-lg overflow-hidden" style={{borderColor: 'var(--border-color)'}}>
-                                                <div 
-                                                    className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                                                    onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <div>
-                                                            <h3 className="font-semibold">{student.fullName}</h3>
-                                                            <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{student.email}</p>
-                                                            <div className="text-sm mt-1" style={{color: 'var(--text-secondary)'}}>
-                                                                Badges: {(student.badgesEarned || []).length}/20
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-gray-400">
-                                                            {isExpanded ? '▲' : '▼'}
-                                                        </div>
-                                                    </div>
+                                            <div key={weekNum} className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                                 onClick={() => {
+                                                     setPreviewContent({...weekData, week: weekNum, title: weekData?.title || `Semana ${weekNum}`});
+                                                     setShowContentPreview(true);
+                                                 }}>
+                                                <h3 className="font-semibold text-sm mb-2">Semana {weekNum}</h3>
+                                                <h4 className="font-medium mb-2 line-clamp-2">{weekData?.title || 'Sin título'}</h4>
+                                                <p className="text-xs text-gray-600 mb-3 line-clamp-3">{weekData?.description || 'Sin descripción'}</p>
+                                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                                    <span>{weekData?.activities?.length || 0} actividades</span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            editWeekContent(weekNum);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-800 font-medium"
+                                                    >
+                                                        Editar
+                                                    </button>
                                                 </div>
-                                                
-                                                {isExpanded && (
-                                                    <div className="px-4 pb-4 border-t" style={{borderColor: 'var(--border-color)'}}>
-                                                        <div className="mt-4">
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                                                                {badges.map(badge => {
-                                                                    const hasEarned = (student.badgesEarned || []).includes(badge.id);
-                                                                    return (
-                                                                        <button
-                                                                            key={badge.id}
-                                                                            onClick={() => !hasEarned && assignBadge(student.id, badge.id)}
-                                                                            className={`p-3 rounded text-left text-sm transition-colors ${
-                                                                                hasEarned 
-                                                                                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                                                                                    : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-blue-50'
-                                                                            }`}
-                                                                            disabled={hasEarned}
-                                                                            title={badge.description}
-                                                                        >
-                                                                            <div className="flex items-start gap-2">
-                                                                                <span className="text-lg">{hasEarned ? '✓' : '+'}</span>
-                                                                                <div>
-                                                                                    <div className="font-medium">{badge.name}</div>
-                                                                                    <div className="text-xs opacity-75 mt-1">{badge.description}</div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
-                            )}
+                            </div>
+                            
+                            <div className="card rounded-xl p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold">Estudiantes Registrados ({students.length})</h2>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => setShowRanking(!showRanking)}
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
+                                        </button>
+                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                            Código para compartir: <strong>{selectedCourse.courseCode}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                {students.length === 0 ? (
+                                    <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
+                                ) : showRanking ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b" style={{borderColor: 'var(--border-color)'}}>
+                                                    <th className="text-left p-3 font-semibold">#</th>
+                                                    <th className="text-left p-3 font-semibold">Estudiante</th>
+                                                    <th className="text-center p-3 font-semibold">Badges Ganados</th>
+                                                    <th className="text-center p-3 font-semibold">Badges Asignados</th>
+                                                    <th className="text-center p-3 font-semibold">Total</th>
+                                                    <th className="text-left p-3 font-semibold">Detalle de Badges</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {students
+                                                    .sort((a, b) => {
+                                                        const aEarned = (a.badgesEarned || []).filter(badgeId => a.badgeStatus?.[badgeId] === 'earned').length;
+                                                        const bEarned = (b.badgesEarned || []).filter(badgeId => b.badgeStatus?.[badgeId] === 'earned').length;
+                                                        return bEarned - aEarned;
+                                                    })
+                                                    .map((student, index) => {
+                                                        const earnedBadges = (student.badgesEarned || []).filter(badgeId => student.badgeStatus?.[badgeId] === 'earned');
+                                                        const assignedBadges = (student.badgesEarned || []).filter(badgeId => student.badgeStatus?.[badgeId] === 'assigned');
+                                                        return (
+                                                            <tr key={student.id} className="border-b hover:bg-gray-50" style={{borderColor: 'var(--border-color)'}}>
+                                                                <td className="p-3 font-semibold">{index + 1}</td>
+                                                                <td className="p-3">
+                                                                    <div>
+                                                                        <div className="font-medium">{student.fullName}</div>
+                                                                        <div className="text-xs" style={{color: 'var(--text-secondary)'}}>{student.email}</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                                                        🏆 {earnedBadges.length}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                                                                        🔴 {assignedBadges.length}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-center font-semibold">{(student.badgesEarned || []).length}</td>
+                                                                <td className="p-3">
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {(selectedCourse.availableBadges || []).map((badge, badgeIndex) => {
+                                                                            const badgeId = `${badge.maxWeek}-${badgeIndex}`;
+                                                                            const hasEarned = (student.badgesEarned || []).includes(badgeId);
+                                                                            const badgeStatus = student.badgeStatus?.[badgeId];
+                                                                            if (!hasEarned) return null;
+                                                                            return (
+                                                                                <span key={badgeId} className={`px-1 py-0.5 text-xs rounded ${
+                                                                                    badgeStatus === 'earned' 
+                                                                                        ? 'bg-green-100 text-green-800' 
+                                                                                        : 'bg-red-100 text-red-800'
+                                                                                }`}>
+                                                                                    {badgeStatus === 'earned' ? '🏆' : '🔴'} {badge.name}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {students.map(student => {
+                                            const isExpanded = expandedStudent === student.id;
+                                            return (
+                                                <div key={student.id} className="border rounded-lg overflow-hidden" style={{borderColor: 'var(--border-color)'}}>
+                                                    <div 
+                                                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                                                        onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <div>
+                                                                <h3 className="font-semibold">{student.fullName}</h3>
+                                                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{student.email}</p>
+                                                                <div className="text-sm mt-1" style={{color: 'var(--text-secondary)'}}>
+                                                                    Badges: {(student.badgesEarned || []).length}/20
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removeStudent(student.id);
+                                                                    }}
+                                                                    className="text-red-500 hover:text-red-700 px-2 py-1 rounded"
+                                                                    title="Remover estudiante"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                                <div className="text-gray-400">
+                                                                    {isExpanded ? '▲' : '▼'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {isExpanded && (
+                                                        <div className="px-4 pb-4 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                                            <div className="mt-4">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                    {(selectedCourse.availableBadges || []).sort((a, b) => a.maxWeek - b.maxWeek).map((badge, globalIndex) => {
+                                                                        const badgeId = `${badge.maxWeek}-${globalIndex}`;
+                                                                        const hasEarned = (student.badgesEarned || []).includes(badgeId);
+                                                                        const badgeStatus = student.badgeStatus?.[badgeId];
+                                                                        const isEarned = badgeStatus === 'earned';
+                                                                        const isAssigned = badgeStatus === 'assigned';
+                                                                        
+                                                                        return (
+                                                                            <div key={badgeId} className="border rounded p-2 flex flex-col">
+                                                                                <div className="text-sm font-medium mb-1">{badge.name}</div>
+                                                                                <div className="text-xs text-gray-600 mb-1">Semana {badge.maxWeek}</div>
+                                                                                <div className="text-xs text-gray-600 mb-2 overflow-hidden" style={{
+                                                                                    display: '-webkit-box',
+                                                                                    WebkitLineClamp: 2,
+                                                                                    WebkitBoxOrient: 'vertical'
+                                                                                }}>{badge.description}</div>
+                                                                                <div className="mt-auto">
+                                                                                    {!hasEarned ? (
+                                                                                        <div className="flex gap-1">
+                                                                                            <button
+                                                                                                onClick={() => assignBadge(student.id, badgeId, true)}
+                                                                                                className="flex-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200"
+                                                                                            >
+                                                                                                ✓ Ganado
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => assignBadge(student.id, badgeId, false)}
+                                                                                                className="flex-1 px-2 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200"
+                                                                                            >
+                                                                                                → Asignar
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            onClick={() => changeBadgeStatus(student.id, badgeId, isEarned ? 'assigned' : 'earned')}
+                                                                                            className={`w-full px-2 py-1 rounded text-xs hover:opacity-80 ${
+                                                                                                isEarned 
+                                                                                                    ? 'bg-green-100 text-green-800' 
+                                                                                                    : 'bg-red-100 text-red-800'
+                                                                                            }`}
+                                                                                            title={`Cambiar a ${isEarned ? 'asignado' : 'ganado'}`}
+                                                                                        >
+                                                                                            {isEarned ? '🏆 Ganado' : '🔴 Solo Asignado'}
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
+                    
+                    {/* Modal de Preview de Contenido */}
+                    {showContentPreview && previewContent && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                                <div className="p-6">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="text-lg font-semibold">Semana {previewContent.week}: {previewContent.title}</h3>
+                                        <button
+                                            onClick={() => setShowContentPreview(false)}
+                                            className="text-gray-500 hover:text-gray-700"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h4 className="font-medium mb-2">Descripción</h4>
+                                            <p className="text-gray-600">{previewContent.description || 'Sin descripción'}</p>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-medium mb-2">Contenido</h4>
+                                            <div className="prose max-w-none text-gray-600">{previewContent.content || 'Sin contenido'}</div>
+                                        </div>
+                                        {previewContent.activities && previewContent.activities.length > 0 && (
+                                            <div>
+                                                <h4 className="font-medium mb-2">Actividades ({previewContent.activities.length})</h4>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    {previewContent.activities.map((activity, idx) => (
+                                                        <li key={idx} className="text-gray-600">{activity}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-end gap-2 mt-6">
+                                        <button
+                                            onClick={() => {
+                                                setShowContentPreview(false);
+                                                editWeekContent(previewContent.week);
+                                            }}
+                                            className="btn btn-primary"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            onClick={() => setShowContentPreview(false)}
+                                            className="btn btn-secondary"
+                                        >
+                                            Cerrar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
                     <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
                         Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
                     </footer>
@@ -830,222 +1774,14 @@
             const [loading, setLoading] = React.useState(true);
             const [expandedWeek, setExpandedWeek] = React.useState(null);
             const [professorName, setProfessorName] = React.useState('');
+            const [dynamicContent, setDynamicContent] = React.useState([]);
+            const [courseInfo, setCourseInfo] = React.useState(null);
 
-            const courseContent = [
-                {
-                    id: 1,
-                    week: 1,
-                    title: "Misión de Inicio - Descubriendo el Territorio de la Investigación",
-                    description: "Fundamentos de la investigación en diseño e innovación",
-                    content: "Presentación del curso, acuerdos sobre IA, introducción a la investigación aplicada en diseño, innovación y experiencia de usuario. Identificación de diferentes campos y tipos de investigación desde la disciplina del diseño.",
-                    activities: [
-                        "Círculo de Expectativas: Compartir expectativas del curso",
-                        "Exploración de Casos Inspiradores: Análisis de proyectos de investigación en diseño",
-                        "Formación de Equipos: Organización en grupos para exposiciones",
-                        "Diario del Investigador: Reflexionar sobre 3 preguntas de investigación"
-                    ],
-                    badge: "Iniciación",
-                    unlocked: true
-                },
-                {
-                    id: 2,
-                    weeks: "2-5",
-                    title: "Unidad 1: Reconocer los enfoques y rutas de investigación",
-                    description: "Fundamentos científicos y metodológicos",
-                    content: "Exposiciones grupales sobre conceptos fundamentales: Ciencia, Investigación científica, Tipos de investigación científica, Método científico, Hipótesis, Experimento científico, e Investigación en Diseño. Cada equipo tendrá 15 minutos para presentar de manera creativa e innovadora. La evaluación se realizará mediante una rúbrica que considera creatividad, claridad, conclusiones y participación.",
-                    activities: [
-                        "Semana 2: Exposiciones sobre 'Ciencia' e 'Investigación Científica'",
-                        "Semana 3: Exposiciones sobre 'Tipos de Investigación' y 'Método Científico'",
-                        "Semana 4: Exposiciones sobre 'Hipótesis' y 'Experimento Científico'",
-                        "Semana 5: Exposición sobre 'Investigación en Diseño' y síntesis",
-                        "Debates y reflexiones después de cada exposición",
-                        "Análisis de conexiones con ejemplos de diseño"
-                    ],
-                    badges: ["Maestro Expositor", "Participación Activa: Novato", "Participación Activa: Aprendiz", "Participación Activa: Avanzado", "Participación Activa: Máster", "Cuestionador Perspicaz", "Clarificador del Saber", "Conector de Conceptos"],
-                    unlocked: false,
-                    requiredBadge: 1
-                },
-                {
-                    id: 6,
-                    week: 6,
-                    title: "Misión de Ideación - Sembrando Ideas, Cosechando Problemas",
-                    description: "Unidad 2: Planteamiento de la investigación",
-                    content: "Cómo surgen las ideas de investigación en el campo del diseño e innovación: observación, tendencias, necesidades no satisfechas, brechas en el conocimiento. Técnicas de problematización: '5 Porqués', Diagrama de Ishikawa, Árbol de Problemas.",
-                    activities: [
-                        "Tormenta de Ideas Creativa y Problemática (60 min)",
-                        "Taller: Descomponiendo el Problema (60 min)",
-                        "El Problema del Héroe: Seleccionar problemática para proyecto",
-                        "Mapa Mental del Problema: Visualizar causas, efectos y actores"
-                    ],
-                    badge: "Sembrador de Ideas",
-                    unlocked: false,
-                    requiredBadge: 2
-                },
-                {
-                    id: 7,
-                    week: 7,
-                    title: "Misión de Precisión - Afinando la Pregunta Correcta",
-                    description: "Formulación de preguntas de investigación",
-                    content: "Análisis de problemas en diversos contextos: identificación de la población, el contexto y el alcance. Delimitación de problemas de investigación: de lo general a lo específico. Formulación de preguntas de investigación con características claras, concisas, factibles, relevantes y éticas.",
-                    activities: [
-                        "Taller de Preguntas Poderosas (90 min)",
-                        "El Embudo de la Investigación (30 min)",
-                        "El Enigma Resuelto: Redactar planteamiento del problema",
-                        "Definir pregunta de investigación final"
-                    ],
-                    badge: "Artífice de Preguntas",
-                    unlocked: false,
-                    requiredBadge: 10
-                },
-                {
-                    id: 8,
-                    week: 8,
-                    title: "Misión de Fundamentación - Construyendo los Pilares del Conocimiento",
-                    description: "Revisión de literatura y objetivos de investigación",
-                    content: "Revisión de literatura científica: importancia, tipos de fuentes, bases de datos académicas. Estrategias de búsqueda sistemática: palabras clave, operadores booleanos, filtros. Formulación de objetivos de investigación SMART.",
-                    activities: [
-                        "Cazadores de Conocimiento: Laboratorio de Búsqueda (75 min)",
-                        "Objetivos SMART: Taller de Precisión (45 min)",
-                        "La Biblioteca del Investigador: Revisión bibliográfica profunda",
-                        "Marco Conceptual Preliminar: Identificar conceptos clave"
-                    ],
-                    badge: "Bibliotecario Experto",
-                    unlocked: false,
-                    requiredBadge: 11
-                },
-                {
-                    id: 9,
-                    week: 9,
-                    title: "Misión de Planificación - El Mapa del Tesoro de tu Proyecto",
-                    description: "Estructura de la propuesta de investigación",
-                    content: "Justificación de la investigación: relevancia teórica, práctica, social, metodológica. Alcance y limitaciones del estudio. Estructura completa de la propuesta de investigación con todos sus componentes.",
-                    activities: [
-                        "El Argumento Persuasivo: Taller de Justificación (60 min)",
-                        "Presentación Preliminar del Mapa (60 min)",
-                        "El Borrador del Explorador: Consolidar propuesta completa",
-                        "Retroalimentación constructiva entre compañeros"
-                    ],
-                    badge: "Arquitecto de Proyectos",
-                    unlocked: false,
-                    requiredBadge: 12
-                },
-                {
-                    id: 10,
-                    week: 10,
-                    title: "Misión de Diseño - Creando tu Estrategia de Recolección",
-                    description: "Diseño metodológico y población de estudio",
-                    content: "Diseño metodológico: Selección del tipo de estudio. Población y muestra: criterios de inclusión y exclusión, métodos de muestreo. Definición de conceptos clave y operacionalización de variables. Consideraciones sobre validez y fiabilidad.",
-                    activities: [
-                        "El Laboratorio Metodológico (90 min)",
-                        "Debate: ¿Cuántos y Quiénes? (30 min)",
-                        "El Arsenal del Investigador: Profundizar marco conceptual",
-                        "Esquema Metodológico Detallado: Desarrollar metodología completa"
-                    ],
-                    badge: "Estratega Metodológico",
-                    unlocked: false,
-                    requiredBadge: 13
-                },
-                {
-                    id: 11,
-                    week: 11,
-                    title: "Misión de Herramientas - Construyendo tus Instrumentos",
-                    description: "Técnicas e instrumentos de recolección de datos",
-                    content: "Técnicas de recolección de datos cualitativos: entrevistas, grupos focales, observación, diarios de campo. Técnicas cuantitativas: encuestas, experimentos, pruebas de usabilidad. Diseño de instrumentos: redacción de preguntas, estructura, validación.",
-                    activities: [
-                        "Caja de Herramientas del Investigador: Taller de Diseño de Instrumentos (90 min)",
-                        "Mini-Simulación de Recolección (30 min)",
-                        "El Kit de Recolección: Desarrollar borradores completos",
-                        "Ejercicios de role-play y pruebas entre compañeros"
-                    ],
-                    badge: "Constructor de Instrumentos",
-                    unlocked: false,
-                    requiredBadge: 14
-                },
-                {
-                    id: 12,
-                    week: 12,
-                    title: "Misión de Campo - Recolectando los Datos (¡La Aventura Comienza!)",
-                    description: "Ejecución de la recolección de datos",
-                    content: "Ejecución de la recolección de datos: preparación logística, gestión de participantes, ética en la práctica. Organización de datos cualitativos y cuantitativos. Manejo de imprevistos durante la recolección.",
-                    activities: [
-                        "Expedición de Datos: Desafíos y Soluciones (60 min)",
-                        "Taller: Organizando el Tesoro (60 min)",
-                        "El Diario del Explorador: Iniciar recolección de datos",
-                        "Base de Datos Preliminar: Organizar datos recolectados"
-                    ],
-                    badge: "Recolector de Datos",
-                    unlocked: false,
-                    requiredBadge: 15
-                },
-                {
-                    id: 13,
-                    week: 13,
-                    title: "Misión de Descifrado - Análisis Cualitativo",
-                    description: "Unidad 3: Ejecución de la investigación",
-                    content: "Introducción al análisis de datos cualitativos: el proceso interpretativo. Técnicas de análisis cualitativo: codificación, análisis temático, análisis de contenido. Herramientas para el análisis cualitativo. Interpretación de resultados cualitativos.",
-                    activities: [
-                        "El Detective Cualitativo: Taller de Codificación (90 min)",
-                        "Discusión: Historias que los Datos Cuentan (30 min)",
-                        "Primeros Hallazgos Cualitativos: Análisis preliminar",
-                        "Identificar 3-5 temas o categorías emergentes clave"
-                    ],
-                    badge: "Intérprete Cualitativo",
-                    unlocked: false,
-                    requiredBadge: 16
-                },
-                {
-                    id: 14,
-                    week: 14,
-                    title: "Misión de Cuantificación - Análisis Cuantitativo",
-                    description: "Análisis de datos cuantitativos",
-                    content: "Introducción al análisis de datos cuantitativos: estadísticas descriptivas. Estadísticas inferenciales básicas. Herramientas para el análisis cuantitativo. Interpretación de resultados cuantitativos: patrones, tendencias y relaciones.",
-                    activities: [
-                        "El Mago de los Números: Taller de Análisis Descriptivo (90 min)",
-                        "Debate: ¿Qué Nos Dicen los Números? (30 min)",
-                        "Primeros Hallazgos Cuantitativos: Análisis preliminar",
-                        "Generar 3-5 gráficos o tablas con hallazgos relevantes"
-                    ],
-                    badge: "Analista Cuantitativo",
-                    unlocked: false,
-                    requiredBadge: 17
-                },
-                {
-                    id: 15,
-                    week: 15,
-                    title: "Misión de Narrativa - Contando tu Historia con Datos",
-                    description: "Unidad 4: Presentación de resultados",
-                    content: "Principios de visualización de datos: claridad, precisión, integridad, estética. Herramientas de visualización. Estructura del informe final de investigación. Redacción académica y estilo.",
-                    activities: [
-                        "El Artista de Datos: Taller de Visualización (90 min)",
-                        "Construyendo el Esqueleto del Informe (30 min)",
-                        "El Primer Capítulo: Empezar a redactar informe final",
-                        "Crear visualizaciones impactantes para resultados"
-                    ],
-                    badge: "Narrador Visual",
-                    unlocked: false,
-                    requiredBadge: 18
-                },
-                {
-                    id: 16,
-                    week: 16,
-                    title: "Misión de Impacto - Preparando tu Gran Revelación (Entrega Final)",
-                    description: "Presentación y defensa del proyecto final",
-                    content: "Comunicación efectiva de resultados de investigación: adaptación del mensaje a la audiencia, claridad y concisión. Diseño de presentaciones orales. Consideraciones éticas en la comunicación de resultados. Presentación y defensa formal del proyecto.",
-                    activities: [
-                        "La Defensa del Proyecto (120 min)",
-                        "Presentación ante profesor y compañeros",
-                        "Sesión de preguntas y respuestas",
-                        "¡Disfruta de tu éxito y celebra tus logros!"
-                    ],
-                    badge: "Investigador Élite",
-                    unlocked: false,
-                    requiredBadge: 19
-                }
-            ];
+
 
             React.useEffect(() => {
                 loadUserData();
-                loadProfessorName();
+                loadCourseData();
             }, []);
 
             const loadUserData = async () => {
@@ -1061,25 +1797,64 @@
                 }
             };
             
-            const loadProfessorName = async () => {
+            const loadCourseData = async () => {
                 try {
                     const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
                     if (userDoc.exists) {
                         const studentData = userDoc.data();
                         const courseCode = studentData.courseCode;
                         
-                        const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
-                            .where('courseCode', '==', courseCode)
-                            .limit(1)
-                            .get();
-                        
-                        if (!coursesQuery.empty) {
-                            const courseData = coursesQuery.docs[0].data();
-                            setProfessorName(courseData.professorName || 'No asignado');
+                        if (courseCode) {
+                            const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                                .where('courseCode', '==', courseCode)
+                                .limit(1)
+                                .get();
+                            
+                            if (!coursesQuery.empty) {
+                                const courseData = coursesQuery.docs[0].data();
+                                setProfessorName(courseData.professorName || 'No asignado');
+                                setCourseInfo(courseData);
+                                
+                                // Crear contenido dinámico
+                                const contentArray = [];
+                                
+                                // Información general
+                                contentArray.push({
+                                    id: 'info',
+                                    type: 'info',
+                                    title: 'Información General del Curso',
+                                    description: 'Datos del curso y badges disponibles',
+                                    unlocked: true
+                                });
+                                
+                                // Semanas dinámicas
+                                for (let i = 1; i <= courseData.weeks; i++) {
+                                    const weekData = courseData.weeklyContent?.find(w => w.week === i);
+                                    // Asignar badges a esta semana según la configuración del profesor
+                                    const weekBadges = courseData.availableBadges?.filter(badge => badge.maxWeek === i) || [];
+                                    contentArray.push({
+                                        id: i,
+                                        week: i,
+                                        title: weekData?.title || `Semana ${i}`,
+                                        description: weekData?.description || 'Contenido por definir',
+                                        content: weekData?.content || '',
+                                        activities: weekData?.activities || [],
+                                        badges: weekBadges,
+                                        unlocked: i === 1 // Solo la primera semana desbloqueada por defecto
+                                    });
+                                }
+                                
+                                setDynamicContent(contentArray);
+                            } else {
+                                setProfessorName('Curso no encontrado');
+                            }
+                        } else {
+                            setProfessorName('Sin asignar');
                         }
                     }
                 } catch (error) {
-                    console.error('Error cargando nombre del profesor:', error);
+                    console.error('Error cargando datos del curso:', error);
+                    setProfessorName('Error cargando');
                 }
             };
 
@@ -1096,6 +1871,11 @@
                 if (!userData || !userData.badgesEarned) return false;
                 return userData.badgesEarned.includes(badgeId);
             };
+            
+            const getBadgeStatusType = (badgeId) => {
+                if (!userData || !userData.badgeStatus) return null;
+                return userData.badgeStatus[badgeId] || null;
+            };
 
             const getProgressPercentage = () => {
                 if (!userData || !userData.badgesEarned) return 0;
@@ -1104,13 +1884,24 @@
 
             const isContentUnlocked = (content) => {
                 if (content.unlocked) return true;
-                if (!content.requiredBadge) return true;
-                if (content.requiredBadge === 2) {
-                    // Week 6 unlocks only after getting badges 1-9 (all from weeks 1-5)
-                    const requiredBadges = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-                    return requiredBadges.every(badgeId => getBadgeStatus(badgeId));
+                // Cada semana se desbloquea si todas las semanas anteriores tienen todos sus badges ganados
+                if (content.week && content.week > 1) {
+                    for (let week = 1; week < content.week; week++) {
+                        const weekBadges = dynamicContent.find(c => c.week === week)?.badges || [];
+                        if (weekBadges.length === 0) continue; // Si no hay badges, continuar
+                        const hasAllBadges = weekBadges.every((badge, index) => {
+                            // Encontrar el índice global del badge en availableBadges
+                            const globalIndex = courseInfo?.availableBadges?.findIndex(b => b.name === badge.name && b.maxWeek === week) ?? index;
+                            const badgeId = `${week}-${globalIndex}`;
+                            return getBadgeStatus(badgeId);
+                        });
+                        if (!hasAllBadges) {
+                            return false; // Si no tiene todos los badges de alguna semana anterior, bloquear
+                        }
+                    }
+                    return true;
                 }
-                return getBadgeStatus(content.requiredBadge);
+                return true;
             };
 
             if (loading) {
@@ -1123,7 +1914,7 @@
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
                                 <h1 className="text-3xl font-bold mb-2" style={{color: 'var(--text-primary)'}}>
-                                    Seminario de Investigación
+                                    {courseInfo?.name || 'Cargando...'}
                                 </h1>
                                 <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
                                     <User />
@@ -1160,112 +1951,14 @@
 
                     <main className="container mx-auto max-w-6xl">
                         <div className="grid gap-6">
-                            {/* Tarjeta de Información General del Curso */}
-                            <div className="card rounded-xl overflow-hidden bg-slate-100" style={{
-                                borderColor: 'var(--accent-color)'
-                            }}>
-                                <div 
-                                    className="p-6 cursor-pointer transition-colors"
-                                    onClick={() => setExpandedWeek(expandedWeek === 'info' ? null : 'info')}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold bg-blue-500">
-                                                📚
-                                            </div>
-                                            <div>
-                                                <h2 className="text-xl font-bold text-blue-600">
-                                                    Información General del Curso
-                                                </h2>
-                                                <p className="text-sm text-gray-600">
-                                                    Datos del curso y badges disponibles
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="text-gray-400">
-                                            {expandedWeek === 'info' ? '▲' : '▼'}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {expandedWeek === 'info' && (
-                                    <div className="px-6 pb-6 border-t" style={{borderColor: isDarkMode ? '#475569' : 'var(--border-color)'}}>
-                                        <div className="mt-4">
-                                            <div className="grid md:grid-cols-2 gap-6 mb-6">
-                                                <div>
-                                                    <h3 className="font-semibold mb-2 text-gray-800">Datos del Curso</h3>
-                                                    <ul className="space-y-1 text-sm text-gray-600">
-                                                        <li><strong>Nombre:</strong> Seminario de Investigación</li>
-                                                        <li><strong>Código:</strong> 12266-DIS</li>
-                                                        <li><strong>Periodo:</strong> 202520</li>
-                                                        <li><strong>NRE:</strong> 12318</li>
-                                                        <li><strong>Grupo:</strong> 001</li>
-                                                        <li><strong>Programas:</strong> DIS 03, DMI 03</li>
-                                                        <li><strong>Intensidad:</strong> 2 horas semanales</li>
-                                                        <li><strong>Créditos:</strong> 2</li>
-                                                        <li><strong>Docente:</strong> {professorName}</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-semibold mb-2 text-gray-800">Introducción</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        El Seminario de Investigación está diseñado para que los estudiantes desarrollen capacidades en investigación aplicada al campo del diseño, la innovación y la experiencia de usuario. Este curso integra la exploración de problemáticas con el desarrollo de habilidades en investigación, preparando a los estudiantes para abordar desafíos desde una perspectiva académica y práctica.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="mb-6">
-                                                <h3 className="font-semibold mb-2 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h3>
-                                                <p className="text-sm text-gray-600">
-                                                    Este curso promueve un uso ético, crítico y transparente de las tecnologías de IAG, permitiendo su aplicación en las actividades formativas y evaluativas de acuerdo con los niveles de uso que especifique el profesor. Se debe tener en cuenta que la clasificación de cada mecanismo o actividad se refiere al máximo nivel posible de uso de IAG que se espera de los estudiantes en dicho mecanismo o actividad. Durante el desarrollo de la asignatura, cuando se le indique, el estudiante deberá aplicar y declarar el nivel de uso de la IAG según la escala establecida, verificando la calidad, veracidad y pertinencia del contenido generado. Este acuerdo tiene como propósito fortalecer una relación formativa, reflexiva y dialógica con la IAG, orientada al desarrollo de capacidades creativas, investigativas y colaborativas.
-                                                </p>
-                                            </div>
-                                            
-                                            <div>
-                                                <h3 className="font-semibold mb-3 text-gray-800">🏆 Badges Disponibles en el Curso</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-blue-600">Badge de Iniciación</div>
-                                                        <div className="text-gray-600">Semana 1 - Inicio del curso</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-purple-600">Badge de Maestro Expositor</div>
-                                                        <div className="text-gray-600">Semanas 2-5 - Exposición grupal</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-green-600">Badges de Participación Activa</div>
-                                                        <div className="text-gray-600">Novato, Aprendiz, Avanzado, Máster</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-orange-600">Badge de Cuestionador Perspicaz</div>
-                                                        <div className="text-gray-600">Preguntas desafiantes</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-teal-600">Badge de Clarificador del Saber</div>
-                                                        <div className="text-gray-600">Respuestas claras</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-indigo-600">Badge de Conector de Conceptos</div>
-                                                        <div className="text-gray-600">Síntesis y conexiones</div>
-                                                    </div>
-                                                    <div className="p-2 bg-white rounded border">
-                                                        <div className="font-medium text-red-600">Badges de Investigación</div>
-                                                        <div className="text-gray-600">Semanas 6-16 - Proyecto final</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            {courseContent.map((content) => {
+                            {dynamicContent.map((content) => {
                                 const unlocked = isContentUnlocked(content);
                                 const isExpanded = expandedWeek === content.id;
                                 
                                 return (
                                     <div key={content.id} className={`card rounded-xl overflow-hidden ${
                                         !unlocked ? 'opacity-50' : ''
-                                    }`}>
+                                    } ${content.type === 'info' ? 'bg-slate-100' : ''}`} style={content.type === 'info' ? {borderColor: 'var(--accent-color)'} : {}}>
                                         <div 
                                             className={`p-6 transition-colors ${
                                                 unlocked ? 'cursor-pointer' : 'cursor-not-allowed'
@@ -1277,11 +1970,11 @@
                                                     <div className={`w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold ${
                                                         unlocked ? 'bg-blue-500' : 'bg-gray-400'
                                                     }`}>
-                                                        {unlocked ? (content.week || (content.weeks === '2-5' ? '2' : content.weeks)) : '🔒'}
+                                                        {unlocked ? (content.type === 'info' ? '📚' : (content.week || (content.weeks === '2-5' ? '2' : content.weeks))) : '🔒'}
                                                     </div>
                                                     <div>
                                                         <h3 className="text-lg font-semibold">
-                                                            {content.week ? `Semana ${content.week}` : `Semanas ${content.weeks}`}: {content.title}
+                                                            {content.type === 'info' ? content.title : (content.week ? `Semana ${content.week}: ${content.title}` : `Semanas ${content.weeks}: ${content.title}`)}
                                                         </h3>
                                                         <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
                                                             {content.description}
@@ -1291,27 +1984,25 @@
                                                                 Bloqueado - Completa badge anterior
                                                             </span>
                                                         )}
-                                                        {unlocked && content.badge && (
-                                                            <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
-                                                                getBadgeStatus(content.id === 1 ? 1 : content.id + 4) 
-                                                                    ? 'bg-green-100 text-green-800' 
-                                                                    : 'bg-gray-100 text-gray-600'
-                                                            }`}>
-                                                                {getBadgeStatus(content.id === 1 ? 1 : content.id + 4) ? '🏆' : '○'} {content.badge}
-                                                            </span>
-                                                        )}
-                                                        {unlocked && content.badges && (
+                                                        {unlocked && content.badges && content.badges.length > 0 && (
                                                             <div className="mt-2 flex flex-wrap gap-1">
                                                                 {content.badges.map((badge, index) => {
-                                                                    const badgeId = content.weeks === "2-5" ? index + 2 : index + 1;
+                                                                    // Encontrar el índice global del badge en availableBadges
+                                                                    const globalIndex = courseInfo?.availableBadges?.findIndex(b => b.name === badge.name && b.maxWeek === content.week) ?? index;
+                                                                    const badgeId = `${content.week}-${globalIndex}`;
                                                                     const badgeEarned = getBadgeStatus(badgeId);
+                                                                    const badgeStatusType = getBadgeStatusType(badgeId);
                                                                     return (
                                                                         <span key={index} className={`px-2 py-1 text-xs rounded-full ${
                                                                             badgeEarned 
-                                                                                ? 'bg-green-100 text-green-800' 
+                                                                                ? (badgeStatusType === 'earned' 
+                                                                                    ? 'bg-green-100 text-green-800' 
+                                                                                    : 'bg-red-100 text-red-800')
                                                                                 : 'bg-gray-100 text-gray-600'
                                                                         }`}>
-                                                                            {badgeEarned ? '🏆' : '○'} {badge}
+                                                                            {badgeEarned 
+                                                                                ? (badgeStatusType === 'earned' ? '🏆' : '🔴')
+                                                                                : '○'} {badge.name}
                                                                         </span>
                                                                     );
                                                                 })}
@@ -1328,20 +2019,97 @@
                                         {isExpanded && unlocked && (
                                             <div className="px-6 pb-6 border-t" style={{borderColor: 'var(--border-color)'}}>
                                                 <div className="mt-4">
-                                                    <h4 className="font-semibold mb-2">Contenido:</h4>
-                                                    <p className="mb-4" style={{color: 'var(--text-secondary)'}}>
-                                                        {content.content}
-                                                    </p>
-                                                    
-                                                    <h4 className="font-semibold mb-2">Actividades:</h4>
-                                                    <ul className="space-y-1 mb-6">
-                                                        {content.activities.map((activity, index) => (
-                                                            <li key={index} className="flex items-start gap-2">
-                                                                <span className="text-blue-500 mt-1">•</span>
-                                                                <span style={{color: 'var(--text-secondary)'}}>{activity}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
+                                                    {content.type === 'info' ? (
+                                                        <div>
+                                                            <div className="grid md:grid-cols-2 gap-6 mb-6">
+                                                                <div>
+                                                                    <h3 className="font-semibold mb-2 text-gray-800">Datos del Curso</h3>
+                                                                    <ul className="space-y-1 text-sm text-gray-600">
+                                                                        <li><strong>Universidad:</strong> {courseInfo?.university || 'Por definir'}</li>
+                                                                        <li><strong>Nombre:</strong> {courseInfo?.courseName || courseInfo?.name || 'Por definir'}</li>
+                                                                        <li><strong>Código:</strong> {courseInfo?.courseCode || 'Por definir'}</li>
+                                                                        <li><strong>Periodo:</strong> {courseInfo?.period || 'Por definir'}</li>
+                                                                        <li><strong>Grupo:</strong> {courseInfo?.group || 'Por definir'}</li>
+                                                                        <li><strong>Programa/s:</strong> {courseInfo?.programs || 'Por definir'}</li>
+                                                                        <li><strong>Intensidad Horaria:</strong> {courseInfo?.intensity || 'Por definir'}</li>
+                                                                        <li><strong>Créditos:</strong> {courseInfo?.credits || 'Por definir'}</li>
+                                                                        <li><strong>Docente:</strong> {professorName || 'Cargando...'}</li>
+                                                                    </ul>
+                                                                </div>
+                                                                <div>
+                                                                    <h3 className="font-semibold mb-2 text-gray-800">Introducción</h3>
+                                                                    <p className="text-sm text-gray-600">
+                                                                        {courseInfo?.introduction || 'Por definir'}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="mb-6">
+                                                                <h3 className="font-semibold mb-2 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h3>
+                                                                <p className="text-sm text-gray-600">
+                                                                    {courseInfo?.iagAgreements || 'Por definir'}
+                                                                </p>
+                                                            </div>
+                                                            
+                                                            <div>
+                                                                <h3 className="font-semibold mb-3 text-gray-800">🏆 Badges Disponibles en el Curso</h3>
+                                                                {courseInfo?.availableBadges && courseInfo.availableBadges.length > 0 ? (
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                                                                        {courseInfo.availableBadges.map((badge, index) => (
+                                                                            <div key={index} className="p-2 bg-white rounded border">
+                                                                                <div className="font-bold text-green-600">{badge.name}</div>
+                                                                                <div className="text-gray-600">{badge.description}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="p-4 bg-gray-50 rounded border text-center text-gray-600">
+                                                                        <p>El profesor aún no ha configurado los badges para este curso.</p>
+                                                                        <p className="text-xs mt-1">Los badges aparecerán aquí una vez que sean definidos.</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            {content.content && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Contenido:</h4>
+                                                                    <p className="mb-4" style={{color: 'var(--text-secondary)'}}>
+                                                                        {content.content}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {content.activities && content.activities.length > 0 && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Actividades:</h4>
+                                                                    <ul className="space-y-1 mb-6">
+                                                                        {content.activities.map((activity, index) => (
+                                                                            <li key={index} className="flex items-start gap-2">
+                                                                                <span className="text-blue-500 mt-1">•</span>
+                                                                                <span style={{color: 'var(--text-secondary)'}}>{activity}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {content.badges && content.badges.length > 0 && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">🏆 Badges de esta Semana:</h4>
+                                                                    <div className="grid gap-2">
+                                                                        {content.badges.map((badge, index) => (
+                                                                            <div key={index} className="p-2 bg-gray-50 rounded border">
+                                                                                <div className="font-medium text-sm">{badge.name}</div>
+                                                                                <div className="text-xs text-gray-600">{badge.description}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     
                                                     {content.weeks === "2-5" && (
                                                         <div className="mt-6">

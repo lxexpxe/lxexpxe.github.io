@@ -27,17 +27,41 @@ Aplica las siguientes reglas de seguridad en tu consola de Firebase:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Reglas para usuarios
     match /artifacts/seminario-investigacion-app/users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
+      // Permitir que profesores lean todos los usuarios
       allow read: if request.auth != null && 
         exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.userType == 'professor';
       
+      // Permitir que profesores actualicen badges de estudiantes de su curso
       allow update: if request.auth != null && 
         exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.userType == 'professor' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgesEarned', 'lastBadgeEarned']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgesEarned', 'lastBadgeEarned', 'badgeStatus']);
+      
+      // Permitir que profesores eliminen estudiantes
+      allow delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.userType == 'professor';
+    }
+    
+    // Reglas para cursos
+    match /artifacts/seminario-investigacion-app/courses/{courseId} {
+      // Profesores pueden leer/escribir sus propios cursos
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.professorId;
+      
+      // Profesores pueden crear cursos
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.professorId;
+      
+      // Estudiantes pueden leer cursos de su código
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/seminario-investigacion-app/users/$(request.auth.uid)).data.courseCode == resource.data.courseCode;
     }
   }
 }
