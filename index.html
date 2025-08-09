@@ -271,8 +271,8 @@
             const [courseCode, setCourseCode] = React.useState('');
             
             const validateEmail = (email) => {
-                const icesiBothPattern = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co)$/;
-                return icesiBothPattern.test(email);
+                const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
+                return validDomains.test(email);
             };
 
             const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -307,7 +307,7 @@
                 setLoading(true);
 
                 if (!validateEmail(email)) {
-                    toast.showToast('Usa tu correo institucional (@icesi.edu.co o @u.icesi.edu.co)', 'error');
+                    toast.showToast('Usa tu correo institucional (@icesi.edu.co, @u.icesi.edu.co, @estudiante.uniajc.edu.co o @profesores.uniajc.edu.co)', 'error');
                     setLoading(false);
                     return;
                 }
@@ -383,9 +383,6 @@
                     );
                     const user = userCredential.user;
                     
-                    const appId = 'seminario-investigacion-app';
-                    const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
-                    
                     const userData = {
                         email: pendingUserData.email,
                         fullName: pendingUserData.fullName,
@@ -394,13 +391,33 @@
                         createdAt: new Date()
                     };
 
-                    if (pendingUserData.userType === 'student') {
+                    if (pendingUserData.userType === 'professor') {
+                        // Crear profesor con estructura profile
+                        await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`)
+                            .set(userData);
+                    } else {
+                        // Crear estudiante en subcoleción del curso
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
                         userData.courseCode = pendingUserData.courseCode;
+                        
+                        // Buscar el curso por código
+                        const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                            .where('courseCode', '==', pendingUserData.courseCode)
+                            .limit(1)
+                            .get();
+                        
+                        if (!coursesQuery.empty) {
+                            const courseDoc = coursesQuery.docs[0];
+                            await db.collection(`artifacts/seminario-investigacion-app/courses/${courseDoc.id}/students`)
+                                .doc(user.uid)
+                                .set(userData);
+                            // Guardar courseId en localStorage para uso posterior
+                            localStorage.setItem('studentCourseId', courseDoc.id);
+                        } else {
+                            throw new Error('Curso no encontrado');
+                        }
                     }
-                    
-                    await userDocRef.set(userData);
                     
                     toast.showToast('¡Cuenta creada exitosamente! Bienvenido.', 'success');
                     
@@ -416,6 +433,8 @@
                         errorMessage = 'Este correo ya está registrado';
                     } else if (err.code === 'permission-denied') {
                         errorMessage = 'Error de permisos en Firestore. Verifica las reglas de seguridad.';
+                    } else if (err.message === 'Curso no encontrado') {
+                        errorMessage = 'El código de curso no existe. Verifica con tu profesor.';
                     }
                     
                     toast.showToast(errorMessage, 'error');
@@ -504,7 +523,7 @@
                                 <input
                                     className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                     type="email"
-                                    placeholder="correo@icesi.edu.co o @u.icesi.edu.co"
+                                    placeholder="Correo institucional"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -566,6 +585,7 @@
                                             </p>
                                         </div>
                                     )}
+
                                 </>
                             )}
                             
@@ -601,7 +621,6 @@
                                         setEmail('');
                                         setPassword('');
                                         setFullName('');
-                                        setUserRole('student');
                                         setCourseCode('');
                                     }}
                                 >
@@ -664,7 +683,7 @@
 
             const loadUserData = async () => {
                 try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`).get();
                     if (userDoc.exists) {
                         setUserData(userDoc.data());
                     }
@@ -675,9 +694,7 @@
 
             const loadCourses = async () => {
                 try {
-                    const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
-                        .where('professorId', '==', currentUser.uid)
-                        .get();
+                    const coursesQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).get();
                     
                     const coursesData = coursesQuery.docs.map(doc => ({
                         id: doc.id,
@@ -700,9 +717,8 @@
                 if (!selectedCourse) return;
                 
                 try {
-                    const studentsQuery = await db.collection('artifacts/seminario-investigacion-app/users')
-                        .where('userType', '==', 'student')
-                        .where('courseCode', '==', selectedCourse.courseCode)
+                    // Cargar estudiantes desde la subcolección del curso
+                    const studentsQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
                         .get();
                     
                     const studentsData = studentsQuery.docs.map(doc => ({
@@ -741,7 +757,7 @@
                         badges: []
                     };
                     
-                    const docRef = await db.collection('artifacts/seminario-investigacion-app/courses').add(courseData);
+                    const docRef = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).add(courseData);
                     
                     // Crear estructura inicial de semanas
                     const weeklyContent = [];
@@ -770,7 +786,7 @@
             
             const assignBadge = async (studentId, badgeId, earned = true) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
                     
                     if (studentDoc.exists) {
@@ -821,7 +837,7 @@
             
             const updateBadgeStatus = async (studentId, badgeId, newStatus) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
                     
                     if (studentDoc.exists) {
@@ -850,7 +866,7 @@
                 }
                 
                 try {
-                    await db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`).delete();
+                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
                     toast.showToast('Estudiante removido exitosamente', 'success');
                     loadStudents();
                 } catch (error) {
@@ -866,7 +882,7 @@
                     const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, deletePassword);
                     await currentUser.reauthenticateWithCredential(credential);
                     
-                    await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
+                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
                     
                     toast.showToast('Curso eliminado exitosamente', 'success');
                     setShowDeleteConfirm(null);
@@ -915,7 +931,7 @@
             
             const saveWeekContent = async () => {
                 try {
-                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`);
+                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`);
                     
                     if (editingWeek === 0) {
                         // Guardar información general
@@ -960,7 +976,7 @@
                     setShowEditContent(false);
                     await loadCourses();
                     // Actualizar el curso seleccionado con los nuevos datos
-                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`).get();
+                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`).get();
                     if (updatedCourseData.exists) {
                         setSelectedCourse({id: selectedCourse.id, ...updatedCourseData.data()});
                     }
@@ -1050,7 +1066,7 @@
                                                         type="text"
                                                         value={weekContent.university || ''}
                                                         onChange={(e) => setWeekContent({...weekContent, university: e.target.value})}
-                                                        placeholder="Universidad Icesi"
+                                                        placeholder="Nombre de la universidad"
                                                     />
                                                 </div>
                                                 <div>
@@ -1060,7 +1076,7 @@
                                                         type="text"
                                                         value={weekContent.courseName || ''}
                                                         onChange={(e) => setWeekContent({...weekContent, courseName: e.target.value})}
-                                                        placeholder="Seminario de Investigación"
+                                                        placeholder="Nombre del curso"
                                                     />
                                                 </div>
                                                 <div>
@@ -1325,7 +1341,7 @@
                                         <input
                                             className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                             type="text"
-                                            placeholder="Universidad Icesi"
+                                            placeholder="Nombre de la universidad"
                                             value={newCourse.university}
                                             onChange={(e) => setNewCourse({...newCourse, university: e.target.value})}
                                         />
@@ -1336,7 +1352,7 @@
                                         <input
                                             className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                             type="text"
-                                            placeholder="Seminario de Investigación"
+                                            placeholder="Nombre del curso"
                                             value={newCourse.name}
                                             onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
                                         />
@@ -1460,7 +1476,7 @@
                             ))}
                             <button
                                 onClick={() => setShowCreateCourse(true)}
-                                className="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-all"
+                                className="px-4 py-2 rounded-full text-sm font-medium border-2 border-dashed border-blue-500 text-blue-500 hover:border-blue-600 hover:text-blue-600 transition-all bg-transparent"
                             >
                                 + Crear Nuevo Curso
                             </button>
@@ -1704,54 +1720,104 @@
                     {/* Modal de Preview de Contenido */}
                     {showContentPreview && previewContent && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-                                <div className="p-6">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h3 className="text-lg font-semibold">Semana {previewContent.week}: {previewContent.title}</h3>
+                            <div className="card rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden" style={{backgroundColor: 'var(--bg-secondary)'}}>
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center font-bold">
+                                                    {previewContent.week}
+                                                </div>
+                                                <h3 className="text-xl font-bold">{previewContent.title}</h3>
+                                            </div>
+                                            <p className="text-blue-100 text-sm">Vista previa del contenido semanal</p>
+                                        </div>
                                         <button
                                             onClick={() => setShowContentPreview(false)}
-                                            className="text-gray-500 hover:text-gray-700"
+                                            className="text-white hover:text-blue-200 text-2xl font-light w-8 h-8 flex items-center justify-center"
                                         >
-                                            ✕
+                                            ×
                                         </button>
                                     </div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h4 className="font-medium mb-2">Descripción</h4>
-                                            <p className="text-gray-600">{previewContent.description || 'Sin descripción'}</p>
+                                </div>
+                                
+                                {/* Content */}
+                                <div className="p-6 overflow-y-auto" style={{maxHeight: 'calc(85vh - 200px)'}}>
+                                    <div className="space-y-6">
+                                        {/* Descripción */}
+                                        <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-400">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-blue-600 text-lg">📝</span>
+                                                <h4 className="font-semibold text-blue-800">Descripción</h4>
+                                            </div>
+                                            <p className="text-blue-700 leading-relaxed">{previewContent.description || 'Sin descripción'}</p>
                                         </div>
-                                        <div>
-                                            <h4 className="font-medium mb-2">Contenido</h4>
-                                            <div className="prose max-w-none text-gray-600">{previewContent.content || 'Sin contenido'}</div>
+                                        
+                                        {/* Contenido */}
+                                        <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-400">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-green-600 text-lg">📚</span>
+                                                <h4 className="font-semibold text-green-800">Contenido</h4>
+                                            </div>
+                                            <div className="text-green-700 leading-relaxed whitespace-pre-line">{previewContent.content || 'Sin contenido'}</div>
                                         </div>
+                                        
+                                        {/* Actividades */}
                                         {previewContent.activities && previewContent.activities.length > 0 && (
-                                            <div>
-                                                <h4 className="font-medium mb-2">Actividades ({previewContent.activities.length})</h4>
-                                                <ul className="list-disc list-inside space-y-1">
+                                            <div className="bg-orange-50 rounded-xl p-4 border-l-4 border-orange-400">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-orange-600 text-lg">🎯</span>
+                                                    <h4 className="font-semibold text-orange-800">Actividades ({previewContent.activities.length})</h4>
+                                                </div>
+                                                <div className="space-y-2">
                                                     {previewContent.activities.map((activity, idx) => (
-                                                        <li key={idx} className="text-gray-600">{activity}</li>
+                                                        <div key={idx} className="flex items-start gap-3 p-2 bg-white rounded-lg">
+                                                            <span className="text-orange-500 font-bold text-sm mt-1">{idx + 1}.</span>
+                                                            <span className="text-orange-700 flex-1">{activity}</span>
+                                                        </div>
                                                     ))}
-                                                </ul>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Badges */}
+                                        {selectedCourse?.availableBadges?.filter(badge => badge.maxWeek === previewContent.week).length > 0 && (
+                                            <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-400">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-purple-600 text-lg">🏆</span>
+                                                    <h4 className="font-semibold text-purple-800">Badges Disponibles</h4>
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    {selectedCourse.availableBadges.filter(badge => badge.maxWeek === previewContent.week).map((badge, idx) => (
+                                                        <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
+                                                            <div className="font-medium text-purple-800">{badge.name}</div>
+                                                            <div className="text-sm text-purple-600 mt-1">{badge.description}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex justify-end gap-2 mt-6">
-                                        <button
-                                            onClick={() => {
-                                                setShowContentPreview(false);
-                                                editWeekContent(previewContent.week);
-                                            }}
-                                            className="btn btn-primary"
-                                        >
-                                            Editar
-                                        </button>
-                                        <button
-                                            onClick={() => setShowContentPreview(false)}
-                                            className="btn btn-secondary"
-                                        >
-                                            Cerrar
-                                        </button>
-                                    </div>
+                                </div>
+                                
+                                {/* Footer */}
+                                <div className="border-t p-4 bg-gray-50 flex justify-end gap-3">
+                                    <button
+                                        onClick={() => setShowContentPreview(false)}
+                                        className="btn btn-secondary"
+                                    >
+                                        Cerrar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowContentPreview(false);
+                                            editWeekContent(previewContent.week);
+                                        }}
+                                        className="btn btn-primary"
+                                    >
+                                        ✏️ Editar
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1785,40 +1851,31 @@
             }, []);
 
             const loadUserData = async () => {
-                try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
-                    if (userDoc.exists) {
-                        setUserData(userDoc.data());
-                    }
-                } catch (error) {
-                    console.error('Error cargando datos del usuario:', error);
-                } finally {
-                    setLoading(false);
-                }
+                // Los datos del usuario se cargarán junto con los datos del curso
+                setLoading(false);
             };
             
             const loadCourseData = async () => {
                 try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
-                    if (userDoc.exists) {
-                        const studentData = userDoc.data();
-                        const courseCode = studentData.courseCode;
+                    // Buscar en todos los profesores para encontrar al estudiante
+                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
+                    
+                    for (const professorDoc of professorsSnapshot.docs) {
+                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`).get();
                         
-                        if (courseCode) {
-                            const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
-                                .where('courseCode', '==', courseCode)
-                                .limit(1)
-                                .get();
+                        for (const courseDoc of coursesSnapshot.docs) {
+                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
                             
-                            if (!coursesQuery.empty) {
-                                const courseData = coursesQuery.docs[0].data();
+                            if (studentDoc.exists) {
+                                setUserData(studentDoc.data());
+                                
+                                const courseData = courseDoc.data();
                                 setProfessorName(courseData.professorName || 'No asignado');
                                 setCourseInfo(courseData);
                                 
                                 // Crear contenido dinámico
                                 const contentArray = [];
                                 
-                                // Información general
                                 contentArray.push({
                                     id: 'info',
                                     type: 'info',
@@ -1827,10 +1884,8 @@
                                     unlocked: true
                                 });
                                 
-                                // Semanas dinámicas
                                 for (let i = 1; i <= courseData.weeks; i++) {
                                     const weekData = courseData.weeklyContent?.find(w => w.week === i);
-                                    // Asignar badges a esta semana según la configuración del profesor
                                     const weekBadges = courseData.availableBadges?.filter(badge => badge.maxWeek === i) || [];
                                     contentArray.push({
                                         id: i,
@@ -1840,18 +1895,16 @@
                                         content: weekData?.content || '',
                                         activities: weekData?.activities || [],
                                         badges: weekBadges,
-                                        unlocked: i === 1 // Solo la primera semana desbloqueada por defecto
+                                        unlocked: i === 1
                                     });
                                 }
                                 
                                 setDynamicContent(contentArray);
-                            } else {
-                                setProfessorName('Curso no encontrado');
+                                return; // Salir una vez encontrado
                             }
-                        } else {
-                            setProfessorName('Sin asignar');
                         }
                     }
+
                 } catch (error) {
                     console.error('Error cargando datos del curso:', error);
                     setProfessorName('Error cargando');
@@ -2200,9 +2253,14 @@
                     if (user) {
                         try {
                             const db = firebase.firestore();
-                            const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${user.uid}`).get();
+                            
+                            // Primero buscar en profesores
+                            let userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`).get();
+                            
                             if (userDoc.exists) {
-                                setUserData(userDoc.data());
+                                setUserData({...userDoc.data(), userType: 'professor'});
+                            } else {
+                                setUserData({userType: 'student'});
                             }
                         } catch (error) {
                             console.error('Error cargando datos del usuario:', error);
