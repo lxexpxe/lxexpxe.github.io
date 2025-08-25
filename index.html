@@ -269,6 +269,8 @@
             const [pendingUserData, setPendingUserData] = React.useState(null);
             const [userRole, setUserRole] = React.useState('student');
             const [courseCode, setCourseCode] = React.useState('');
+            const [showPasswordReset, setShowPasswordReset] = React.useState(false);
+            const [newPassword, setNewPassword] = React.useState('');
             
             const validateEmail = (email) => {
                 const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
@@ -366,6 +368,53 @@
                 }
             };
 
+            const handlePasswordReset = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+
+                if (!validateEmail(email)) {
+                    toast.showToast('Ingresa tu correo institucional', 'error');
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    const code = generateCode();
+                    setGeneratedCode(code);
+                    
+                    await sendVerificationEmail(email, code, email.split('@')[0]);
+                    setShowCodeVerification(true);
+                    toast.showToast('Código enviado para restablecer contraseña', 'success');
+                } catch (error) {
+                    console.error('Error enviando código:', error);
+                    toast.showToast('Error enviando código', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleResetPassword = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+
+                if (verificationCode !== generatedCode) {
+                    toast.showToast('Código incorrecto', 'error');
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    toast.showToast('Se envió un enlace de restablecimiento a tu correo', 'success');
+                    setShowPasswordReset(false);
+                    setShowCodeVerification(false);
+                } catch (error) {
+                    toast.showToast('Error restableciendo contraseña', 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
             const handleVerifyCode = async (e) => {
                 e.preventDefault();
                 setLoading(true);
@@ -396,27 +445,15 @@
                         await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`)
                             .set(userData);
                     } else {
-                        // Crear estudiante en subcoleción del curso
+                        // Para estudiantes, solo guardamos los datos básicos
+                        // El profesor los agregará manualmente a su curso
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
                         userData.courseCode = pendingUserData.courseCode;
                         
-                        // Buscar el curso por código
-                        const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
-                            .where('courseCode', '==', pendingUserData.courseCode)
-                            .limit(1)
-                            .get();
-                        
-                        if (!coursesQuery.empty) {
-                            const courseDoc = coursesQuery.docs[0];
-                            await db.collection(`artifacts/seminario-investigacion-app/courses/${courseDoc.id}/students`)
-                                .doc(user.uid)
-                                .set(userData);
-                            // Guardar courseId en localStorage para uso posterior
-                            localStorage.setItem('studentCourseId', courseDoc.id);
-                        } else {
-                            throw new Error('Curso no encontrado');
-                        }
+                        // Crear documento temporal del estudiante
+                        await db.doc(`artifacts/seminario-investigacion-app/temp-students/${user.uid}`)
+                            .set(userData);
                     }
                     
                     toast.showToast('¡Cuenta creada exitosamente! Bienvenido.', 'success');
@@ -443,6 +480,59 @@
                 }
             };
 
+            if (showPasswordReset && !showCodeVerification) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
+                        <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                                    Restablecer Contraseña
+                                </h2>
+                                <ThemeToggle />
+                            </div>
+                            
+                            <form onSubmit={handlePasswordReset}>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                        Correo Institucional
+                                    </label>
+                                    <input
+                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                        type="email"
+                                        placeholder="Correo institucional"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="flex flex-col gap-4">
+                                    <button
+                                        className="btn btn-primary w-full"
+                                        type="submit"
+                                        disabled={loading}
+                                    >
+                                        {loading && <Loader2 className="w-5 h-5" />}
+                                        Enviar Código
+                                    </button>
+                                    
+                                    <button
+                                        className="btn btn-secondary w-full"
+                                        type="button"
+                                        onClick={() => {
+                                            setShowPasswordReset(false);
+                                            setEmail('');
+                                        }}
+                                    >
+                                        Volver
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
             if (showCodeVerification) {
                 return (
                     <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
@@ -456,7 +546,7 @@
                             
                             <div className="text-center mb-6">
                                 <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                                    Ingresa el código de 6 dígitos enviado a <strong>{pendingUserData?.email}</strong>
+                                    Ingresa el código de 6 dígitos enviado a <strong>{pendingUserData?.email || email}</strong>
                                 </p>
                             </div>
                             
@@ -478,9 +568,10 @@
                                         className="btn btn-primary w-full"
                                         type="submit"
                                         disabled={loading || verificationCode.length !== 6}
+                                        onClick={showPasswordReset ? handleResetPassword : handleVerifyCode}
                                     >
                                         {loading && <Loader2 className="w-5 h-5" />}
-                                        Verificar y Crear Cuenta
+                                        {showPasswordReset ? 'Restablecer Contraseña' : 'Verificar y Crear Cuenta'}
                                     </button>
                                     
                                     <button
@@ -491,6 +582,7 @@
                                             setVerificationCode('');
                                             setGeneratedCode('');
                                             setPendingUserData(null);
+                                            setShowPasswordReset(false);
                                         }}
                                     >
                                         Volver
@@ -626,6 +718,16 @@
                                 >
                                     {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
                                 </button>
+                                
+                                {isLogin && (
+                                    <button
+                                        className="btn btn-secondary w-full text-sm"
+                                        type="button"
+                                        onClick={() => setShowPasswordReset(true)}
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </button>
+                                )}
                             </div>
                         </form>
                         <div className="text-center mt-4 text-xs" style={{color: 'var(--text-secondary)'}}>
@@ -660,6 +762,8 @@
             const [showContentPreview, setShowContentPreview] = React.useState(false);
             const [previewContent, setPreviewContent] = React.useState(null);
             const [showRanking, setShowRanking] = React.useState(false);
+            const [pendingStudents, setPendingStudents] = React.useState([]);
+            const [showPendingStudents, setShowPendingStudents] = React.useState(false);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
                 description: '',
@@ -678,6 +782,7 @@
             React.useEffect(() => {
                 if (selectedCourse) {
                     loadStudents();
+                    loadPendingStudents();
                 }
             }, [selectedCourse]);
 
@@ -717,7 +822,6 @@
                 if (!selectedCourse) return;
                 
                 try {
-                    // Cargar estudiantes desde la subcolección del curso
                     const studentsQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
                         .get();
                     
@@ -730,6 +834,58 @@
                 } catch (error) {
                     console.error('Error cargando estudiantes:', error);
                     toast.showToast('Error cargando estudiantes', 'error');
+                }
+            };
+            
+            const loadPendingStudents = async () => {
+                if (!selectedCourse) return;
+                
+                try {
+                    const tempStudentsQuery = await db.collection('artifacts/seminario-investigacion-app/temp-students')
+                        .where('courseCode', '==', selectedCourse.courseCode)
+                        .get();
+                    
+                    const pendingData = tempStudentsQuery.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    setPendingStudents(pendingData);
+                } catch (error) {
+                    console.error('Error cargando estudiantes pendientes:', error);
+                }
+            };
+            
+            const approveStudent = async (studentData) => {
+                try {
+                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
+                        .set({
+                            ...studentData,
+                            approvedAt: new Date(),
+                            badgesEarned: [],
+                            badgeStatus: {},
+                            lastBadgeEarned: null
+                        });
+                    
+                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentData.id}`).delete();
+                    
+                    toast.showToast('Estudiante aprobado exitosamente', 'success');
+                    loadStudents();
+                    loadPendingStudents();
+                } catch (error) {
+                    console.error('Error aprobando estudiante:', error);
+                    toast.showToast('Error aprobando estudiante', 'error');
+                }
+            };
+            
+            const rejectStudent = async (studentId) => {
+                try {
+                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentId}`).delete();
+                    toast.showToast('Estudiante rechazado', 'success');
+                    loadPendingStudents();
+                } catch (error) {
+                    console.error('Error rechazando estudiante:', error);
+                    toast.showToast('Error rechazando estudiante', 'error');
                 }
             };
 
@@ -826,6 +982,15 @@
             const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(null);
             const [deletePassword, setDeletePassword] = React.useState('');
             const [showDeletePassword, setShowDeletePassword] = React.useState(false);
+            const [showProfile, setShowProfile] = React.useState(false);
+            const [showChangeCourseCode, setShowChangeCourseCode] = React.useState(false);
+            const [profileData, setProfileData] = React.useState({
+                fullName: '',
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            const [newCourseCode, setNewCourseCode] = React.useState('');
             
             const changeBadgeStatus = (studentId, badgeId, newStatus) => {
                 if (confirm(`¿Estás seguro de cambiar el badge a ${newStatus === 'earned' ? 'ganado' : 'asignado'}?`)) {
@@ -896,6 +1061,64 @@
                         console.error('Error eliminando curso:', error);
                         toast.showToast('Error eliminando curso', 'error');
                     }
+                }
+            };
+            
+            const handleUpdateProfile = async (e) => {
+                e.preventDefault();
+                
+                try {
+                    if (profileData.newPassword) {
+                        if (profileData.newPassword !== profileData.confirmPassword) {
+                            toast.showToast('Las contraseñas no coinciden', 'error');
+                            return;
+                        }
+                        
+                        const credential = firebase.auth.EmailAuthProvider.credential(
+                            currentUser.email, 
+                            profileData.currentPassword
+                        );
+                        await currentUser.reauthenticateWithCredential(credential);
+                        await currentUser.updatePassword(profileData.newPassword);
+                        toast.showToast('Contraseña actualizada', 'success');
+                    }
+                    
+                    if (profileData.fullName && profileData.fullName !== userData?.fullName) {
+                        await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`)
+                            .update({ fullName: profileData.fullName });
+                        toast.showToast('Nombre actualizado', 'success');
+                        loadUserData();
+                    }
+                    
+                    setShowProfile(false);
+                    setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
+                } catch (error) {
+                    if (error.code === 'auth/wrong-password') {
+                        toast.showToast('Contraseña actual incorrecta', 'error');
+                    } else {
+                        toast.showToast('Error actualizando perfil', 'error');
+                    }
+                }
+            };
+            
+            const handleChangeCourseCode = async (e) => {
+                e.preventDefault();
+                
+                if (!newCourseCode.startsWith('#')) {
+                    toast.showToast('El código debe comenzar con #', 'error');
+                    return;
+                }
+                
+                try {
+                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
+                        .update({ courseCode: newCourseCode });
+                    
+                    toast.showToast('Código del curso actualizado', 'success');
+                    setShowChangeCourseCode(false);
+                    loadCourses();
+                } catch (error) {
+                    console.error('Error actualizando código:', error);
+                    toast.showToast('Error actualizando código del curso', 'error');
                 }
             };
             
@@ -997,6 +1220,125 @@
 
             if (loading) {
                 return <LoadingSpinner />;
+            }
+            
+            if (showProfile) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="card rounded-xl p-6 w-full max-w-md">
+                            <h3 className="text-lg font-bold mb-4">Perfil de Usuario</h3>
+                            <form onSubmit={handleUpdateProfile}>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-bold mb-2">Nombre Completo</label>
+                                    <input
+                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                        type="text"
+                                        placeholder={userData?.fullName || 'Tu nombre completo'}
+                                        value={profileData.fullName}
+                                        onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                                    />
+                                </div>
+                                
+                                <div className="border-t pt-4 mb-4">
+                                    <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
+                                    <div className="space-y-3">
+                                        <input
+                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                            type="password"
+                                            placeholder="Contraseña actual"
+                                            value={profileData.currentPassword}
+                                            onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
+                                        />
+                                        <input
+                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                            type="password"
+                                            placeholder="Nueva contraseña"
+                                            value={profileData.newPassword}
+                                            onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
+                                        />
+                                        <input
+                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                            type="password"
+                                            placeholder="Confirmar nueva contraseña"
+                                            value={profileData.confirmPassword}
+                                            onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowProfile(false);
+                                            setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
+                                        }}
+                                        className="btn btn-secondary flex-1"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary flex-1"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (showChangeCourseCode) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="card rounded-xl p-6 w-full max-w-md">
+                            <h3 className="text-lg font-bold mb-4">Cambiar Código del Curso</h3>
+                            <form onSubmit={handleChangeCourseCode}>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-bold mb-2">Nuevo Código del Curso</label>
+                                    <input
+                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                        type="text"
+                                        placeholder="#NUEVO_CODIGO"
+                                        value={newCourseCode}
+                                        onChange={(e) => {
+                                            let value = e.target.value;
+                                            if (value && !value.startsWith('#')) {
+                                                value = '#' + value;
+                                            }
+                                            setNewCourseCode(value);
+                                        }}
+                                        required
+                                    />
+                                    <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                                        Los estudiantes usarán este código para unirse al curso
+                                    </p>
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowChangeCourseCode(false);
+                                            setNewCourseCode('');
+                                        }}
+                                        className="btn btn-secondary flex-1"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary flex-1"
+                                    >
+                                        Actualizar Código
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
             }
             
             if (showDeleteConfirm) {
@@ -1435,6 +1777,14 @@
                                 )}
                             </div>
                             <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowProfile(true)}
+                                    className="btn btn-secondary flex items-center gap-2"
+                                    title="Perfil de usuario"
+                                >
+                                    <User />
+                                    <span className="hidden md:inline">Perfil</span>
+                                </button>
                                 <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
@@ -1533,19 +1883,81 @@
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-bold">Estudiantes Registrados ({students.length})</h2>
                                     <div className="flex items-center gap-4">
+                                        {pendingStudents.length > 0 && (
+                                            <button
+                                                onClick={() => {
+                                                    setShowPendingStudents(!showPendingStudents);
+                                                    setShowRanking(false);
+                                                }}
+                                                className={`btn btn-secondary text-sm ${
+                                                    showPendingStudents 
+                                                        ? 'bg-orange-200 text-orange-900' 
+                                                        : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                                }`}
+                                            >
+                                                📋 {showPendingStudents ? 'Ocultar' : 'Pendientes'} ({pendingStudents.length})
+                                            </button>
+                                        )}
                                         <button
-                                            onClick={() => setShowRanking(!showRanking)}
+                                            onClick={() => {
+                                                setShowRanking(!showRanking);
+                                                setShowPendingStudents(false);
+                                            }}
                                             className="btn btn-secondary text-sm"
                                         >
                                             {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
                                         </button>
-                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                                            Código para compartir: <strong>{selectedCourse.courseCode}</strong>
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                Código para compartir: <strong>{selectedCourse.courseCode}</strong>
+                                            </p>
+                                            <button
+                                                onClick={() => {
+                                                    setNewCourseCode(selectedCourse.courseCode);
+                                                    setShowChangeCourseCode(true);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800 text-sm"
+                                                title="Cambiar código del curso"
+                                            >
+                                                ✏️
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                {students.length === 0 ? (
+                                {showPendingStudents ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                            <h3 className="font-semibold text-orange-800 mb-2">Estudiantes Pendientes de Aprobación</h3>
+                                            <p className="text-sm text-orange-700 mb-4">Estos estudiantes se han registrado y esperan tu aprobación para unirse al curso.</p>
+                                        </div>
+                                        {pendingStudents.map(student => (
+                                            <div key={student.id} className="border rounded-lg p-4 bg-white">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <h4 className="font-semibold">{student.fullName}</h4>
+                                                        <p className="text-sm text-gray-600">{student.email}</p>
+                                                        <p className="text-xs text-gray-500">Código usado: {student.courseCode}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => approveStudent(student)}
+                                                            className="px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 text-sm"
+                                                        >
+                                                            ✓ Aprobar
+                                                        </button>
+                                                        <button
+                                                            onClick={() => rejectStudent(student.id)}
+                                                            className="px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-sm"
+                                                        >
+                                                            ✗ Rechazar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : students.length === 0 ? (
                                     <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
                                 ) : showRanking ? (
                                     <div className="overflow-x-auto">
@@ -1842,6 +2254,109 @@
             const [professorName, setProfessorName] = React.useState('');
             const [dynamicContent, setDynamicContent] = React.useState([]);
             const [courseInfo, setCourseInfo] = React.useState(null);
+            const [showProfile, setShowProfile] = React.useState(false);
+            const [showJoinCourse, setShowJoinCourse] = React.useState(false);
+            const [joinCourseCode, setJoinCourseCode] = React.useState('');
+            const [profileData, setProfileData] = React.useState({
+                fullName: '',
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            
+            const handleJoinCourse = async (e) => {
+                e.preventDefault();
+                if (!joinCourseCode.startsWith('#')) {
+                    toast.showToast('El código debe comenzar con #', 'error');
+                    return;
+                }
+                
+                try {
+                    // Verificar si ya está pendiente con este código
+                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                    if (tempStudentDoc.exists && tempStudentDoc.data().courseCode === joinCourseCode) {
+                        toast.showToast('Ya tienes una solicitud pendiente para este curso', 'error');
+                        return;
+                    }
+                    
+                    // Verificar si ya está aprobado en algún curso con este código
+                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
+                    
+                    for (const professorDoc of professorsSnapshot.docs) {
+                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`)
+                            .where('courseCode', '==', joinCourseCode)
+                            .get();
+                        
+                        for (const courseDoc of coursesSnapshot.docs) {
+                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
+                            
+                            if (studentDoc.exists) {
+                                toast.showToast('Ya estás registrado en este curso', 'error');
+                                return;
+                            }
+                        }
+                    }
+                    
+                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
+                        .set({
+                            email: currentUser.email,
+                            fullName: userData?.fullName || currentUser.email.split('@')[0],
+                            userType: 'student',
+                            courseCode: joinCourseCode,
+                            badgesEarned: [],
+                            lastBadgeEarned: null,
+                            createdAt: new Date()
+                        });
+                    
+                    toast.showToast('Solicitud enviada. Espera la aprobación del profesor.', 'success');
+                    setShowJoinCourse(false);
+                    setJoinCourseCode('');
+                    loadCourseData();
+                } catch (error) {
+                    console.error('Error uniéndose al curso:', error);
+                    toast.showToast('Error enviando solicitud', 'error');
+                }
+            };
+            
+            const handleUpdateProfile = async (e) => {
+                e.preventDefault();
+                
+                try {
+                    if (profileData.newPassword) {
+                        if (profileData.newPassword !== profileData.confirmPassword) {
+                            toast.showToast('Las contraseñas no coinciden', 'error');
+                            return;
+                        }
+                        
+                        const credential = firebase.auth.EmailAuthProvider.credential(
+                            currentUser.email, 
+                            profileData.currentPassword
+                        );
+                        await currentUser.reauthenticateWithCredential(credential);
+                        await currentUser.updatePassword(profileData.newPassword);
+                        toast.showToast('Contraseña actualizada', 'success');
+                    }
+                    
+                    if (profileData.fullName && profileData.fullName !== userData?.fullName) {
+                        const tempDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                        if (tempDoc.exists) {
+                            await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
+                                .update({ fullName: profileData.fullName });
+                        }
+                        toast.showToast('Nombre actualizado', 'success');
+                    }
+                    
+                    setShowProfile(false);
+                    setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
+                    loadCourseData();
+                } catch (error) {
+                    if (error.code === 'auth/wrong-password') {
+                        toast.showToast('Contraseña actual incorrecta', 'error');
+                    } else {
+                        toast.showToast('Error actualizando perfil', 'error');
+                    }
+                }
+            };
 
 
 
@@ -1857,6 +2372,17 @@
             
             const loadCourseData = async () => {
                 try {
+                    // Primero verificar si está en temp-students
+                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                    
+                    if (tempStudentDoc.exists) {
+                        // Estudiante pendiente de aprobación
+                        const tempData = tempStudentDoc.data();
+                        setUserData({...tempData, isPending: true});
+                        setProfessorName('Pendiente de aprobación');
+                        return;
+                    }
+                    
                     // Buscar en todos los profesores para encontrar al estudiante
                     const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
                     
@@ -1960,6 +2486,52 @@
             if (loading) {
                 return <LoadingSpinner />;
             }
+            
+            if (userData?.isPending) {
+                return (
+                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                        <div className="max-w-2xl mx-auto">
+                            <div className="card rounded-xl p-8 text-center">
+                                <div className="mb-6">
+                                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <span className="text-3xl">⏳</span>
+                                    </div>
+                                    <h1 className="text-2xl font-bold mb-2">Registro Pendiente</h1>
+                                    <p className="text-lg" style={{color: 'var(--text-secondary)'}}>
+                                        Hola, <strong>{userData.fullName}</strong>
+                                    </p>
+                                </div>
+                                
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
+                                    <h2 className="font-semibold text-orange-800 mb-2">Tu registro está siendo revisado</h2>
+                                    <p className="text-orange-700 mb-4">
+                                        Te has registrado exitosamente con el código <strong>{userData.courseCode}</strong>.
+                                        El profesor debe aprobar tu solicitud antes de que puedas acceder al contenido del curso.
+                                    </p>
+                                    <p className="text-sm text-orange-600">
+                                        Recibirás acceso una vez que el profesor apruebe tu registro. 
+                                        Puedes cerrar esta página y volver más tarde.
+                                    </p>
+                                </div>
+                                
+                                <div className="flex justify-center gap-3">
+                                    <ThemeToggle />
+                                    <button
+                                        onClick={handleLogout}
+                                        className="btn btn-secondary flex items-center gap-2"
+                                    >
+                                        <LogOut />
+                                        Cerrar Sesión
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
+                            Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+                        </footer>
+                    </div>
+                );
+            }
 
             return (
                 <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
@@ -1989,6 +2561,21 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowJoinCourse(true)}
+                                    className="btn btn-primary text-sm"
+                                    title="Unirse a un curso"
+                                >
+                                    + Unirse a Curso
+                                </button>
+                                <button
+                                    onClick={() => setShowProfile(true)}
+                                    className="btn btn-secondary flex items-center gap-2"
+                                    title="Perfil de usuario"
+                                >
+                                    <User />
+                                    <span className="hidden md:inline">Perfil</span>
+                                </button>
                                 <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
@@ -2001,6 +2588,117 @@
                             </div>
                         </div>
                     </header>
+
+                    {showJoinCourse && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="card rounded-xl p-6 w-full max-w-md">
+                                <h3 className="text-lg font-bold mb-4">Unirse a un Curso</h3>
+                                <form onSubmit={handleJoinCourse}>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-bold mb-2">Código del Curso</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="text"
+                                            placeholder="#codigo_del_profesor"
+                                            value={joinCourseCode}
+                                            onChange={(e) => {
+                                                let value = e.target.value;
+                                                if (value && !value.startsWith('#')) {
+                                                    value = '#' + value;
+                                                }
+                                                setJoinCourseCode(value);
+                                            }}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowJoinCourse(false);
+                                                setJoinCourseCode('');
+                                            }}
+                                            className="btn btn-secondary flex-1"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary flex-1"
+                                        >
+                                            Enviar Solicitud
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {showProfile && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="card rounded-xl p-6 w-full max-w-md">
+                                <h3 className="text-lg font-bold mb-4">Perfil de Usuario</h3>
+                                <form onSubmit={handleUpdateProfile}>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-bold mb-2">Nombre Completo</label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
+                                            type="text"
+                                            placeholder={userData?.fullName || 'Tu nombre completo'}
+                                            value={profileData.fullName}
+                                            onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                                        />
+                                    </div>
+                                    
+                                    <div className="border-t pt-4 mb-4">
+                                        <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
+                                        <div className="space-y-3">
+                                            <input
+                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                                type="password"
+                                                placeholder="Contraseña actual"
+                                                value={profileData.currentPassword}
+                                                onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
+                                            />
+                                            <input
+                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                                type="password"
+                                                placeholder="Nueva contraseña"
+                                                value={profileData.newPassword}
+                                                onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
+                                            />
+                                            <input
+                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                                type="password"
+                                                placeholder="Confirmar nueva contraseña"
+                                                value={profileData.confirmPassword}
+                                                onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowProfile(false);
+                                                setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
+                                            }}
+                                            className="btn btn-secondary flex-1"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary flex-1"
+                                        >
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
 
                     <main className="container mx-auto max-w-6xl">
                         <div className="grid gap-6">
