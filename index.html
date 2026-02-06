@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,7 +31,7 @@
             --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        
+
         [data-theme="dark"] {
             --bg-primary: #111827;
             --bg-secondary: #1f2937;
@@ -40,14 +41,14 @@
             --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
         }
-        
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-primary);
             transition: background-color 0.3s ease, color 0.3s ease;
         }
-        
+
         .spinner {
             border: 4px solid rgba(77, 150, 255, 0.2);
             border-left-color: var(--accent-color);
@@ -56,48 +57,69 @@
             height: 24px;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
-        
+
         @keyframes slideDown {
-            from { opacity: 0; max-height: 0; }
-            to { opacity: 1; max-height: 1000px; }
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
         }
-        
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
-        
-        .animate-slideDown { animation: slideDown 0.3s ease-out; }
-        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
-        
+
+        .animate-slideDown {
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out;
+        }
+
         .card {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
             box-shadow: var(--shadow);
             transition: all 0.3s ease;
         }
-        
+
         .card:hover {
             box-shadow: var(--shadow-lg);
             transform: translateY(-2px);
         }
-        
+
         .input-field {
             background-color: var(--bg-secondary);
             border: 2px solid var(--border-color);
             color: var(--text-primary);
             transition: all 0.2s ease;
         }
-        
+
         .input-field:focus {
             border-color: var(--accent-color);
             box-shadow: 0 0 0 3px rgba(77, 150, 255, 0.1);
         }
-        
+
         .btn {
             padding: 0.75rem 1.5rem;
             border-radius: 9999px;
@@ -110,28 +132,28 @@
             justify-content: center;
             gap: 0.5rem;
         }
-        
+
         .btn-primary {
             background: linear-gradient(135deg, var(--accent-color), #3b82f6);
             color: white;
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: var(--shadow-lg);
         }
-        
+
         .btn-secondary {
             background-color: var(--bg-secondary);
             color: var(--text-primary);
             border: 2px solid var(--border-color);
         }
-        
+
         .btn-secondary:hover {
             border-color: var(--accent-color);
             color: var(--accent-color);
         }
-        
+
         .theme-toggle {
             background-color: var(--bg-secondary);
             border: 2px solid var(--border-color);
@@ -140,11 +162,11 @@
             cursor: pointer;
             transition: all 0.2s ease;
         }
-        
+
         .theme-toggle:hover {
             border-color: var(--accent-color);
         }
-        
+
         .toast {
             position: fixed;
             top: 1rem;
@@ -156,11 +178,19 @@
             z-index: 1000;
             animation: fadeIn 0.3s ease;
         }
-        
-        .toast-success { background-color: var(--success-color); }
-        .toast-error { background-color: var(--error-color); }
-        .toast-info { background-color: var(--accent-color); }
-        
+
+        .toast-success {
+            background-color: var(--success-color);
+        }
+
+        .toast-error {
+            background-color: var(--error-color);
+        }
+
+        .toast-info {
+            background-color: var(--accent-color);
+        }
+
         .fab {
             position: fixed;
             bottom: 2rem;
@@ -180,22 +210,23 @@
             transition: all 0.3s ease;
             z-index: 100;
         }
-        
+
         .fab:hover {
             transform: scale(1.1);
             box-shadow: 0 8px 25px rgba(77, 150, 255, 0.4);
         }
     </style>
 </head>
+
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
         const ToastContext = React.createContext();
-        
+
         function ToastProvider({ children }) {
             const [toasts, setToasts] = React.useState([]);
-            
+
             const showToast = (message, type = 'success') => {
                 const id = Date.now();
                 setToasts(prev => [...prev, { id, message, type }]);
@@ -203,11 +234,11 @@
                     setToasts(prev => prev.filter(toast => toast.id !== id));
                 }, 3000);
             };
-            
+
             return React.createElement(ToastContext.Provider, { value: { showToast } }, [
                 children,
-                React.createElement('div', { key: 'toasts' }, 
-                    toasts.map(toast => 
+                React.createElement('div', { key: 'toasts' },
+                    toasts.map(toast =>
                         React.createElement('div', {
                             key: toast.id,
                             className: `toast toast-${toast.type}`
@@ -216,26 +247,26 @@
                 )
             ]);
         }
-        
+
         const useToast = () => React.useContext(ToastContext);
-        
+
         function useTheme() {
-            const [theme, setTheme] = React.useState(() => 
+            const [theme, setTheme] = React.useState(() =>
                 localStorage.getItem('theme') || 'light'
             );
-            
+
             React.useEffect(() => {
                 document.documentElement.setAttribute('data-theme', theme);
                 localStorage.setItem('theme', theme);
             }, [theme]);
-            
+
             const toggleTheme = () => {
                 setTheme(prev => prev === 'light' ? 'dark' : 'light');
             };
-            
+
             return { theme, toggleTheme };
         }
-        
+
         function ThemeToggle() {
             const { theme, toggleTheme } = useTheme();
             return React.createElement('button', {
@@ -244,18 +275,18 @@
                 title: `Cambiar a tema ${theme === 'light' ? 'oscuro' : 'claro'}`
             }, theme === 'light' ? '🌙' : '☀️');
         }
-        
+
         const User = ({ className = '' }) => React.createElement('span', { className }, '👤');
         const LogOut = ({ className = '' }) => React.createElement('span', { className }, '🚪');
         const Loader2 = ({ className = '' }) => React.createElement('div', { className: `spinner ${className}` });
 
         const LoadingSpinner = () => (
-          <div className="flex justify-center items-center py-8 animate-fadeIn">
-            <div className="spinner"></div>
-            <p className="ml-3" style={{color: 'var(--text-secondary)'}}>Cargando...</p>
-          </div>
+            <div className="flex justify-center items-center py-8 animate-fadeIn">
+                <div className="spinner"></div>
+                <p className="ml-3" style={{ color: 'var(--text-secondary)' }}>Cargando...</p>
+            </div>
         );
-        
+
         function AuthPage() {
             const toast = useToast();
             const auth = firebase.auth();
@@ -273,7 +304,7 @@
             const [courseCode, setCourseCode] = React.useState('');
             const [showPasswordReset, setShowPasswordReset] = React.useState(false);
             const [newPassword, setNewPassword] = React.useState('');
-            
+
             const validateEmail = (email) => {
                 const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
                 return validDomains.test(email);
@@ -284,20 +315,20 @@
             const sendVerificationEmail = async (email, code, fullName) => {
                 try {
                     emailjs.init('145MnHTSSDkBVKZAU');
-                    
+
                     const templateParams = {
                         to_name: fullName || email.split('@')[0],
                         to_email: email,
                         verification_code: code,
                         from_name: 'Seminario de Investigación'
                     };
-                    
+
                     const result = await emailjs.send(
                         'service_7u1zcni',
                         'template_1129sv3',
                         templateParams
                     );
-                    
+
                     toast.showToast('Código enviado a tu correo', 'success');
                 } catch (error) {
                     console.error('Error enviando email:', error);
@@ -323,7 +354,7 @@
                     } else {
                         const code = generateCode();
                         setGeneratedCode(code);
-                        
+
                         if (userRole === 'student') {
                             if (!courseCode.startsWith('#')) {
                                 toast.showToast('Los estudiantes deben ingresar un código de curso válido (#codigo)', 'error');
@@ -331,27 +362,27 @@
                                 return;
                             }
                         }
-                        
+
                         const pendingData = {
                             email,
                             password,
                             fullName,
                             userType: userRole
                         };
-                        
+
                         if (userRole === 'student') {
                             pendingData.courseCode = courseCode;
                         }
-                        
+
                         setPendingUserData(pendingData);
-                        
+
                         await sendVerificationEmail(email, code, fullName);
                         setShowCodeVerification(true);
                     }
                 } catch (err) {
                     console.error('Error en handleAuth:', err);
                     let errorMessage = 'Error de autenticación. Por favor, intenta de nuevo.';
-                    
+
                     if (err.code === 'auth/invalid-email') {
                         errorMessage = 'El correo electrónico no tiene un formato válido.';
                     } else if (err.code === 'auth/user-not-found') {
@@ -363,7 +394,7 @@
                     } else if (err.code === 'auth/weak-password') {
                         errorMessage = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
                     }
-                    
+
                     toast.showToast(errorMessage, 'error');
                 } finally {
                     setLoading(false);
@@ -383,7 +414,7 @@
                 try {
                     const code = generateCode();
                     setGeneratedCode(code);
-                    
+
                     await sendVerificationEmail(email, code, email.split('@')[0]);
                     setShowCodeVerification(true);
                     toast.showToast('Código enviado para restablecer contraseña', 'success');
@@ -433,7 +464,7 @@
                         pendingUserData.password
                     );
                     const user = userCredential.user;
-                    
+
                     const userData = {
                         email: pendingUserData.email,
                         fullName: pendingUserData.fullName,
@@ -452,14 +483,14 @@
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
                         userData.courseCode = pendingUserData.courseCode;
-                        
+
                         // Crear documento temporal del estudiante
                         await db.doc(`artifacts/seminario-investigacion-app/temp-students/${user.uid}`)
                             .set(userData);
                     }
-                    
+
                     toast.showToast('¡Cuenta creada exitosamente! Bienvenido.', 'success');
-                    
+
                     setShowCodeVerification(false);
                     setVerificationCode('');
                     setGeneratedCode('');
@@ -467,7 +498,7 @@
                 } catch (err) {
                     console.error('Error creando cuenta:', err);
                     let errorMessage = 'Error creando la cuenta';
-                    
+
                     if (err.code === 'auth/email-already-in-use') {
                         errorMessage = 'Este correo ya está registrado';
                     } else if (err.code === 'permission-denied') {
@@ -475,7 +506,7 @@
                     } else if (err.message === 'Curso no encontrado') {
                         errorMessage = 'El código de curso no existe. Verifica con tu profesor.';
                     }
-                    
+
                     toast.showToast(errorMessage, 'error');
                 } finally {
                     setLoading(false);
@@ -484,18 +515,18 @@
 
             if (showPasswordReset && !showCodeVerification) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                                <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                     Restablecer Contraseña
                                 </h2>
                                 <ThemeToggle />
                             </div>
-                            
+
                             <form onSubmit={handlePasswordReset}>
                                 <div className="mb-4">
-                                    <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                    <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                         Correo Institucional
                                     </label>
                                     <input
@@ -507,7 +538,7 @@
                                         required
                                     />
                                 </div>
-                                
+
                                 <div className="flex flex-col gap-4">
                                     <button
                                         className="btn btn-primary w-full"
@@ -517,7 +548,7 @@
                                         {loading && <Loader2 className="w-5 h-5" />}
                                         Enviar Código
                                     </button>
-                                    
+
                                     <button
                                         className="btn btn-secondary w-full"
                                         type="button"
@@ -537,21 +568,21 @@
 
             if (showCodeVerification) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                                <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                     Verificar Código
                                 </h2>
                                 <ThemeToggle />
                             </div>
-                            
+
                             <div className="text-center mb-6">
-                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                     Ingresa el código de 6 dígitos enviado a <strong>{pendingUserData?.email || email}</strong>
                                 </p>
                             </div>
-                            
+
                             <form onSubmit={handleVerifyCode}>
                                 <div className="mb-6">
                                     <input
@@ -564,7 +595,7 @@
                                         required
                                     />
                                 </div>
-                                
+
                                 <div className="flex flex-col gap-4">
                                     <button
                                         className="btn btn-primary w-full"
@@ -575,7 +606,7 @@
                                         {loading && <Loader2 className="w-5 h-5" />}
                                         {showPasswordReset ? 'Restablecer Contraseña' : 'Verificar y Crear Cuenta'}
                                     </button>
-                                    
+
                                     <button
                                         className="btn btn-secondary w-full"
                                         type="button"
@@ -591,8 +622,8 @@
                                     </button>
                                 </div>
                             </form>
-                            <div className="text-center mt-4 text-xs" style={{color: 'var(--text-secondary)'}}>
-                                Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+                            <div className="text-center mt-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                             </div>
                         </div>
                     </div>
@@ -600,18 +631,18 @@
             }
 
             return (
-                <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
+                <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                            <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                 {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
                             </h2>
                             <ThemeToggle />
                         </div>
-                        
+
                         <form onSubmit={handleAuth}>
                             <div className="mb-4">
-                                <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     Correo Institucional
                                 </label>
                                 <input
@@ -623,11 +654,11 @@
                                     required
                                 />
                             </div>
-                            
+
                             {!isLogin && (
                                 <>
                                     <div className="mb-4">
-                                        <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                             Nombre Completo
                                         </label>
                                         <input
@@ -639,9 +670,9 @@
                                             required
                                         />
                                     </div>
-                                    
+
                                     <div className="mb-4">
-                                        <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                             Tipo de Usuario
                                         </label>
                                         <select
@@ -654,10 +685,10 @@
                                             <option value="professor">Profesor</option>
                                         </select>
                                     </div>
-                                    
+
                                     {userRole === 'student' && (
                                         <div className="mb-4">
-                                            <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                            <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                                 Código de Curso
                                             </label>
                                             <input
@@ -674,7 +705,7 @@
                                                 }}
                                                 required
                                             />
-                                            <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                                            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                                                 Ingresa el código que te proporcionó tu profesor
                                             </p>
                                         </div>
@@ -682,9 +713,9 @@
 
                                 </>
                             )}
-                            
+
                             <div className="mb-4">
-                                <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     Contraseña
                                 </label>
                                 <input
@@ -696,7 +727,7 @@
                                     required
                                 />
                             </div>
-                            
+
                             <div className="flex flex-col gap-4 mt-6">
                                 <button
                                     className="btn btn-primary w-full"
@@ -706,7 +737,7 @@
                                     {loading && <Loader2 className="w-5 h-5" />}
                                     {isLogin ? 'Iniciar Sesión' : 'Enviar Código'}
                                 </button>
-                                
+
                                 <button
                                     className="btn btn-secondary w-full"
                                     type="button"
@@ -720,7 +751,7 @@
                                 >
                                     {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
                                 </button>
-                                
+
                                 {isLogin && (
                                     <button
                                         className="btn btn-secondary w-full text-sm"
@@ -732,8 +763,8 @@
                                 )}
                             </div>
                         </form>
-                        <div className="text-center mt-4 text-xs" style={{color: 'var(--text-secondary)'}}>
-                            Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+                        <div className="text-center mt-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                         </div>
                     </div>
                 </div>
@@ -783,7 +814,7 @@
                 loadUserData();
                 loadCourses();
             }, []);
-            
+
             React.useEffect(() => {
                 if (selectedCourse) {
                     loadStudents();
@@ -809,12 +840,12 @@
             const loadCourses = async () => {
                 try {
                     const coursesQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).get();
-                    
+
                     const coursesData = coursesQuery.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
-                    
+
                     setCourses(coursesData);
                     if (coursesData.length > 0 && !selectedCourse) {
                         setSelectedCourse(coursesData[0]);
@@ -826,45 +857,45 @@
                     setLoading(false);
                 }
             };
-            
+
             const loadStudents = async () => {
                 if (!selectedCourse) return;
-                
+
                 try {
                     const studentsQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
                         .get();
-                    
+
                     const studentsData = studentsQuery.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
-                    
+
                     setStudents(studentsData);
                 } catch (error) {
                     console.error('Error cargando estudiantes:', error);
                     toast.showToast('Error cargando estudiantes', 'error');
                 }
             };
-            
+
             const loadPendingStudents = async () => {
                 if (!selectedCourse) return;
-                
+
                 try {
                     const tempStudentsQuery = await db.collection('artifacts/seminario-investigacion-app/temp-students')
                         .where('courseCode', '==', selectedCourse.courseCode)
                         .get();
-                    
+
                     const pendingData = tempStudentsQuery.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
-                    
+
                     setPendingStudents(pendingData);
                 } catch (error) {
                     console.error('Error cargando estudiantes pendientes:', error);
                 }
             };
-            
+
             const approveStudent = async (studentData) => {
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
@@ -875,9 +906,9 @@
                             badgeStatus: {},
                             lastBadgeEarned: null
                         });
-                    
+
                     await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentData.id}`).delete();
-                    
+
                     toast.showToast('Estudiante aprobado exitosamente', 'success');
                     loadStudents();
                     loadPendingStudents();
@@ -886,7 +917,7 @@
                     toast.showToast('Error aprobando estudiante', 'error');
                 }
             };
-            
+
             const rejectStudent = async (studentId) => {
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentId}`).delete();
@@ -897,7 +928,7 @@
                     toast.showToast('Error rechazando estudiante', 'error');
                 }
             };
-            
+
             const generateTodayQR = () => {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -906,7 +937,7 @@
                     date: today,
                     professorId: currentUser.uid
                 });
-                
+
                 setTimeout(() => {
                     if (qrCodeRef.current) {
                         qrCodeRef.current.innerHTML = '';
@@ -918,18 +949,18 @@
                     }
                 }, 100);
             };
-            
+
             const loadAttendanceData = async () => {
                 if (!selectedCourse) return;
-                
+
                 try {
                     const attendanceSnapshot = await db.collection(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance`).get();
-                    
+
                     const attendanceByDate = {};
                     attendanceSnapshot.docs.forEach(doc => {
                         attendanceByDate[doc.id] = doc.data().students || [];
                     });
-                    
+
                     setAttendanceData(attendanceByDate);
                 } catch (error) {
                     console.error('Error cargando asistencia:', error);
@@ -941,10 +972,10 @@
                     toast.showToast('Nombre, código y universidad son requeridos', 'error');
                     return;
                 }
-                
+
                 try {
                     const courseCode = newCourse.code.startsWith('#') ? newCourse.code : '#' + newCourse.code;
-                    
+
                     const courseData = {
                         name: newCourse.name,
                         courseCode: courseCode,
@@ -959,9 +990,9 @@
                         weeklyContent: [],
                         badges: []
                     };
-                    
+
                     const docRef = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).add(courseData);
-                    
+
                     // Crear estructura inicial de semanas
                     const weeklyContent = [];
                     for (let i = 1; i <= newCourse.weeks; i++) {
@@ -974,9 +1005,9 @@
                             badges: []
                         });
                     }
-                    
+
                     await docRef.update({ weeklyContent });
-                    
+
                     toast.showToast('Curso creado exitosamente', 'success');
                     setShowCreateCourse(false);
                     setNewCourse({ name: '', code: '', university: '', description: '', weeks: 16, weeklyContent: [] });
@@ -986,17 +1017,17 @@
                     toast.showToast('Error creando curso', 'error');
                 }
             };
-            
+
             const assignBadge = async (studentId, badgeId, earned = true) => {
                 try {
                     const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
-                    
+
                     if (studentDoc.exists) {
                         const studentData = studentDoc.data();
                         const currentBadges = studentData.badgesEarned || [];
                         const currentBadgeStatus = studentData.badgeStatus || {};
-                        
+
                         if (!currentBadges.includes(badgeId)) {
                             await studentRef.update({
                                 badgesEarned: [...currentBadges, badgeId],
@@ -1006,7 +1037,7 @@
                                 },
                                 lastBadgeEarned: new Date()
                             });
-                            
+
                             toast.showToast(`Badge ${earned ? 'ganado' : 'asignado'} exitosamente`, 'success');
                             loadStudents();
                         } else {
@@ -1022,7 +1053,7 @@
                     }
                 }
             };
-            
+
             const [showPasswordModal, setShowPasswordModal] = React.useState(false);
             const [passwordData, setPasswordData] = React.useState({ password: '', showPassword: false, studentId: '', badgeId: '', newStatus: '' });
             const [isUpdatingBadge, setIsUpdatingBadge] = React.useState(false);
@@ -1038,31 +1069,31 @@
                 confirmPassword: ''
             });
             const [newCourseCode, setNewCourseCode] = React.useState('');
-            
+
             const changeBadgeStatus = (studentId, badgeId, newStatus) => {
                 if (confirm(`¿Estás seguro de cambiar el badge a ${newStatus === 'earned' ? 'ganado' : 'asignado'}?`)) {
                     updateBadgeStatus(studentId, badgeId, newStatus);
                 }
             };
-            
 
-            
+
+
             const updateBadgeStatus = async (studentId, badgeId, newStatus) => {
                 try {
                     const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
-                    
+
                     if (studentDoc.exists) {
                         const studentData = studentDoc.data();
                         const currentBadgeStatus = studentData.badgeStatus || {};
-                        
+
                         await studentRef.update({
                             badgeStatus: {
                                 ...currentBadgeStatus,
                                 [badgeId]: newStatus
                             }
                         });
-                        
+
                         toast.showToast(`Badge cambiado a ${newStatus === 'earned' ? 'ganado' : 'asignado'}`, 'success');
                         loadStudents();
                     }
@@ -1071,12 +1102,12 @@
                     toast.showToast('Error actualizando badge', 'error');
                 }
             };
-            
+
             const removeStudent = async (studentId) => {
                 if (!confirm('¿Estás seguro de que quieres remover este estudiante del curso?')) {
                     return;
                 }
-                
+
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
                     toast.showToast('Estudiante removido exitosamente', 'success');
@@ -1086,16 +1117,16 @@
                     toast.showToast('Error removiendo estudiante', 'error');
                 }
             };
-            
+
             const deleteCourse = async () => {
                 if (!deletePassword) return;
-                
+
                 try {
                     const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, deletePassword);
                     await currentUser.reauthenticateWithCredential(credential);
-                    
+
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
-                    
+
                     toast.showToast('Curso eliminado exitosamente', 'success');
                     setShowDeleteConfirm(null);
                     setDeletePassword('');
@@ -1110,33 +1141,33 @@
                     }
                 }
             };
-            
+
             const handleUpdateProfile = async (e) => {
                 e.preventDefault();
-                
+
                 try {
                     if (profileData.newPassword) {
                         if (profileData.newPassword !== profileData.confirmPassword) {
                             toast.showToast('Las contraseñas no coinciden', 'error');
                             return;
                         }
-                        
+
                         const credential = firebase.auth.EmailAuthProvider.credential(
-                            currentUser.email, 
+                            currentUser.email,
                             profileData.currentPassword
                         );
                         await currentUser.reauthenticateWithCredential(credential);
                         await currentUser.updatePassword(profileData.newPassword);
                         toast.showToast('Contraseña actualizada', 'success');
                     }
-                    
+
                     if (profileData.fullName && profileData.fullName !== userData?.fullName) {
                         await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`)
                             .update({ fullName: profileData.fullName });
                         toast.showToast('Nombre actualizado', 'success');
                         loadUserData();
                     }
-                    
+
                     setShowProfile(false);
                     setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
                 } catch (error) {
@@ -1147,19 +1178,19 @@
                     }
                 }
             };
-            
+
             const handleChangeCourseCode = async (e) => {
                 e.preventDefault();
-                
+
                 if (!newCourseCode.startsWith('#')) {
                     toast.showToast('El código debe comenzar con #', 'error');
                     return;
                 }
-                
+
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
                         .update({ courseCode: newCourseCode });
-                    
+
                     toast.showToast('Código del curso actualizado', 'success');
                     setShowChangeCourseCode(false);
                     loadCourses();
@@ -1168,7 +1199,7 @@
                     toast.showToast('Error actualizando código del curso', 'error');
                 }
             };
-            
+
             const editWeekContent = (weekNumber) => {
                 if (weekNumber === 0) {
                     // Editar información general
@@ -1198,11 +1229,11 @@
                 setEditingWeek(weekNumber);
                 setShowEditContent(true);
             };
-            
+
             const saveWeekContent = async () => {
                 try {
                     const courseRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`);
-                    
+
                     if (editingWeek === 0) {
                         // Guardar información general
                         await courseRef.update({
@@ -1222,33 +1253,33 @@
                         // Guardar contenido de semana
                         const courseDoc = await courseRef.get();
                         const courseData = courseDoc.data();
-                        
+
                         let weeklyContent = courseData.weeklyContent || [];
                         const weekIndex = weeklyContent.findIndex(w => w.week === editingWeek);
-                        
+
                         const updatedWeek = {
                             ...weekContent,
                             week: editingWeek,
                             activities: weekContent.activities?.filter(a => a.trim()) || [],
                             badges: weekContent.badges?.filter(b => b.name?.trim()) || []
                         };
-                        
+
                         if (weekIndex >= 0) {
                             weeklyContent[weekIndex] = updatedWeek;
                         } else {
                             weeklyContent.push(updatedWeek);
                         }
-                        
+
                         await courseRef.update({ weeklyContent });
                     }
-                    
+
                     toast.showToast('Contenido guardado exitosamente', 'success');
                     setShowEditContent(false);
                     await loadCourses();
                     // Actualizar el curso seleccionado con los nuevos datos
                     const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`).get();
                     if (updatedCourseData.exists) {
-                        setSelectedCourse({id: selectedCourse.id, ...updatedCourseData.data()});
+                        setSelectedCourse({ id: selectedCourse.id, ...updatedCourseData.data() });
                     }
                 } catch (error) {
                     console.error('Error guardando contenido:', error);
@@ -1268,7 +1299,7 @@
             if (loading) {
                 return <LoadingSpinner />;
             }
-            
+
             if (showProfile) {
                 return (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1282,10 +1313,10 @@
                                         type="text"
                                         placeholder={userData?.fullName || 'Tu nombre completo'}
                                         value={profileData.fullName}
-                                        onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                                        onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
                                     />
                                 </div>
-                                
+
                                 <div className="border-t pt-4 mb-4">
                                     <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
                                     <div className="space-y-3">
@@ -1294,25 +1325,25 @@
                                             type="password"
                                             placeholder="Contraseña actual"
                                             value={profileData.currentPassword}
-                                            onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
+                                            onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
                                         />
                                         <input
                                             className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
                                             type="password"
                                             placeholder="Nueva contraseña"
                                             value={profileData.newPassword}
-                                            onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
+                                            onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
                                         />
                                         <input
                                             className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
                                             type="password"
                                             placeholder="Confirmar nueva contraseña"
                                             value={profileData.confirmPassword}
-                                            onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
+                                            onChange={(e) => setProfileData({ ...profileData, confirmPassword: e.target.value })}
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex gap-3">
                                     <button
                                         type="button"
@@ -1336,7 +1367,7 @@
                     </div>
                 );
             }
-            
+
             if (showChangeCourseCode) {
                 return (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1359,11 +1390,11 @@
                                         }}
                                         required
                                     />
-                                    <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                                    <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                                         Los estudiantes usarán este código para unirse al curso
                                     </p>
                                 </div>
-                                
+
                                 <div className="flex gap-3">
                                     <button
                                         type="button"
@@ -1387,37 +1418,37 @@
                     </div>
                 );
             }
-            
+
             if (showAttendance) {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const dates = Object.keys(attendanceData).sort().reverse();
-                
+
                 const formatDateMmmDD = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
                     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
                     return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}`;
                 };
-                
+
                 const formatDateMmmDDYY = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
                     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
                     const year = String(date.getFullYear()).slice(-2);
                     return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}-${year}`;
                 };
-                
+
                 return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="max-w-6xl mx-auto">
                             <div className="card rounded-xl p-6 mb-6">
                                 <div className="flex justify-between items-center mb-4">
                                     <div>
                                         <h2 className="text-2xl font-bold">Control de Asistencia</h2>
-                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{selectedCourse.name}</p>
+                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{selectedCourse.name}</p>
                                     </div>
                                     <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
                                 </div>
-                                
+
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="text-center">
                                         <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
@@ -1426,7 +1457,7 @@
                                         </div>
                                         <p className="text-sm text-gray-600 mt-2">Los estudiantes deben escanear este código</p>
                                     </div>
-                                    
+
                                     <div>
                                         <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
                                         <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
@@ -1449,7 +1480,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="card rounded-xl p-6">
                                 <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
                                 <div className="overflow-x-auto">
@@ -1465,10 +1496,10 @@
                                         </thead>
                                         <tbody>
                                             {students.map(student => {
-                                                const attendanceCount = dates.filter(date => 
+                                                const attendanceCount = dates.filter(date =>
                                                     attendanceData[date]?.some(record => record.studentId === student.id)
                                                 ).length;
-                                                
+
                                                 return (
                                                     <tr key={student.id} className="border-b hover:bg-gray-50">
                                                         <td className="p-3">{student.fullName}</td>
@@ -1492,13 +1523,13 @@
                     </div>
                 );
             }
-            
+
             if (showDeleteConfirm) {
                 return (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="card rounded-xl p-6 w-full max-w-md mx-4">
                             <h3 className="text-lg font-bold mb-4">Eliminar Curso</h3>
-                            <p className="text-sm mb-4" style={{color: 'var(--text-secondary)'}}>
+                            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                                 Ingresa tu contraseña para confirmar la eliminación del curso:
                             </p>
                             <div className="relative mb-4">
@@ -1540,14 +1571,14 @@
                     </div>
                 );
             }
-            
+
             if (showEditContent) {
                 return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="max-w-4xl mx-auto">
                             <div className="card rounded-xl p-6">
                                 <h2 className="text-2xl font-bold mb-6">{editingWeek === 0 ? 'Editar Información General' : `Editar Contenido - Semana ${editingWeek}`}</h2>
-                                
+
                                 {editingWeek === 0 ? (
                                     <div className="space-y-6">
                                         <div>
@@ -1559,7 +1590,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.university || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, university: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, university: e.target.value })}
                                                         placeholder="Nombre de la universidad"
                                                     />
                                                 </div>
@@ -1569,7 +1600,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.courseName || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, courseName: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, courseName: e.target.value })}
                                                         placeholder="Nombre del curso"
                                                     />
                                                 </div>
@@ -1579,7 +1610,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.courseCode || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, courseCode: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, courseCode: e.target.value })}
                                                         placeholder="INGE-3032"
                                                     />
                                                 </div>
@@ -1589,7 +1620,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.period || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, period: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, period: e.target.value })}
                                                         placeholder="2024-2"
                                                     />
                                                 </div>
@@ -1599,7 +1630,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.group || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, group: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, group: e.target.value })}
                                                         placeholder="01"
                                                     />
                                                 </div>
@@ -1609,7 +1640,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.programs || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, programs: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, programs: e.target.value })}
                                                         placeholder="Ingeniería de Sistemas"
                                                     />
                                                 </div>
@@ -1619,7 +1650,7 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.intensity || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, intensity: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, intensity: e.target.value })}
                                                         placeholder="4 horas semanales"
                                                     />
                                                 </div>
@@ -1629,35 +1660,35 @@
                                                         className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                         type="text"
                                                         value={weekContent.credits || ''}
-                                                        onChange={(e) => setWeekContent({...weekContent, credits: e.target.value})}
+                                                        onChange={(e) => setWeekContent({ ...weekContent, credits: e.target.value })}
                                                         placeholder="3"
                                                     />
                                                 </div>
                                             </div>
                                         </div>
-                                        
+
                                         <div>
                                             <h4 className="font-semibold text-lg mb-4 text-gray-800">Introducción</h4>
                                             <textarea
                                                 className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                 rows="4"
                                                 value={weekContent.introduction || ''}
-                                                onChange={(e) => setWeekContent({...weekContent, introduction: e.target.value})}
+                                                onChange={(e) => setWeekContent({ ...weekContent, introduction: e.target.value })}
                                                 placeholder="Introducción del curso..."
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <h4 className="font-semibold text-lg mb-4 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h4>
                                             <textarea
                                                 className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                 rows="6"
                                                 value={weekContent.iagAgreements || ''}
-                                                onChange={(e) => setWeekContent({...weekContent, iagAgreements: e.target.value})}
+                                                onChange={(e) => setWeekContent({ ...weekContent, iagAgreements: e.target.value })}
                                                 placeholder="Acuerdos sobre el uso de Inteligencia Artificial Generativa..."
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <h4 className="font-semibold text-lg mb-4 text-gray-800">Badges Disponibles en el Curso</h4>
                                             <div className="space-y-3">
@@ -1671,8 +1702,8 @@
                                                                     value={badge.name || ''}
                                                                     onChange={(e) => {
                                                                         const newBadges = [...(weekContent.availableBadges || [])];
-                                                                        newBadges[index] = {...badge, name: e.target.value};
-                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                        newBadges[index] = { ...badge, name: e.target.value };
+                                                                        setWeekContent({ ...weekContent, availableBadges: newBadges });
                                                                     }}
                                                                     className="input-field w-full p-2 rounded"
                                                                     placeholder="Badge de Iniciación"
@@ -1685,8 +1716,8 @@
                                                                     value={badge.description || ''}
                                                                     onChange={(e) => {
                                                                         const newBadges = [...(weekContent.availableBadges || [])];
-                                                                        newBadges[index] = {...badge, description: e.target.value};
-                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                        newBadges[index] = { ...badge, description: e.target.value };
+                                                                        setWeekContent({ ...weekContent, availableBadges: newBadges });
                                                                     }}
                                                                     className="input-field w-full p-2 rounded"
                                                                     placeholder="Descripción del badge"
@@ -1698,12 +1729,12 @@
                                                                     value={badge.maxWeek || 1}
                                                                     onChange={(e) => {
                                                                         const newBadges = [...(weekContent.availableBadges || [])];
-                                                                        newBadges[index] = {...badge, maxWeek: parseInt(e.target.value)};
-                                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                        newBadges[index] = { ...badge, maxWeek: parseInt(e.target.value) };
+                                                                        setWeekContent({ ...weekContent, availableBadges: newBadges });
                                                                     }}
                                                                     className="input-field w-full p-2 rounded"
                                                                 >
-                                                                    {Array.from({length: selectedCourse?.weeks || 16}, (_, i) => i + 1).map(week => (
+                                                                    {Array.from({ length: selectedCourse?.weeks || 16 }, (_, i) => i + 1).map(week => (
                                                                         <option key={week} value={week}>Semana {week}</option>
                                                                     ))}
                                                                 </select>
@@ -1712,7 +1743,7 @@
                                                         <button
                                                             onClick={() => {
                                                                 const newBadges = (weekContent.availableBadges || []).filter((_, i) => i !== index);
-                                                                setWeekContent({...weekContent, availableBadges: newBadges});
+                                                                setWeekContent({ ...weekContent, availableBadges: newBadges });
                                                             }}
                                                             className="mt-2 text-red-600 text-sm hover:text-red-800"
                                                         >
@@ -1722,8 +1753,8 @@
                                                 ))}
                                                 <button
                                                     onClick={() => {
-                                                        const newBadges = [...(weekContent.availableBadges || []), {name: '', description: '', maxWeek: 1}];
-                                                        setWeekContent({...weekContent, availableBadges: newBadges});
+                                                        const newBadges = [...(weekContent.availableBadges || []), { name: '', description: '', maxWeek: 1 }];
+                                                        setWeekContent({ ...weekContent, availableBadges: newBadges });
                                                     }}
                                                     className="w-full p-3 border-2 border-dashed border-gray-300 rounded text-gray-600 hover:border-gray-400 hover:text-gray-800"
                                                 >
@@ -1740,30 +1771,30 @@
                                                 className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                 type="text"
                                                 value={weekContent.title || ''}
-                                                onChange={(e) => setWeekContent({...weekContent, title: e.target.value})}
+                                                onChange={(e) => setWeekContent({ ...weekContent, title: e.target.value })}
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <label className="block text-sm font-bold mb-2">Descripción</label>
                                             <input
                                                 className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                 type="text"
                                                 value={weekContent.description || ''}
-                                                onChange={(e) => setWeekContent({...weekContent, description: e.target.value})}
+                                                onChange={(e) => setWeekContent({ ...weekContent, description: e.target.value })}
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <label className="block text-sm font-bold mb-2">Contenido</label>
                                             <textarea
                                                 className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                                 rows="4"
                                                 value={weekContent.content || ''}
-                                                onChange={(e) => setWeekContent({...weekContent, content: e.target.value})}
+                                                onChange={(e) => setWeekContent({ ...weekContent, content: e.target.value })}
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <label className="block text-sm font-bold mb-2">Actividades</label>
                                             {(weekContent.activities || ['']).map((activity, index) => (
@@ -1775,14 +1806,14 @@
                                                         onChange={(e) => {
                                                             const newActivities = [...(weekContent.activities || [''])];
                                                             newActivities[index] = e.target.value;
-                                                            setWeekContent({...weekContent, activities: newActivities});
+                                                            setWeekContent({ ...weekContent, activities: newActivities });
                                                         }}
                                                         placeholder="Actividad..."
                                                     />
                                                     <button
                                                         onClick={() => {
                                                             const newActivities = (weekContent.activities || ['']).filter((_, i) => i !== index);
-                                                            setWeekContent({...weekContent, activities: newActivities});
+                                                            setWeekContent({ ...weekContent, activities: newActivities });
                                                         }}
                                                         className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
                                                     >
@@ -1791,17 +1822,17 @@
                                                 </div>
                                             ))}
                                             <button
-                                                onClick={() => setWeekContent({...weekContent, activities: [...(weekContent.activities || ['']), '']})}
+                                                onClick={() => setWeekContent({ ...weekContent, activities: [...(weekContent.activities || ['']), ''] })}
                                                 className="btn btn-secondary text-sm"
                                             >
                                                 + Agregar Actividad
                                             </button>
                                         </div>
-                                        
+
 
                                     </div>
                                 )}
-                                
+
                                 <div className="flex gap-4 mt-6">
                                     <button
                                         onClick={() => setShowEditContent(false)}
@@ -1821,14 +1852,14 @@
                     </div>
                 );
             }
-            
+
             if (showCreateCourse) {
                 return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="max-w-2xl mx-auto">
                             <div className="card rounded-xl p-6">
                                 <h2 className="text-2xl font-bold mb-6">Crear Nuevo Curso</h2>
-                                
+
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-bold mb-2">Universidad</label>
@@ -1837,10 +1868,10 @@
                                             type="text"
                                             placeholder="Nombre de la universidad"
                                             value={newCourse.university}
-                                            onChange={(e) => setNewCourse({...newCourse, university: e.target.value})}
+                                            onChange={(e) => setNewCourse({ ...newCourse, university: e.target.value })}
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-bold mb-2">Nombre del Curso</label>
                                         <input
@@ -1848,10 +1879,10 @@
                                             type="text"
                                             placeholder="Nombre del curso"
                                             value={newCourse.name}
-                                            onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
+                                            onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-bold mb-2">Código del Curso</label>
                                         <input
@@ -1864,11 +1895,11 @@
                                                 if (value && !value.startsWith('#')) {
                                                     value = '#' + value;
                                                 }
-                                                setNewCourse({...newCourse, code: value});
+                                                setNewCourse({ ...newCourse, code: value });
                                             }}
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-bold mb-2">Descripción</label>
                                         <textarea
@@ -1876,10 +1907,10 @@
                                             rows="3"
                                             placeholder="Descripción del curso..."
                                             value={newCourse.description}
-                                            onChange={(e) => setNewCourse({...newCourse, description: e.target.value})}
+                                            onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-bold mb-2">Número de Semanas</label>
                                         <input
@@ -1888,11 +1919,11 @@
                                             min="1"
                                             max="20"
                                             value={newCourse.weeks}
-                                            onChange={(e) => setNewCourse({...newCourse, weeks: parseInt(e.target.value)})}
+                                            onChange={(e) => setNewCourse({ ...newCourse, weeks: parseInt(e.target.value) })}
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex gap-4 mt-6">
                                     <button
                                         onClick={() => setShowCreateCourse(false)}
@@ -1914,16 +1945,16 @@
             }
 
             return (
-                <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
                                 <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
-                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                     Profesor: {currentUser.email}
                                 </p>
                                 {selectedCourse && (
-                                    <p className="text-xs" style={{color: 'var(--text-secondary)'}}>
+                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                                         Curso actual: {selectedCourse.name} ({selectedCourse.courseCode})
                                     </p>
                                 )}
@@ -1955,9 +1986,9 @@
                             </div>
                         </div>
                     </header>
-                    
 
-                    
+
+
                     {/* Pills de cursos */}
                     <div className="card rounded-xl p-6 mb-6">
                         <h2 className="text-xl font-bold mb-4">Mis Cursos</h2>
@@ -1966,11 +1997,10 @@
                                 <div key={course.id} className="relative group">
                                     <button
                                         onClick={() => setSelectedCourse(course)}
-                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                            selectedCourse?.id === course.id 
-                                                ? 'bg-blue-500 text-white' 
+                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCourse?.id === course.id
+                                                ? 'bg-blue-500 text-white'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
+                                            }`}
                                     >
                                         {course.name}
                                     </button>
@@ -1993,10 +2023,10 @@
                             </button>
                         </div>
                         {courses.length === 0 && (
-                            <p className="text-center py-8" style={{color: 'var(--text-secondary)'}}>No tienes cursos creados aún.</p>
+                            <p className="text-center py-8" style={{ color: 'var(--text-secondary)' }}>No tienes cursos creados aún.</p>
                         )}
                     </div>
-                    
+
                     {selectedCourse && (
                         <div className="grid gap-6">
                             {/* Vista de contenido del curso */}
@@ -2015,10 +2045,10 @@
                                         const weekData = selectedCourse.weeklyContent?.find(w => w.week === weekNum);
                                         return (
                                             <div key={weekNum} className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                                                 onClick={() => {
-                                                     setPreviewContent({...weekData, week: weekNum, title: weekData?.title || `Semana ${weekNum}`});
-                                                     setShowContentPreview(true);
-                                                 }}>
+                                                onClick={() => {
+                                                    setPreviewContent({ ...weekData, week: weekNum, title: weekData?.title || `Semana ${weekNum}` });
+                                                    setShowContentPreview(true);
+                                                }}>
                                                 <h3 className="font-semibold text-sm mb-2">Semana {weekNum}</h3>
                                                 <h4 className="font-medium mb-2 line-clamp-2">{weekData?.title || 'Sin título'}</h4>
                                                 <p className="text-xs text-gray-600 mb-3 line-clamp-3">{weekData?.description || 'Sin descripción'}</p>
@@ -2039,7 +2069,7 @@
                                     })}
                                 </div>
                             </div>
-                            
+
                             <div className="card rounded-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-bold">Estudiantes Registrados ({students.length})</h2>
@@ -2050,11 +2080,10 @@
                                                     setShowPendingStudents(!showPendingStudents);
                                                     setShowRanking(false);
                                                 }}
-                                                className={`btn btn-secondary text-sm ${
-                                                    showPendingStudents 
-                                                        ? 'bg-orange-200 text-orange-900' 
+                                                className={`btn btn-secondary text-sm ${showPendingStudents
+                                                        ? 'bg-orange-200 text-orange-900'
                                                         : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                                                }`}
+                                                    }`}
                                             >
                                                 📋 {showPendingStudents ? 'Ocultar' : 'Pendientes'} ({pendingStudents.length})
                                             </button>
@@ -2069,7 +2098,7 @@
                                             {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
                                         </button>
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                                 Código para compartir: <strong>{selectedCourse.courseCode}</strong>
                                             </p>
                                             <button
@@ -2085,7 +2114,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {showPendingStudents ? (
                                     <div className="space-y-4">
                                         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -2119,12 +2148,12 @@
                                         ))}
                                     </div>
                                 ) : students.length === 0 ? (
-                                    <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
+                                    <p style={{ color: 'var(--text-secondary)' }}>No hay estudiantes registrados aún.</p>
                                 ) : showRanking ? (
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="border-b" style={{borderColor: 'var(--border-color)'}}>
+                                                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
                                                     <th className="text-left p-3 font-semibold">#</th>
                                                     <th className="text-left p-3 font-semibold">Estudiante</th>
                                                     <th className="text-center p-3 font-semibold">Badges Ganados</th>
@@ -2144,12 +2173,12 @@
                                                         const earnedBadges = (student.badgesEarned || []).filter(badgeId => student.badgeStatus?.[badgeId] === 'earned');
                                                         const assignedBadges = (student.badgesEarned || []).filter(badgeId => student.badgeStatus?.[badgeId] === 'assigned');
                                                         return (
-                                                            <tr key={student.id} className="border-b hover:bg-gray-50" style={{borderColor: 'var(--border-color)'}}>
+                                                            <tr key={student.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
                                                                 <td className="p-3 font-semibold">{index + 1}</td>
                                                                 <td className="p-3">
                                                                     <div>
                                                                         <div className="font-medium">{student.fullName}</div>
-                                                                        <div className="text-xs" style={{color: 'var(--text-secondary)'}}>{student.email}</div>
+                                                                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{student.email}</div>
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-3 text-center">
@@ -2171,11 +2200,10 @@
                                                                             const badgeStatus = student.badgeStatus?.[badgeId];
                                                                             if (!hasEarned) return null;
                                                                             return (
-                                                                                <span key={badgeId} className={`px-1 py-0.5 text-xs rounded ${
-                                                                                    badgeStatus === 'earned' 
-                                                                                        ? 'bg-green-100 text-green-800' 
+                                                                                <span key={badgeId} className={`px-1 py-0.5 text-xs rounded ${badgeStatus === 'earned'
+                                                                                        ? 'bg-green-100 text-green-800'
                                                                                         : 'bg-red-100 text-red-800'
-                                                                                }`}>
+                                                                                    }`}>
                                                                                     {badgeStatus === 'earned' ? '🏆' : '🔴'} {badge.name}
                                                                                 </span>
                                                                             );
@@ -2193,16 +2221,16 @@
                                         {students.map(student => {
                                             const isExpanded = expandedStudent === student.id;
                                             return (
-                                                <div key={student.id} className="border rounded-lg overflow-hidden" style={{borderColor: 'var(--border-color)'}}>
-                                                    <div 
+                                                <div key={student.id} className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                                                    <div
                                                         className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                                                         onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
                                                     >
                                                         <div className="flex justify-between items-center">
                                                             <div>
                                                                 <h3 className="font-semibold">{student.fullName}</h3>
-                                                                <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{student.email}</p>
-                                                                <div className="text-sm mt-1" style={{color: 'var(--text-secondary)'}}>
+                                                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{student.email}</p>
+                                                                <div className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                                                                     Badges: {(student.badgesEarned || []).length}/20
                                                                 </div>
                                                             </div>
@@ -2223,9 +2251,9 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    
+
                                                     {isExpanded && (
-                                                        <div className="px-4 pb-4 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                                        <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
                                                             <div className="mt-4">
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                                                     {(selectedCourse.availableBadges || []).sort((a, b) => a.maxWeek - b.maxWeek).map((badge, globalIndex) => {
@@ -2234,7 +2262,7 @@
                                                                         const badgeStatus = student.badgeStatus?.[badgeId];
                                                                         const isEarned = badgeStatus === 'earned';
                                                                         const isAssigned = badgeStatus === 'assigned';
-                                                                        
+
                                                                         return (
                                                                             <div key={badgeId} className="border rounded p-2 flex flex-col">
                                                                                 <div className="text-sm font-medium mb-1">{badge.name}</div>
@@ -2263,11 +2291,10 @@
                                                                                     ) : (
                                                                                         <button
                                                                                             onClick={() => changeBadgeStatus(student.id, badgeId, isEarned ? 'assigned' : 'earned')}
-                                                                                            className={`w-full px-2 py-1 rounded text-xs hover:opacity-80 ${
-                                                                                                isEarned 
-                                                                                                    ? 'bg-green-100 text-green-800' 
+                                                                                            className={`w-full px-2 py-1 rounded text-xs hover:opacity-80 ${isEarned
+                                                                                                    ? 'bg-green-100 text-green-800'
                                                                                                     : 'bg-red-100 text-red-800'
-                                                                                            }`}
+                                                                                                }`}
                                                                                             title={`Cambiar a ${isEarned ? 'asignado' : 'ganado'}`}
                                                                                         >
                                                                                             {isEarned ? '🏆 Ganado' : '🔴 Solo Asignado'}
@@ -2289,11 +2316,11 @@
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Modal de Preview de Contenido */}
                     {showContentPreview && previewContent && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="card rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden" style={{backgroundColor: 'var(--bg-secondary)'}}>
+                            <div className="card rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                                 {/* Header */}
                                 <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
                                     <div className="flex justify-between items-start">
@@ -2314,9 +2341,9 @@
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 {/* Content */}
-                                <div className="p-6 overflow-y-auto" style={{maxHeight: 'calc(85vh - 200px)'}}>
+                                <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 200px)' }}>
                                     <div className="space-y-6">
                                         {/* Descripción */}
                                         <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-400">
@@ -2326,7 +2353,7 @@
                                             </div>
                                             <p className="text-blue-700 leading-relaxed">{previewContent.description || 'Sin descripción'}</p>
                                         </div>
-                                        
+
                                         {/* Contenido */}
                                         <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-400">
                                             <div className="flex items-center gap-2 mb-3">
@@ -2335,7 +2362,7 @@
                                             </div>
                                             <div className="text-green-700 leading-relaxed whitespace-pre-line">{previewContent.content || 'Sin contenido'}</div>
                                         </div>
-                                        
+
                                         {/* Actividades */}
                                         {previewContent.activities && previewContent.activities.length > 0 && (
                                             <div className="bg-orange-50 rounded-xl p-4 border-l-4 border-orange-400">
@@ -2353,7 +2380,7 @@
                                                 </div>
                                             </div>
                                         )}
-                                        
+
                                         {/* Badges */}
                                         {selectedCourse?.availableBadges?.filter(badge => badge.maxWeek === previewContent.week).length > 0 && (
                                             <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-400">
@@ -2373,7 +2400,7 @@
                                         )}
                                     </div>
                                 </div>
-                                
+
                                 {/* Footer */}
                                 <div className="border-t p-4 bg-gray-50 flex justify-end gap-3">
                                     <button
@@ -2395,9 +2422,9 @@
                             </div>
                         </div>
                     )}
-                    
-                    <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
-                        Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+
+                    <footer className="mt-8 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                     </footer>
                 </div>
             );
@@ -2426,14 +2453,14 @@
                 newPassword: '',
                 confirmPassword: ''
             });
-            
+
             const handleJoinCourse = async (e) => {
                 e.preventDefault();
                 if (!joinCourseCode.startsWith('#')) {
                     toast.showToast('El código debe comenzar con #', 'error');
                     return;
                 }
-                
+
                 try {
                     // Verificar si ya está pendiente con este código
                     const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
@@ -2441,25 +2468,25 @@
                         toast.showToast('Ya tienes una solicitud pendiente para este curso', 'error');
                         return;
                     }
-                    
+
                     // Verificar si ya está aprobado en algún curso con este código
                     const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
-                    
+
                     for (const professorDoc of professorsSnapshot.docs) {
                         const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`)
                             .where('courseCode', '==', joinCourseCode)
                             .get();
-                        
+
                         for (const courseDoc of coursesSnapshot.docs) {
                             const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
-                            
+
                             if (studentDoc.exists) {
                                 toast.showToast('Ya estás registrado en este curso', 'error');
                                 return;
                             }
                         }
                     }
-                    
+
                     await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
                         .set({
                             email: currentUser.email,
@@ -2470,7 +2497,7 @@
                             lastBadgeEarned: null,
                             createdAt: new Date()
                         });
-                    
+
                     toast.showToast('Solicitud enviada. Espera la aprobación del profesor.', 'success');
                     setShowJoinCourse(false);
                     setJoinCourseCode('');
@@ -2480,26 +2507,26 @@
                     toast.showToast('Error enviando solicitud', 'error');
                 }
             };
-            
+
             const handleUpdateProfile = async (e) => {
                 e.preventDefault();
-                
+
                 try {
                     if (profileData.newPassword) {
                         if (profileData.newPassword !== profileData.confirmPassword) {
                             toast.showToast('Las contraseñas no coinciden', 'error');
                             return;
                         }
-                        
+
                         const credential = firebase.auth.EmailAuthProvider.credential(
-                            currentUser.email, 
+                            currentUser.email,
                             profileData.currentPassword
                         );
                         await currentUser.reauthenticateWithCredential(credential);
                         await currentUser.updatePassword(profileData.newPassword);
                         toast.showToast('Contraseña actualizada', 'success');
                     }
-                    
+
                     if (profileData.fullName && profileData.fullName !== userData?.fullName) {
                         const tempDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
                         if (tempDoc.exists) {
@@ -2508,7 +2535,7 @@
                         }
                         toast.showToast('Nombre actualizado', 'success');
                     }
-                    
+
                     setShowProfile(false);
                     setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
                     loadCourseData();
@@ -2520,21 +2547,21 @@
                     }
                 }
             };
-            
+
             const startQRScanner = () => {
                 setShowQRScanner(true);
-                
+
                 setTimeout(() => {
                     const html5QrCode = new Html5Qrcode("qr-reader");
                     scannerRef.current = html5QrCode;
-                    
+
                     html5QrCode.start(
                         { facingMode: "environment" },
                         { fps: 10, qrbox: 250 },
                         async (decodedText) => {
                             try {
                                 const qrData = JSON.parse(decodedText);
-                                
+
                                 if (qrData.courseId && qrData.date && qrData.professorId) {
                                     await registerAttendance(qrData);
                                     html5QrCode.stop();
@@ -2553,7 +2580,7 @@
                     });
                 }, 100);
             };
-            
+
             const stopQRScanner = () => {
                 if (scannerRef.current) {
                     scannerRef.current.stop().then(() => {
@@ -2566,36 +2593,36 @@
                     setShowQRScanner(false);
                 }
             };
-            
+
             const registerAttendance = async (qrData) => {
                 try {
                     // Verificar que el estudiante esté matriculado en el curso
                     const professorCoursesRef = db.collection(`artifacts/seminario-investigacion-app/professors/${qrData.professorId}/courses/${qrData.courseId}/students`);
                     const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
-                    
+
                     if (!studentDoc.exists) {
                         toast.showToast('No estás matriculado en este curso', 'error');
                         return;
                     }
-                    
+
                     const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
                     const attendanceDoc = await attendanceRef.get();
-                    
+
                     const studentData = {
                         studentId: currentUser.uid,
                         studentName: userData?.fullName || currentUser.email,
                         timestamp: new Date()
                     };
-                    
+
                     if (attendanceDoc.exists) {
                         const existingData = attendanceDoc.data();
                         const students = existingData.students || [];
-                        
+
                         if (students.some(s => s.studentId === currentUser.uid)) {
                             toast.showToast('Ya registraste tu asistencia hoy', 'info');
                             return;
                         }
-                        
+
                         await attendanceRef.update({
                             students: [...students, studentData]
                         });
@@ -2606,7 +2633,7 @@
                             students: [studentData]
                         });
                     }
-                    
+
                     toast.showToast('¡Asistencia registrada exitosamente!', 'success');
                 } catch (error) {
                     console.error('Error registrando asistencia:', error);
@@ -2625,39 +2652,39 @@
                 // Los datos del usuario se cargarán junto con los datos del curso
                 setLoading(false);
             };
-            
+
             const loadCourseData = async () => {
                 try {
                     // Primero verificar si está en temp-students
                     const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
-                    
+
                     if (tempStudentDoc.exists) {
                         // Estudiante pendiente de aprobación
                         const tempData = tempStudentDoc.data();
-                        setUserData({...tempData, isPending: true});
+                        setUserData({ ...tempData, isPending: true });
                         setProfessorName('Pendiente de aprobación');
                         return;
                     }
-                    
+
                     // Buscar en todos los profesores para encontrar al estudiante
                     const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
-                    
+
                     for (const professorDoc of professorsSnapshot.docs) {
                         const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`).get();
-                        
+
                         for (const courseDoc of coursesSnapshot.docs) {
                             const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
-                            
+
                             if (studentDoc.exists) {
                                 setUserData(studentDoc.data());
-                                
+
                                 const courseData = courseDoc.data();
                                 setProfessorName(courseData.professorName || 'No asignado');
                                 setCourseInfo(courseData);
-                                
+
                                 // Crear contenido dinámico
                                 const contentArray = [];
-                                
+
                                 contentArray.push({
                                     id: 'info',
                                     type: 'info',
@@ -2665,7 +2692,7 @@
                                     description: 'Datos del curso y badges disponibles',
                                     unlocked: true
                                 });
-                                
+
                                 for (let i = 1; i <= courseData.weeks; i++) {
                                     const weekData = courseData.weeklyContent?.find(w => w.week === i);
                                     const weekBadges = courseData.availableBadges?.filter(badge => badge.maxWeek === i) || [];
@@ -2680,7 +2707,7 @@
                                         unlocked: i === 1
                                     });
                                 }
-                                
+
                                 setDynamicContent(contentArray);
                                 return; // Salir una vez encontrado
                             }
@@ -2706,7 +2733,7 @@
                 if (!userData || !userData.badgesEarned) return false;
                 return userData.badgesEarned.includes(badgeId);
             };
-            
+
             const getBadgeStatusType = (badgeId) => {
                 if (!userData || !userData.badgeStatus) return null;
                 return userData.badgeStatus[badgeId] || null;
@@ -2742,10 +2769,10 @@
             if (loading) {
                 return <LoadingSpinner />;
             }
-            
+
             if (userData?.isPending) {
                 return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="max-w-2xl mx-auto">
                             <div className="card rounded-xl p-8 text-center">
                                 <div className="mb-6">
@@ -2753,11 +2780,11 @@
                                         <span className="text-3xl">⏳</span>
                                     </div>
                                     <h1 className="text-2xl font-bold mb-2">Registro Pendiente</h1>
-                                    <p className="text-lg" style={{color: 'var(--text-secondary)'}}>
+                                    <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
                                         Hola, <strong>{userData.fullName}</strong>
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
                                     <h2 className="font-semibold text-orange-800 mb-2">Tu registro está siendo revisado</h2>
                                     <p className="text-orange-700 mb-4">
@@ -2765,11 +2792,11 @@
                                         El profesor debe aprobar tu solicitud antes de que puedas acceder al contenido del curso.
                                     </p>
                                     <p className="text-sm text-orange-600">
-                                        Recibirás acceso una vez que el profesor apruebe tu registro. 
+                                        Recibirás acceso una vez que el profesor apruebe tu registro.
                                         Puedes cerrar esta página y volver más tarde.
                                     </p>
                                 </div>
-                                
+
                                 <div className="flex justify-center gap-3">
                                     <ThemeToggle />
                                     <button
@@ -2782,32 +2809,32 @@
                                 </div>
                             </div>
                         </div>
-                        <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
-                            Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+                        <footer className="mt-8 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                         </footer>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
+                <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
-                                <h1 className="text-3xl font-bold mb-2" style={{color: 'var(--text-primary)'}}>
+                                <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     {courseInfo?.name || 'Cargando...'}
                                 </h1>
-                                <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                                     <User />
                                     <span>Hola, <strong>{userData?.fullName || currentUser.email.split('@')[0]}</strong></span>
                                 </div>
                                 <div className="mt-2">
-                                    <div className="flex items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
+                                    <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                                         <span>Progreso: {getProgressPercentage()}% ({userData?.badgesEarned?.length || 0}/20 badges)</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                                        <div 
-                                            className="h-2 rounded-full transition-all duration-300" 
+                                        <div
+                                            className="h-2 rounded-full transition-all duration-300"
                                             style={{
                                                 width: `${getProgressPercentage()}%`,
                                                 background: 'linear-gradient(90deg, #ef4444 0%, #f97316 25%, #eab308 50%, #22c55e 75%, #3b82f6 100%)'
@@ -2818,36 +2845,34 @@
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={startQRScanner}
-                                    className="btn btn-primary text-sm"
-                                    title="Registrar asistencia"
-                                >
-                                    📷 Asistencia
-                                </button>
-                                <button
                                     onClick={() => setShowJoinCourse(true)}
-                                    className="btn btn-primary text-sm"
+                                    className="btn btn-secondary"
                                     title="Unirse a un curso"
                                 >
-                                    + Unirse a Curso
+                                    +
+                                </button>
+                                <button
+                                    onClick={startQRScanner}
+                                    className="btn btn-secondary"
+                                    title="Registrar asistencia"
+                                >
+                                    📷
                                 </button>
                                 <button
                                     onClick={() => setShowProfile(true)}
-                                    className="btn btn-secondary flex items-center gap-2"
+                                    className="btn btn-secondary"
                                     title="Perfil de usuario"
                                 >
                                     <User />
-                                    <span className="hidden md:inline">Perfil</span>
                                 </button>
-                                <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
-                                    className="btn btn-secondary flex items-center gap-2"
+                                    className="btn btn-secondary"
                                     title="Cerrar sesión"
                                 >
                                     <LogOut />
-                                    <span className="hidden md:inline">Cerrar Sesión</span>
                                 </button>
+                                <ThemeToggle />
                             </div>
                         </div>
                     </header>
@@ -2860,7 +2885,7 @@
                                     <button onClick={stopQRScanner} className="text-2xl">×</button>
                                 </div>
                                 <div id="qr-reader" className="w-full"></div>
-                                <p className="text-sm text-center mt-4" style={{color: 'var(--text-secondary)'}}>
+                                <p className="text-sm text-center mt-4" style={{ color: 'var(--text-secondary)' }}>
                                     Apunta la cámara al código QR del profesor
                                 </p>
                             </div>
@@ -2911,7 +2936,7 @@
                             </div>
                         </div>
                     )}
-                    
+
                     {showProfile && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="card rounded-xl p-6 w-full max-w-md">
@@ -2924,10 +2949,10 @@
                                             type="text"
                                             placeholder={userData?.fullName || 'Tu nombre completo'}
                                             value={profileData.fullName}
-                                            onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                                            onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
                                         />
                                     </div>
-                                    
+
                                     <div className="border-t pt-4 mb-4">
                                         <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
                                         <div className="space-y-3">
@@ -2936,25 +2961,25 @@
                                                 type="password"
                                                 placeholder="Contraseña actual"
                                                 value={profileData.currentPassword}
-                                                onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
+                                                onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
                                             />
                                             <input
                                                 className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
                                                 type="password"
                                                 placeholder="Nueva contraseña"
                                                 value={profileData.newPassword}
-                                                onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
+                                                onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
                                             />
                                             <input
                                                 className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
                                                 type="password"
                                                 placeholder="Confirmar nueva contraseña"
                                                 value={profileData.confirmPassword}
-                                                onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
+                                                onChange={(e) => setProfileData({ ...profileData, confirmPassword: e.target.value })}
                                             />
                                         </div>
                                     </div>
-                                    
+
                                     <div className="flex gap-3">
                                         <button
                                             type="button"
@@ -2983,29 +3008,26 @@
                             {dynamicContent.map((content) => {
                                 const unlocked = isContentUnlocked(content);
                                 const isExpanded = expandedWeek === content.id;
-                                
+
                                 return (
-                                    <div key={content.id} className={`card rounded-xl overflow-hidden ${
-                                        !unlocked ? 'opacity-50' : ''
-                                    } ${content.type === 'info' ? 'bg-slate-100' : ''}`} style={content.type === 'info' ? {borderColor: 'var(--accent-color)'} : {}}>
-                                        <div 
-                                            className={`p-6 transition-colors ${
-                                                unlocked ? 'cursor-pointer' : 'cursor-not-allowed'
-                                            }`}
+                                    <div key={content.id} className={`card rounded-xl overflow-hidden ${!unlocked ? 'opacity-50' : ''
+                                        } ${content.type === 'info' ? 'bg-slate-100' : ''}`} style={content.type === 'info' ? { borderColor: 'var(--accent-color)' } : {}}>
+                                        <div
+                                            className={`p-6 transition-colors ${unlocked ? 'cursor-pointer' : 'cursor-not-allowed'
+                                                }`}
                                             onClick={() => unlocked && setExpandedWeek(isExpanded ? null : content.id)}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
-                                                    <div className={`w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold ${
-                                                        unlocked ? 'bg-blue-500' : 'bg-gray-400'
-                                                    }`}>
+                                                    <div className={`w-12 h-12 min-w-12 rounded-full flex items-center justify-center text-white font-bold ${unlocked ? 'bg-blue-500' : 'bg-gray-400'
+                                                        }`}>
                                                         {unlocked ? (content.type === 'info' ? '📚' : (content.week || (content.weeks === '2-5' ? '2' : content.weeks))) : '🔒'}
                                                     </div>
                                                     <div>
                                                         <h3 className="text-lg font-semibold">
                                                             {content.type === 'info' ? content.title : (content.week ? `Semana ${content.week}: ${content.title}` : `Semanas ${content.weeks}: ${content.title}`)}
                                                         </h3>
-                                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                                             {content.description}
                                                         </p>
                                                         {!unlocked && (
@@ -3022,14 +3044,13 @@
                                                                     const badgeEarned = getBadgeStatus(badgeId);
                                                                     const badgeStatusType = getBadgeStatusType(badgeId);
                                                                     return (
-                                                                        <span key={index} className={`px-2 py-1 text-xs rounded-full ${
-                                                                            badgeEarned 
-                                                                                ? (badgeStatusType === 'earned' 
-                                                                                    ? 'bg-green-100 text-green-800' 
+                                                                        <span key={index} className={`px-2 py-1 text-xs rounded-full ${badgeEarned
+                                                                                ? (badgeStatusType === 'earned'
+                                                                                    ? 'bg-green-100 text-green-800'
                                                                                     : 'bg-red-100 text-red-800')
                                                                                 : 'bg-gray-100 text-gray-600'
-                                                                        }`}>
-                                                                            {badgeEarned 
+                                                                            }`}>
+                                                                            {badgeEarned
                                                                                 ? (badgeStatusType === 'earned' ? '🏆' : '🔴')
                                                                                 : '○'} {badge.name}
                                                                         </span>
@@ -3044,9 +3065,9 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        
+
                                         {isExpanded && unlocked && (
-                                            <div className="px-6 pb-6 border-t" style={{borderColor: 'var(--border-color)'}}>
+                                            <div className="px-6 pb-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
                                                 <div className="mt-4">
                                                     {content.type === 'info' ? (
                                                         <div>
@@ -3072,14 +3093,14 @@
                                                                     </p>
                                                                 </div>
                                                             </div>
-                                                            
+
                                                             <div className="mb-6">
                                                                 <h3 className="font-semibold mb-2 text-gray-800">Acuerdos sobre el Uso de Inteligencia Artificial Generativa (IAG)</h3>
                                                                 <p className="text-sm text-gray-600">
                                                                     {courseInfo?.iagAgreements || 'Por definir'}
                                                                 </p>
                                                             </div>
-                                                            
+
                                                             <div>
                                                                 <h3 className="font-semibold mb-3 text-gray-800">🏆 Badges Disponibles en el Curso</h3>
                                                                 {courseInfo?.availableBadges && courseInfo.availableBadges.length > 0 ? (
@@ -3104,12 +3125,12 @@
                                                             {content.content && (
                                                                 <div>
                                                                     <h4 className="font-semibold mb-2">Contenido:</h4>
-                                                                    <p className="mb-4" style={{color: 'var(--text-secondary)'}}>
+                                                                    <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
                                                                         {content.content}
                                                                     </p>
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {content.activities && content.activities.length > 0 && (
                                                                 <div>
                                                                     <h4 className="font-semibold mb-2">Actividades:</h4>
@@ -3117,13 +3138,13 @@
                                                                         {content.activities.map((activity, index) => (
                                                                             <li key={index} className="flex items-start gap-2">
                                                                                 <span className="text-blue-500 mt-1">•</span>
-                                                                                <span style={{color: 'var(--text-secondary)'}}>{activity}</span>
+                                                                                <span style={{ color: 'var(--text-secondary)' }}>{activity}</span>
                                                                             </li>
                                                                         ))}
                                                                     </ul>
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {content.badges && content.badges.length > 0 && (
                                                                 <div>
                                                                     <h4 className="font-semibold mb-2">🏆 Badges de esta Semana:</h4>
@@ -3139,49 +3160,49 @@
                                                             )}
                                                         </div>
                                                     )}
-                                                    
+
                                                     {content.weeks === "2-5" && (
                                                         <div className="mt-6">
                                                             <h4 className="font-semibold mb-3">📋 Rúbrica de Evaluación</h4>
                                                             <div className="overflow-x-auto">
-                                                                <table className="w-full text-sm border-collapse border" style={{borderColor: 'var(--border-color)'}}>
+                                                                <table className="w-full text-sm border-collapse border" style={{ borderColor: 'var(--border-color)' }}>
                                                                     <thead>
                                                                         <tr className="bg-gray-50">
-                                                                            <th className="border p-2 text-left font-semibold text-gray-800" style={{borderColor: 'var(--border-color)'}}></th>
-                                                                            <th className="border p-2 text-center font-semibold bg-green-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Excelente</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-yellow-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Bueno</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-orange-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Regular</th>
-                                                                            <th className="border p-2 text-center font-semibold bg-red-100 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Necesita Mejorar</th>
+                                                                            <th className="border p-2 text-left font-semibold text-gray-800" style={{ borderColor: 'var(--border-color)' }}></th>
+                                                                            <th className="border p-2 text-center font-semibold bg-green-100 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Excelente</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-yellow-100 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Bueno</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-orange-100 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Regular</th>
+                                                                            <th className="border p-2 text-center font-semibold bg-red-100 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Necesita Mejorar</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Creatividad</td>
-                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Presenta el contenido de manera altamente innovadora y original. Utiliza recursos visuales y/o interactivos únicos que captan la atención. Demuestra un pensamiento fuera de lo convencional.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Demuestra creatividad en la presentación del contenido. Utiliza algunos recursos originales. Las ideas se presentan de forma interesante.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La presentación es convencional pero correcta. Utiliza recursos comunes. Hay algunos intentos de originalidad.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La presentación carece de elementos creativos. Utiliza métodos muy básicos o repetitivos. No hay originalidad en el enfoque.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Creatividad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Presenta el contenido de manera altamente innovadora y original. Utiliza recursos visuales y/o interactivos únicos que captan la atención. Demuestra un pensamiento fuera de lo convencional.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Demuestra creatividad en la presentación del contenido. Utiliza algunos recursos originales. Las ideas se presentan de forma interesante.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La presentación es convencional pero correcta. Utiliza recursos comunes. Hay algunos intentos de originalidad.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La presentación carece de elementos creativos. Utiliza métodos muy básicos o repetitivos. No hay originalidad en el enfoque.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Claridad</td>
-                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es extraordinariamente clara y bien estructurada. Las ideas fluyen de manera lógica y coherente. El lenguaje es preciso y adecuado. La información se transmite de forma efectiva.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es clara y comprensible. La mayoría de las ideas están bien organizadas. El lenguaje es apropiado aunque con algunas imprecisiones.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es algo confusa en ciertos puntos. Algunas ideas no están bien conectadas. El lenguaje puede ser impreciso o inadecuado ocasionalmente.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>La exposición es difícil de seguir. Las ideas están desorganizadas. El lenguaje es confuso o inapropiado frecuentemente.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Claridad</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La exposición es extraordinariamente clara y bien estructurada. Las ideas fluyen de manera lógica y coherente. El lenguaje es preciso y adecuado. La información se transmite de forma efectiva.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La exposición es clara y comprensible. La mayoría de las ideas están bien organizadas. El lenguaje es apropiado aunque con algunas imprecisiones.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La exposición es algo confusa en ciertos puntos. Algunas ideas no están bien conectadas. El lenguaje puede ser impreciso o inadecuado ocasionalmente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>La exposición es difícil de seguir. Las ideas están desorganizadas. El lenguaje es confuso o inapropiado frecuentemente.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Conclusiones</td>
-                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son profundas y bien fundamentadas. Formula preguntas originales y estimulantes que generan discusión significativa. Demuestra una comprensión excepcional del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son válidas y están bien presentadas. Las preguntas son relevantes y promueven cierta discusión. Demuestra buena comprensión del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son básicas o superficiales. Las preguntas son simples o poco elaboradas. Demuestra comprensión parcial del tema.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Las conclusiones son débiles o ausentes. Las preguntas son irrelevantes o no se formulan. Demuestra poca comprensión del tema.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Conclusiones</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Las conclusiones son profundas y bien fundamentadas. Formula preguntas originales y estimulantes que generan discusión significativa. Demuestra una comprensión excepcional del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Las conclusiones son válidas y están bien presentadas. Las preguntas son relevantes y promueven cierta discusión. Demuestra buena comprensión del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Las conclusiones son básicas o superficiales. Las preguntas son simples o poco elaboradas. Demuestra comprensión parcial del tema.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Las conclusiones son débiles o ausentes. Las preguntas son irrelevantes o no se formulan. Demuestra poca comprensión del tema.</td>
                                                                         </tr>
                                                                         <tr>
-                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Preguntas</td>
-                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa activamente en todas las exposiciones. Hace comentarios constructivos y preguntas relevantes. Demuestra interés genuino y respeto por el trabajo de otros.</td>
-                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa regularmente en las exposiciones. Hace algunos comentarios y preguntas útiles. Muestra interés por el trabajo de otros.</td>
-                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Participa ocasionalmente en las exposiciones. Los comentarios son limitados o poco elaborados. Muestra interés intermitente.</td>
-                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{borderColor: 'var(--border-color)'}}>Raramente participa en las exposiciones. No hace comentarios ni preguntas. Muestra poco interés por el trabajo de otros.</td>
+                                                                            <td className="border p-2 font-semibold bg-gray-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Preguntas</td>
+                                                                            <td className="border p-2 text-xs bg-green-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Participa activamente en todas las exposiciones. Hace comentarios constructivos y preguntas relevantes. Demuestra interés genuino y respeto por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-yellow-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Participa regularmente en las exposiciones. Hace algunos comentarios y preguntas útiles. Muestra interés por el trabajo de otros.</td>
+                                                                            <td className="border p-2 text-xs bg-orange-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Participa ocasionalmente en las exposiciones. Los comentarios son limitados o poco elaborados. Muestra interés intermitente.</td>
+                                                                            <td className="border p-2 text-xs bg-red-50 text-gray-800" style={{ borderColor: 'var(--border-color)' }}>Raramente participa en las exposiciones. No hace comentarios ni preguntas. Muestra poco interés por el trabajo de otros.</td>
                                                                         </tr>
                                                                     </tbody>
                                                                 </table>
@@ -3196,8 +3217,8 @@
                             })}
                         </div>
                     </main>
-                    <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
-                        Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
+                    <footer className="mt-8 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                     </footer>
                 </div>
             );
@@ -3222,21 +3243,21 @@
             React.useEffect(() => {
                 firebase.initializeApp(firebaseConfig);
                 const auth = firebase.auth();
-                
+
                 const unsubscribe = auth.onAuthStateChanged(async (user) => {
                     setCurrentUser(user);
-                    
+
                     if (user) {
                         try {
                             const db = firebase.firestore();
-                            
+
                             // Primero buscar en profesores
                             let userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`).get();
-                            
+
                             if (userDoc.exists) {
-                                setUserData({...userDoc.data(), userType: 'professor'});
+                                setUserData({ ...userDoc.data(), userType: 'professor' });
                             } else {
-                                setUserData({userType: 'student'});
+                                setUserData({ userType: 'student' });
                             }
                         } catch (error) {
                             console.error('Error cargando datos del usuario:', error);
@@ -3244,10 +3265,10 @@
                     } else {
                         setUserData(null);
                     }
-                    
+
                     setAuthReady(true);
                 });
-                
+
                 return () => unsubscribe();
             }, []);
 
@@ -3269,7 +3290,7 @@
                 </>
             );
         }
-        
+
         function App() {
             return (
                 <ToastProvider>
@@ -3282,4 +3303,5 @@
         root.render(React.createElement(App));
     </script>
 </body>
+
 </html>
