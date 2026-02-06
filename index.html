@@ -2555,6 +2555,14 @@
             
             const registerAttendance = async (qrData) => {
                 try {
+                    // Verificar que el estudiante esté matriculado en el curso
+                    const enrollmentDoc = await db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/enrollments/${currentUser.uid}`).get();
+                    
+                    if (!enrollmentDoc.exists) {
+                        toast.showToast('No estás matriculado en este curso', 'error');
+                        return;
+                    }
+                    
                     const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
                     const attendanceDoc = await attendanceRef.get();
                     
