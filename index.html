@@ -277,7 +277,7 @@
         }
 
         const User = ({ className = '' }) => React.createElement('span', { className }, '👤');
-        const LogOut = ({ className = '' }) => React.createElement('span', { className }, '🚪');
+        const LogOut = ({ className = '' }) => React.createElement('span', { className }, '⏻');
         const Loader2 = ({ className = '' }) => React.createElement('div', { className: `spinner ${className}` });
 
         const LoadingSpinner = () => (
@@ -898,13 +898,24 @@
 
             const approveStudent = async (studentData) => {
                 try {
+                    const studentInfo = {
+                        ...studentData,
+                        approvedAt: new Date(),
+                        badgesEarned: [],
+                        badgeStatus: {},
+                        lastBadgeEarned: null
+                    };
+
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
+                        .set(studentInfo);
+
+                    // Agregar a enrollments en la colección global
+                    await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/enrollments/${studentData.id}`)
                         .set({
-                            ...studentData,
-                            approvedAt: new Date(),
-                            badgesEarned: [],
-                            badgeStatus: {},
-                            lastBadgeEarned: null
+                            studentId: studentData.id,
+                            fullName: studentData.fullName,
+                            email: studentData.email,
+                            enrolledAt: new Date()
                         });
 
                     await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentData.id}`).delete();
@@ -1008,6 +1019,22 @@
 
                     await docRef.update({ weeklyContent });
 
+                    // Crear documento en la colección global courses
+                    try {
+                        await db.doc(`artifacts/seminario-investigacion-app/courses/${docRef.id}`).set({
+                            courseName: `Catálogo: ${newCourse.name}`,
+                            courseCode: courseCode,
+                            professorId: currentUser.uid,
+                            professorName: userData?.fullName || currentUser.email,
+                            createdAt: new Date(),
+                            content: newCourse.description || ''
+                        });
+                        console.log('✓ Documento creado en colección global courses:', docRef.id);
+                    } catch (globalError) {
+                        console.error('Error creando documento en colección global:', globalError);
+                        toast.showToast('Curso creado pero error en catálogo global', 'info');
+                    }
+
                     toast.showToast('Curso creado exitosamente', 'success');
                     setShowCreateCourse(false);
                     setNewCourse({ name: '', code: '', university: '', description: '', weeks: 16, weeklyContent: [] });
@@ -1110,6 +1137,10 @@
 
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
+                    
+                    // Remover de enrollments en la colección global
+                    await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/enrollments/${studentId}`).delete();
+                    
                     toast.showToast('Estudiante removido exitosamente', 'success');
                     loadStudents();
                 } catch (error) {
@@ -1125,7 +1156,11 @@
                     const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, deletePassword);
                     await currentUser.reauthenticateWithCredential(credential);
 
+                    // Eliminar de la colección del profesor
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
+                    
+                    // Eliminar de la colección global courses
+                    await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
 
                     toast.showToast('Curso eliminado exitosamente', 'success');
                     setShowDeleteConfirm(null);
@@ -1441,16 +1476,14 @@
                     <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="max-w-6xl mx-auto">
                             <div className="card rounded-xl p-6 mb-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <div>
-                                        <h2 className="text-2xl font-bold">Control de Asistencia</h2>
-                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{selectedCourse.name}</p>
-                                    </div>
+                                <div className="flex justify-end items-center mb-4">
                                     <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
                                 </div>
 
                                 <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="text-center">
+                                    <div className="flex flex-col items-center">
+                                        <h2 className="text-2xl font-bold mb-2">Control de Asistencia</h2>
+                                        <p className="text-2xl font-bold mb-4" style={{ color: 'var(--accent-color)' }}>{selectedCourse.name}</p>
                                         <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
                                         <div className="bg-white p-4 rounded-lg inline-block">
                                             <div ref={qrCodeRef}></div>
@@ -1484,7 +1517,7 @@
                             <div className="card rounded-xl p-6">
                                 <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-xs">
                                         <thead>
                                             <tr className="border-b">
                                                 <th className="text-left p-3">Estudiante</th>
