@@ -899,7 +899,8 @@
             };
             
             const generateTodayQR = () => {
-                const today = new Date().toISOString().split('T')[0];
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const qrData = JSON.stringify({
                     courseId: selectedCourse.id,
                     date: today,
@@ -1388,21 +1389,38 @@
             }
             
             if (showAttendance) {
-                const today = new Date().toISOString().split('T')[0];
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const dates = Object.keys(attendanceData).sort().reverse();
+                
+                const formatDateMmmDD = (dateStr) => {
+                    const date = new Date(dateStr + 'T00:00:00');
+                    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                    return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}`;
+                };
+                
+                const formatDateMmmDDYY = (dateStr) => {
+                    const date = new Date(dateStr + 'T00:00:00');
+                    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                    const year = String(date.getFullYear()).slice(-2);
+                    return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}-${year}`;
+                };
                 
                 return (
                     <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
                         <div className="max-w-6xl mx-auto">
                             <div className="card rounded-xl p-6 mb-6">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Control de Asistencia</h2>
+                                    <div>
+                                        <h2 className="text-2xl font-bold">Control de Asistencia</h2>
+                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>{selectedCourse.name}</p>
+                                    </div>
                                     <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
                                 </div>
                                 
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="text-center">
-                                        <h3 className="font-semibold mb-4">QR de Hoy ({today})</h3>
+                                        <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
                                         <div className="bg-white p-4 rounded-lg inline-block">
                                             <div ref={qrCodeRef}></div>
                                         </div>
@@ -1440,7 +1458,7 @@
                                             <tr className="border-b">
                                                 <th className="text-left p-3">Estudiante</th>
                                                 {dates.slice(0, 10).map(date => (
-                                                    <th key={date} className="text-center p-3">{date}</th>
+                                                    <th key={date} className="text-center p-3">{formatDateMmmDD(date)}</th>
                                                 ))}
                                                 <th className="text-center p-3">Total</th>
                                             </tr>
@@ -1912,37 +1930,33 @@
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
+                                    onClick={() => setShowAttendance(true)}
+                                    className="btn btn-secondary"
+                                    title="Control de Asistencia"
+                                    disabled={!selectedCourse}
+                                >
+                                    📋
+                                </button>
+                                <button
                                     onClick={() => setShowProfile(true)}
-                                    className="btn btn-secondary flex items-center gap-2"
+                                    className="btn btn-secondary"
                                     title="Perfil de usuario"
                                 >
                                     <User />
-                                    <span className="hidden md:inline">Perfil</span>
                                 </button>
-                                <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
-                                    className="btn btn-secondary flex items-center gap-2"
+                                    className="btn btn-secondary"
+                                    title="Cerrar Sesión"
                                 >
                                     <LogOut />
-                                    Cerrar Sesión
                                 </button>
+                                <ThemeToggle />
                             </div>
                         </div>
                     </header>
                     
-                    <div className="card rounded-xl p-6 mb-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Acciones Rápidas</h2>
-                            <button
-                                onClick={() => setShowAttendance(true)}
-                                className="btn btn-primary"
-                                disabled={!selectedCourse}
-                            >
-                                📋 Control de Asistencia
-                            </button>
-                        </div>
-                    </div>
+
                     
                     {/* Pills de cursos */}
                     <div className="card rounded-xl p-6 mb-6">
@@ -1988,7 +2002,7 @@
                             {/* Vista de contenido del curso */}
                             <div className="card rounded-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold">Contenido del Curso</h2>
+                                    <h2 className="text-xl font-bold">{selectedCourse.name}</h2>
                                     <button
                                         onClick={() => editWeekContent(0)}
                                         className="btn btn-secondary text-sm"
@@ -2556,9 +2570,10 @@
             const registerAttendance = async (qrData) => {
                 try {
                     // Verificar que el estudiante esté matriculado en el curso
-                    const enrollmentDoc = await db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/enrollments/${currentUser.uid}`).get();
+                    const professorCoursesRef = db.collection(`artifacts/seminario-investigacion-app/professors/${qrData.professorId}/courses/${qrData.courseId}/students`);
+                    const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
                     
-                    if (!enrollmentDoc.exists) {
+                    if (!studentDoc.exists) {
                         toast.showToast('No estás matriculado en este curso', 'error');
                         return;
                     }
