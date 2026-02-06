@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reglas temporales más permisivas para desarrollo
+    match /artifacts/seminario-investigacion-app/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Permitir lectura de estudiantes temporales
+    match /artifacts/seminario-investigacion-app/temp-students/{userId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

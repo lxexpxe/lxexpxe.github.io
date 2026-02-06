@@ -12,8 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -271,12 +269,10 @@
             const [pendingUserData, setPendingUserData] = React.useState(null);
             const [userRole, setUserRole] = React.useState('student');
             const [courseCode, setCourseCode] = React.useState('');
-            const [showPasswordReset, setShowPasswordReset] = React.useState(false);
-            const [newPassword, setNewPassword] = React.useState('');
             
             const validateEmail = (email) => {
-                const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
-                return validDomains.test(email);
+                const icesiBothPattern = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co)$/;
+                return icesiBothPattern.test(email);
             };
 
             const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -311,7 +307,7 @@
                 setLoading(true);
 
                 if (!validateEmail(email)) {
-                    toast.showToast('Usa tu correo institucional (@icesi.edu.co, @u.icesi.edu.co, @estudiante.uniajc.edu.co o @profesores.uniajc.edu.co)', 'error');
+                    toast.showToast('Usa tu correo institucional (@icesi.edu.co o @u.icesi.edu.co)', 'error');
                     setLoading(false);
                     return;
                 }
@@ -370,53 +366,6 @@
                 }
             };
 
-            const handlePasswordReset = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-
-                if (!validateEmail(email)) {
-                    toast.showToast('Ingresa tu correo institucional', 'error');
-                    setLoading(false);
-                    return;
-                }
-
-                try {
-                    const code = generateCode();
-                    setGeneratedCode(code);
-                    
-                    await sendVerificationEmail(email, code, email.split('@')[0]);
-                    setShowCodeVerification(true);
-                    toast.showToast('Código enviado para restablecer contraseña', 'success');
-                } catch (error) {
-                    console.error('Error enviando código:', error);
-                    toast.showToast('Error enviando código', 'error');
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const handleResetPassword = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-
-                if (verificationCode !== generatedCode) {
-                    toast.showToast('Código incorrecto', 'error');
-                    setLoading(false);
-                    return;
-                }
-
-                try {
-                    await auth.sendPasswordResetEmail(email);
-                    toast.showToast('Se envió un enlace de restablecimiento a tu correo', 'success');
-                    setShowPasswordReset(false);
-                    setShowCodeVerification(false);
-                } catch (error) {
-                    toast.showToast('Error restableciendo contraseña', 'error');
-                } finally {
-                    setLoading(false);
-                }
-            };
-
             const handleVerifyCode = async (e) => {
                 e.preventDefault();
                 setLoading(true);
@@ -434,6 +383,9 @@
                     );
                     const user = userCredential.user;
                     
+                    const appId = 'seminario-investigacion-app';
+                    const userDocRef = db.doc(`artifacts/${appId}/users/${user.uid}`);
+                    
                     const userData = {
                         email: pendingUserData.email,
                         fullName: pendingUserData.fullName,
@@ -442,21 +394,13 @@
                         createdAt: new Date()
                     };
 
-                    if (pendingUserData.userType === 'professor') {
-                        // Crear profesor con estructura profile
-                        await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`)
-                            .set(userData);
-                    } else {
-                        // Para estudiantes, solo guardamos los datos básicos
-                        // El profesor los agregará manualmente a su curso
+                    if (pendingUserData.userType === 'student') {
                         userData.badgesEarned = [];
                         userData.lastBadgeEarned = null;
                         userData.courseCode = pendingUserData.courseCode;
-                        
-                        // Crear documento temporal del estudiante
-                        await db.doc(`artifacts/seminario-investigacion-app/temp-students/${user.uid}`)
-                            .set(userData);
                     }
+                    
+                    await userDocRef.set(userData);
                     
                     toast.showToast('¡Cuenta creada exitosamente! Bienvenido.', 'success');
                     
@@ -472,8 +416,6 @@
                         errorMessage = 'Este correo ya está registrado';
                     } else if (err.code === 'permission-denied') {
                         errorMessage = 'Error de permisos en Firestore. Verifica las reglas de seguridad.';
-                    } else if (err.message === 'Curso no encontrado') {
-                        errorMessage = 'El código de curso no existe. Verifica con tu profesor.';
                     }
                     
                     toast.showToast(errorMessage, 'error');
@@ -481,59 +423,6 @@
                     setLoading(false);
                 }
             };
-
-            if (showPasswordReset && !showCodeVerification) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: 'var(--bg-primary)'}}>
-                        <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
-                                    Restablecer Contraseña
-                                </h2>
-                                <ThemeToggle />
-                            </div>
-                            
-                            <form onSubmit={handlePasswordReset}>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-bold mb-2" style={{color: 'var(--text-primary)'}}>
-                                        Correo Institucional
-                                    </label>
-                                    <input
-                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                        type="email"
-                                        placeholder="Correo institucional"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                
-                                <div className="flex flex-col gap-4">
-                                    <button
-                                        className="btn btn-primary w-full"
-                                        type="submit"
-                                        disabled={loading}
-                                    >
-                                        {loading && <Loader2 className="w-5 h-5" />}
-                                        Enviar Código
-                                    </button>
-                                    
-                                    <button
-                                        className="btn btn-secondary w-full"
-                                        type="button"
-                                        onClick={() => {
-                                            setShowPasswordReset(false);
-                                            setEmail('');
-                                        }}
-                                    >
-                                        Volver
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                );
-            }
 
             if (showCodeVerification) {
                 return (
@@ -548,7 +437,7 @@
                             
                             <div className="text-center mb-6">
                                 <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                                    Ingresa el código de 6 dígitos enviado a <strong>{pendingUserData?.email || email}</strong>
+                                    Ingresa el código de 6 dígitos enviado a <strong>{pendingUserData?.email}</strong>
                                 </p>
                             </div>
                             
@@ -570,10 +459,9 @@
                                         className="btn btn-primary w-full"
                                         type="submit"
                                         disabled={loading || verificationCode.length !== 6}
-                                        onClick={showPasswordReset ? handleResetPassword : handleVerifyCode}
                                     >
                                         {loading && <Loader2 className="w-5 h-5" />}
-                                        {showPasswordReset ? 'Restablecer Contraseña' : 'Verificar y Crear Cuenta'}
+                                        Verificar y Crear Cuenta
                                     </button>
                                     
                                     <button
@@ -584,7 +472,6 @@
                                             setVerificationCode('');
                                             setGeneratedCode('');
                                             setPendingUserData(null);
-                                            setShowPasswordReset(false);
                                         }}
                                     >
                                         Volver
@@ -617,7 +504,7 @@
                                 <input
                                     className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                     type="email"
-                                    placeholder="Correo institucional"
+                                    placeholder="correo@icesi.edu.co o @u.icesi.edu.co"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -679,7 +566,6 @@
                                             </p>
                                         </div>
                                     )}
-
                                 </>
                             )}
                             
@@ -715,21 +601,12 @@
                                         setEmail('');
                                         setPassword('');
                                         setFullName('');
+                                        setUserRole('student');
                                         setCourseCode('');
                                     }}
                                 >
                                     {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
                                 </button>
-                                
-                                {isLogin && (
-                                    <button
-                                        className="btn btn-secondary w-full text-sm"
-                                        type="button"
-                                        onClick={() => setShowPasswordReset(true)}
-                                    >
-                                        ¿Olvidaste tu contraseña?
-                                    </button>
-                                )}
                             </div>
                         </form>
                         <div className="text-center mt-4 text-xs" style={{color: 'var(--text-secondary)'}}>
@@ -764,11 +641,6 @@
             const [showContentPreview, setShowContentPreview] = React.useState(false);
             const [previewContent, setPreviewContent] = React.useState(null);
             const [showRanking, setShowRanking] = React.useState(false);
-            const [pendingStudents, setPendingStudents] = React.useState([]);
-            const [showPendingStudents, setShowPendingStudents] = React.useState(false);
-            const [showAttendance, setShowAttendance] = React.useState(false);
-            const [attendanceData, setAttendanceData] = React.useState({});
-            const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
                 description: '',
@@ -787,17 +659,12 @@
             React.useEffect(() => {
                 if (selectedCourse) {
                     loadStudents();
-                    loadPendingStudents();
-                    if (showAttendance) {
-                        loadAttendanceData();
-                        generateTodayQR();
-                    }
                 }
-            }, [selectedCourse, showAttendance]);
+            }, [selectedCourse]);
 
             const loadUserData = async () => {
                 try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`).get();
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
                     if (userDoc.exists) {
                         setUserData(userDoc.data());
                     }
@@ -808,7 +675,9 @@
 
             const loadCourses = async () => {
                 try {
-                    const coursesQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).get();
+                    const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                        .where('professorId', '==', currentUser.uid)
+                        .get();
                     
                     const coursesData = coursesQuery.docs.map(doc => ({
                         id: doc.id,
@@ -831,7 +700,9 @@
                 if (!selectedCourse) return;
                 
                 try {
-                    const studentsQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
+                    const studentsQuery = await db.collection('artifacts/seminario-investigacion-app/users')
+                        .where('userType', '==', 'student')
+                        .where('courseCode', '==', selectedCourse.courseCode)
                         .get();
                     
                     const studentsData = studentsQuery.docs.map(doc => ({
@@ -843,95 +714,6 @@
                 } catch (error) {
                     console.error('Error cargando estudiantes:', error);
                     toast.showToast('Error cargando estudiantes', 'error');
-                }
-            };
-            
-            const loadPendingStudents = async () => {
-                if (!selectedCourse) return;
-                
-                try {
-                    const tempStudentsQuery = await db.collection('artifacts/seminario-investigacion-app/temp-students')
-                        .where('courseCode', '==', selectedCourse.courseCode)
-                        .get();
-                    
-                    const pendingData = tempStudentsQuery.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    
-                    setPendingStudents(pendingData);
-                } catch (error) {
-                    console.error('Error cargando estudiantes pendientes:', error);
-                }
-            };
-            
-            const approveStudent = async (studentData) => {
-                try {
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
-                        .set({
-                            ...studentData,
-                            approvedAt: new Date(),
-                            badgesEarned: [],
-                            badgeStatus: {},
-                            lastBadgeEarned: null
-                        });
-                    
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentData.id}`).delete();
-                    
-                    toast.showToast('Estudiante aprobado exitosamente', 'success');
-                    loadStudents();
-                    loadPendingStudents();
-                } catch (error) {
-                    console.error('Error aprobando estudiante:', error);
-                    toast.showToast('Error aprobando estudiante', 'error');
-                }
-            };
-            
-            const rejectStudent = async (studentId) => {
-                try {
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentId}`).delete();
-                    toast.showToast('Estudiante rechazado', 'success');
-                    loadPendingStudents();
-                } catch (error) {
-                    console.error('Error rechazando estudiante:', error);
-                    toast.showToast('Error rechazando estudiante', 'error');
-                }
-            };
-            
-            const generateTodayQR = () => {
-                const today = new Date().toISOString().split('T')[0];
-                const qrData = JSON.stringify({
-                    courseId: selectedCourse.id,
-                    date: today,
-                    professorId: currentUser.uid
-                });
-                
-                setTimeout(() => {
-                    if (qrCodeRef.current) {
-                        qrCodeRef.current.innerHTML = '';
-                        new QRCode(qrCodeRef.current, {
-                            text: qrData,
-                            width: 256,
-                            height: 256
-                        });
-                    }
-                }, 100);
-            };
-            
-            const loadAttendanceData = async () => {
-                if (!selectedCourse) return;
-                
-                try {
-                    const attendanceSnapshot = await db.collection(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance`).get();
-                    
-                    const attendanceByDate = {};
-                    attendanceSnapshot.docs.forEach(doc => {
-                        attendanceByDate[doc.id] = doc.data().students || [];
-                    });
-                    
-                    setAttendanceData(attendanceByDate);
-                } catch (error) {
-                    console.error('Error cargando asistencia:', error);
                 }
             };
 
@@ -959,7 +741,7 @@
                         badges: []
                     };
                     
-                    const docRef = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).add(courseData);
+                    const docRef = await db.collection('artifacts/seminario-investigacion-app/courses').add(courseData);
                     
                     // Crear estructura inicial de semanas
                     const weeklyContent = [];
@@ -988,7 +770,7 @@
             
             const assignBadge = async (studentId, badgeId, earned = true) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
                     const studentDoc = await studentRef.get();
                     
                     if (studentDoc.exists) {
@@ -1028,15 +810,6 @@
             const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(null);
             const [deletePassword, setDeletePassword] = React.useState('');
             const [showDeletePassword, setShowDeletePassword] = React.useState(false);
-            const [showProfile, setShowProfile] = React.useState(false);
-            const [showChangeCourseCode, setShowChangeCourseCode] = React.useState(false);
-            const [profileData, setProfileData] = React.useState({
-                fullName: '',
-                currentPassword: '',
-                newPassword: '',
-                confirmPassword: ''
-            });
-            const [newCourseCode, setNewCourseCode] = React.useState('');
             
             const changeBadgeStatus = (studentId, badgeId, newStatus) => {
                 if (confirm(`¿Estás seguro de cambiar el badge a ${newStatus === 'earned' ? 'ganado' : 'asignado'}?`)) {
@@ -1048,7 +821,7 @@
             
             const updateBadgeStatus = async (studentId, badgeId, newStatus) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
+                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`);
                     const studentDoc = await studentRef.get();
                     
                     if (studentDoc.exists) {
@@ -1077,7 +850,7 @@
                 }
                 
                 try {
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
+                    await db.doc(`artifacts/seminario-investigacion-app/users/${studentId}`).delete();
                     toast.showToast('Estudiante removido exitosamente', 'success');
                     loadStudents();
                 } catch (error) {
@@ -1093,7 +866,7 @@
                     const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, deletePassword);
                     await currentUser.reauthenticateWithCredential(credential);
                     
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
+                    await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
                     
                     toast.showToast('Curso eliminado exitosamente', 'success');
                     setShowDeleteConfirm(null);
@@ -1107,64 +880,6 @@
                         console.error('Error eliminando curso:', error);
                         toast.showToast('Error eliminando curso', 'error');
                     }
-                }
-            };
-            
-            const handleUpdateProfile = async (e) => {
-                e.preventDefault();
-                
-                try {
-                    if (profileData.newPassword) {
-                        if (profileData.newPassword !== profileData.confirmPassword) {
-                            toast.showToast('Las contraseñas no coinciden', 'error');
-                            return;
-                        }
-                        
-                        const credential = firebase.auth.EmailAuthProvider.credential(
-                            currentUser.email, 
-                            profileData.currentPassword
-                        );
-                        await currentUser.reauthenticateWithCredential(credential);
-                        await currentUser.updatePassword(profileData.newPassword);
-                        toast.showToast('Contraseña actualizada', 'success');
-                    }
-                    
-                    if (profileData.fullName && profileData.fullName !== userData?.fullName) {
-                        await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`)
-                            .update({ fullName: profileData.fullName });
-                        toast.showToast('Nombre actualizado', 'success');
-                        loadUserData();
-                    }
-                    
-                    setShowProfile(false);
-                    setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
-                } catch (error) {
-                    if (error.code === 'auth/wrong-password') {
-                        toast.showToast('Contraseña actual incorrecta', 'error');
-                    } else {
-                        toast.showToast('Error actualizando perfil', 'error');
-                    }
-                }
-            };
-            
-            const handleChangeCourseCode = async (e) => {
-                e.preventDefault();
-                
-                if (!newCourseCode.startsWith('#')) {
-                    toast.showToast('El código debe comenzar con #', 'error');
-                    return;
-                }
-                
-                try {
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
-                        .update({ courseCode: newCourseCode });
-                    
-                    toast.showToast('Código del curso actualizado', 'success');
-                    setShowChangeCourseCode(false);
-                    loadCourses();
-                } catch (error) {
-                    console.error('Error actualizando código:', error);
-                    toast.showToast('Error actualizando código del curso', 'error');
                 }
             };
             
@@ -1200,7 +915,7 @@
             
             const saveWeekContent = async () => {
                 try {
-                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`);
+                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`);
                     
                     if (editingWeek === 0) {
                         // Guardar información general
@@ -1245,7 +960,7 @@
                     setShowEditContent(false);
                     await loadCourses();
                     // Actualizar el curso seleccionado con los nuevos datos
-                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`).get();
+                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}`).get();
                     if (updatedCourseData.exists) {
                         setSelectedCourse({id: selectedCourse.id, ...updatedCourseData.data()});
                     }
@@ -1266,213 +981,6 @@
 
             if (loading) {
                 return <LoadingSpinner />;
-            }
-            
-            if (showProfile) {
-                return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="card rounded-xl p-6 w-full max-w-md">
-                            <h3 className="text-lg font-bold mb-4">Perfil de Usuario</h3>
-                            <form onSubmit={handleUpdateProfile}>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-bold mb-2">Nombre Completo</label>
-                                    <input
-                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                        type="text"
-                                        placeholder={userData?.fullName || 'Tu nombre completo'}
-                                        value={profileData.fullName}
-                                        onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-                                    />
-                                </div>
-                                
-                                <div className="border-t pt-4 mb-4">
-                                    <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
-                                    <div className="space-y-3">
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Contraseña actual"
-                                            value={profileData.currentPassword}
-                                            onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
-                                        />
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Nueva contraseña"
-                                            value={profileData.newPassword}
-                                            onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
-                                        />
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Confirmar nueva contraseña"
-                                            value={profileData.confirmPassword}
-                                            onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
-                                        />
-                                    </div>
-                                </div>
-                                
-                                <div className="flex gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowProfile(false);
-                                            setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
-                                        }}
-                                        className="btn btn-secondary flex-1"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary flex-1"
-                                    >
-                                        Guardar
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                );
-            }
-            
-            if (showChangeCourseCode) {
-                return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="card rounded-xl p-6 w-full max-w-md">
-                            <h3 className="text-lg font-bold mb-4">Cambiar Código del Curso</h3>
-                            <form onSubmit={handleChangeCourseCode}>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-bold mb-2">Nuevo Código del Curso</label>
-                                    <input
-                                        className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                        type="text"
-                                        placeholder="#NUEVO_CODIGO"
-                                        value={newCourseCode}
-                                        onChange={(e) => {
-                                            let value = e.target.value;
-                                            if (value && !value.startsWith('#')) {
-                                                value = '#' + value;
-                                            }
-                                            setNewCourseCode(value);
-                                        }}
-                                        required
-                                    />
-                                    <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
-                                        Los estudiantes usarán este código para unirse al curso
-                                    </p>
-                                </div>
-                                
-                                <div className="flex gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowChangeCourseCode(false);
-                                            setNewCourseCode('');
-                                        }}
-                                        className="btn btn-secondary flex-1"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary flex-1"
-                                    >
-                                        Actualizar Código
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                );
-            }
-            
-            if (showAttendance) {
-                const today = new Date().toISOString().split('T')[0];
-                const dates = Object.keys(attendanceData).sort().reverse();
-                
-                return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
-                        <div className="max-w-6xl mx-auto">
-                            <div className="card rounded-xl p-6 mb-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold">Control de Asistencia</h2>
-                                    <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
-                                </div>
-                                
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="text-center">
-                                        <h3 className="font-semibold mb-4">QR de Hoy ({today})</h3>
-                                        <div className="bg-white p-4 rounded-lg inline-block">
-                                            <div ref={qrCodeRef}></div>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mt-2">Los estudiantes deben escanear este código</p>
-                                    </div>
-                                    
-                                    <div>
-                                        <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
-                                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
-                                            {attendanceData[today] && attendanceData[today].length > 0 ? (
-                                                <ul className="space-y-2">
-                                                    {attendanceData[today].map((record, idx) => (
-                                                        <li key={idx} className="flex items-center gap-2 text-sm">
-                                                            <span className="text-green-600">✓</span>
-                                                            <span>{record.studentName}</span>
-                                                            <span className="text-xs text-gray-500">
-                                                                ({new Date(record.timestamp?.toDate ? record.timestamp.toDate() : record.timestamp).toLocaleTimeString()})
-                                                            </span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            ) : (
-                                                <p className="text-gray-500 text-center">Aún no hay asistencias registradas hoy</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="card rounded-xl p-6">
-                                <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b">
-                                                <th className="text-left p-3">Estudiante</th>
-                                                {dates.slice(0, 10).map(date => (
-                                                    <th key={date} className="text-center p-3">{date}</th>
-                                                ))}
-                                                <th className="text-center p-3">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {students.map(student => {
-                                                const attendanceCount = dates.filter(date => 
-                                                    attendanceData[date]?.some(record => record.studentId === student.id)
-                                                ).length;
-                                                
-                                                return (
-                                                    <tr key={student.id} className="border-b hover:bg-gray-50">
-                                                        <td className="p-3">{student.fullName}</td>
-                                                        {dates.slice(0, 10).map(date => {
-                                                            const attended = attendanceData[date]?.some(record => record.studentId === student.id);
-                                                            return (
-                                                                <td key={date} className="text-center p-3">
-                                                                    {attended ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                                                                </td>
-                                                            );
-                                                        })}
-                                                        <td className="text-center p-3 font-semibold">{attendanceCount}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
             }
             
             if (showDeleteConfirm) {
@@ -1542,7 +1050,7 @@
                                                         type="text"
                                                         value={weekContent.university || ''}
                                                         onChange={(e) => setWeekContent({...weekContent, university: e.target.value})}
-                                                        placeholder="Nombre de la universidad"
+                                                        placeholder="Universidad Icesi"
                                                     />
                                                 </div>
                                                 <div>
@@ -1552,7 +1060,7 @@
                                                         type="text"
                                                         value={weekContent.courseName || ''}
                                                         onChange={(e) => setWeekContent({...weekContent, courseName: e.target.value})}
-                                                        placeholder="Nombre del curso"
+                                                        placeholder="Seminario de Investigación"
                                                     />
                                                 </div>
                                                 <div>
@@ -1817,7 +1325,7 @@
                                         <input
                                             className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                             type="text"
-                                            placeholder="Nombre de la universidad"
+                                            placeholder="Universidad Icesi"
                                             value={newCourse.university}
                                             onChange={(e) => setNewCourse({...newCourse, university: e.target.value})}
                                         />
@@ -1828,7 +1336,7 @@
                                         <input
                                             className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                             type="text"
-                                            placeholder="Nombre del curso"
+                                            placeholder="Seminario de Investigación"
                                             value={newCourse.name}
                                             onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
                                         />
@@ -1911,14 +1419,6 @@
                                 )}
                             </div>
                             <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setShowProfile(true)}
-                                    className="btn btn-secondary flex items-center gap-2"
-                                    title="Perfil de usuario"
-                                >
-                                    <User />
-                                    <span className="hidden md:inline">Perfil</span>
-                                </button>
                                 <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
@@ -1930,19 +1430,6 @@
                             </div>
                         </div>
                     </header>
-                    
-                    <div className="card rounded-xl p-6 mb-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Acciones Rápidas</h2>
-                            <button
-                                onClick={() => setShowAttendance(true)}
-                                className="btn btn-primary"
-                                disabled={!selectedCourse}
-                            >
-                                📋 Control de Asistencia
-                            </button>
-                        </div>
-                    </div>
                     
                     {/* Pills de cursos */}
                     <div className="card rounded-xl p-6 mb-6">
@@ -1973,7 +1460,7 @@
                             ))}
                             <button
                                 onClick={() => setShowCreateCourse(true)}
-                                className="px-4 py-2 rounded-full text-sm font-medium border-2 border-dashed border-blue-500 text-blue-500 hover:border-blue-600 hover:text-blue-600 transition-all bg-transparent"
+                                className="px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-all"
                             >
                                 + Crear Nuevo Curso
                             </button>
@@ -2030,81 +1517,19 @@
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-bold">Estudiantes Registrados ({students.length})</h2>
                                     <div className="flex items-center gap-4">
-                                        {pendingStudents.length > 0 && (
-                                            <button
-                                                onClick={() => {
-                                                    setShowPendingStudents(!showPendingStudents);
-                                                    setShowRanking(false);
-                                                }}
-                                                className={`btn btn-secondary text-sm ${
-                                                    showPendingStudents 
-                                                        ? 'bg-orange-200 text-orange-900' 
-                                                        : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                                                }`}
-                                            >
-                                                📋 {showPendingStudents ? 'Ocultar' : 'Pendientes'} ({pendingStudents.length})
-                                            </button>
-                                        )}
                                         <button
-                                            onClick={() => {
-                                                setShowRanking(!showRanking);
-                                                setShowPendingStudents(false);
-                                            }}
+                                            onClick={() => setShowRanking(!showRanking)}
                                             className="btn btn-secondary text-sm"
                                         >
                                             {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
                                         </button>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                                                Código para compartir: <strong>{selectedCourse.courseCode}</strong>
-                                            </p>
-                                            <button
-                                                onClick={() => {
-                                                    setNewCourseCode(selectedCourse.courseCode);
-                                                    setShowChangeCourseCode(true);
-                                                }}
-                                                className="text-blue-600 hover:text-blue-800 text-sm"
-                                                title="Cambiar código del curso"
-                                            >
-                                                ✏️
-                                            </button>
-                                        </div>
+                                        <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                                            Código para compartir: <strong>{selectedCourse.courseCode}</strong>
+                                        </p>
                                     </div>
                                 </div>
                                 
-                                {showPendingStudents ? (
-                                    <div className="space-y-4">
-                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                            <h3 className="font-semibold text-orange-800 mb-2">Estudiantes Pendientes de Aprobación</h3>
-                                            <p className="text-sm text-orange-700 mb-4">Estos estudiantes se han registrado y esperan tu aprobación para unirse al curso.</p>
-                                        </div>
-                                        {pendingStudents.map(student => (
-                                            <div key={student.id} className="border rounded-lg p-4 bg-white">
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <h4 className="font-semibold">{student.fullName}</h4>
-                                                        <p className="text-sm text-gray-600">{student.email}</p>
-                                                        <p className="text-xs text-gray-500">Código usado: {student.courseCode}</p>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => approveStudent(student)}
-                                                            className="px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 text-sm"
-                                                        >
-                                                            ✓ Aprobar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => rejectStudent(student.id)}
-                                                            className="px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-sm"
-                                                        >
-                                                            ✗ Rechazar
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : students.length === 0 ? (
+                                {students.length === 0 ? (
                                     <p style={{color: 'var(--text-secondary)'}}>No hay estudiantes registrados aún.</p>
                                 ) : showRanking ? (
                                     <div className="overflow-x-auto">
@@ -2279,104 +1704,54 @@
                     {/* Modal de Preview de Contenido */}
                     {showContentPreview && previewContent && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="card rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden" style={{backgroundColor: 'var(--bg-secondary)'}}>
-                                {/* Header */}
-                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center font-bold">
-                                                    {previewContent.week}
-                                                </div>
-                                                <h3 className="text-xl font-bold">{previewContent.title}</h3>
-                                            </div>
-                                            <p className="text-blue-100 text-sm">Vista previa del contenido semanal</p>
-                                        </div>
+                            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                                <div className="p-6">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="text-lg font-semibold">Semana {previewContent.week}: {previewContent.title}</h3>
                                         <button
                                             onClick={() => setShowContentPreview(false)}
-                                            className="text-white hover:text-blue-200 text-2xl font-light w-8 h-8 flex items-center justify-center"
+                                            className="text-gray-500 hover:text-gray-700"
                                         >
-                                            ×
+                                            ✕
                                         </button>
                                     </div>
-                                </div>
-                                
-                                {/* Content */}
-                                <div className="p-6 overflow-y-auto" style={{maxHeight: 'calc(85vh - 200px)'}}>
-                                    <div className="space-y-6">
-                                        {/* Descripción */}
-                                        <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-400">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-blue-600 text-lg">📝</span>
-                                                <h4 className="font-semibold text-blue-800">Descripción</h4>
-                                            </div>
-                                            <p className="text-blue-700 leading-relaxed">{previewContent.description || 'Sin descripción'}</p>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h4 className="font-medium mb-2">Descripción</h4>
+                                            <p className="text-gray-600">{previewContent.description || 'Sin descripción'}</p>
                                         </div>
-                                        
-                                        {/* Contenido */}
-                                        <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-400">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-green-600 text-lg">📚</span>
-                                                <h4 className="font-semibold text-green-800">Contenido</h4>
-                                            </div>
-                                            <div className="text-green-700 leading-relaxed whitespace-pre-line">{previewContent.content || 'Sin contenido'}</div>
+                                        <div>
+                                            <h4 className="font-medium mb-2">Contenido</h4>
+                                            <div className="prose max-w-none text-gray-600">{previewContent.content || 'Sin contenido'}</div>
                                         </div>
-                                        
-                                        {/* Actividades */}
                                         {previewContent.activities && previewContent.activities.length > 0 && (
-                                            <div className="bg-orange-50 rounded-xl p-4 border-l-4 border-orange-400">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="text-orange-600 text-lg">🎯</span>
-                                                    <h4 className="font-semibold text-orange-800">Actividades ({previewContent.activities.length})</h4>
-                                                </div>
-                                                <div className="space-y-2">
+                                            <div>
+                                                <h4 className="font-medium mb-2">Actividades ({previewContent.activities.length})</h4>
+                                                <ul className="list-disc list-inside space-y-1">
                                                     {previewContent.activities.map((activity, idx) => (
-                                                        <div key={idx} className="flex items-start gap-3 p-2 bg-white rounded-lg">
-                                                            <span className="text-orange-500 font-bold text-sm mt-1">{idx + 1}.</span>
-                                                            <span className="text-orange-700 flex-1">{activity}</span>
-                                                        </div>
+                                                        <li key={idx} className="text-gray-600">{activity}</li>
                                                     ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Badges */}
-                                        {selectedCourse?.availableBadges?.filter(badge => badge.maxWeek === previewContent.week).length > 0 && (
-                                            <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-400">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="text-purple-600 text-lg">🏆</span>
-                                                    <h4 className="font-semibold text-purple-800">Badges Disponibles</h4>
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    {selectedCourse.availableBadges.filter(badge => badge.maxWeek === previewContent.week).map((badge, idx) => (
-                                                        <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
-                                                            <div className="font-medium text-purple-800">{badge.name}</div>
-                                                            <div className="text-sm text-purple-600 mt-1">{badge.description}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                </ul>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                                
-                                {/* Footer */}
-                                <div className="border-t p-4 bg-gray-50 flex justify-end gap-3">
-                                    <button
-                                        onClick={() => setShowContentPreview(false)}
-                                        className="btn btn-secondary"
-                                    >
-                                        Cerrar
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowContentPreview(false);
-                                            editWeekContent(previewContent.week);
-                                        }}
-                                        className="btn btn-primary"
-                                    >
-                                        ✏️ Editar
-                                    </button>
+                                    <div className="flex justify-end gap-2 mt-6">
+                                        <button
+                                            onClick={() => {
+                                                setShowContentPreview(false);
+                                                editWeekContent(previewContent.week);
+                                            }}
+                                            className="btn btn-primary"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            onClick={() => setShowContentPreview(false)}
+                                            className="btn btn-secondary"
+                                        >
+                                            Cerrar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2401,195 +1776,6 @@
             const [professorName, setProfessorName] = React.useState('');
             const [dynamicContent, setDynamicContent] = React.useState([]);
             const [courseInfo, setCourseInfo] = React.useState(null);
-            const [showProfile, setShowProfile] = React.useState(false);
-            const [showJoinCourse, setShowJoinCourse] = React.useState(false);
-            const [joinCourseCode, setJoinCourseCode] = React.useState('');
-            const [showQRScanner, setShowQRScanner] = React.useState(false);
-            const scannerRef = React.useRef(null);
-            const [profileData, setProfileData] = React.useState({
-                fullName: '',
-                currentPassword: '',
-                newPassword: '',
-                confirmPassword: ''
-            });
-            
-            const handleJoinCourse = async (e) => {
-                e.preventDefault();
-                if (!joinCourseCode.startsWith('#')) {
-                    toast.showToast('El código debe comenzar con #', 'error');
-                    return;
-                }
-                
-                try {
-                    // Verificar si ya está pendiente con este código
-                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
-                    if (tempStudentDoc.exists && tempStudentDoc.data().courseCode === joinCourseCode) {
-                        toast.showToast('Ya tienes una solicitud pendiente para este curso', 'error');
-                        return;
-                    }
-                    
-                    // Verificar si ya está aprobado en algún curso con este código
-                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
-                    
-                    for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`)
-                            .where('courseCode', '==', joinCourseCode)
-                            .get();
-                        
-                        for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
-                            
-                            if (studentDoc.exists) {
-                                toast.showToast('Ya estás registrado en este curso', 'error');
-                                return;
-                            }
-                        }
-                    }
-                    
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
-                        .set({
-                            email: currentUser.email,
-                            fullName: userData?.fullName || currentUser.email.split('@')[0],
-                            userType: 'student',
-                            courseCode: joinCourseCode,
-                            badgesEarned: [],
-                            lastBadgeEarned: null,
-                            createdAt: new Date()
-                        });
-                    
-                    toast.showToast('Solicitud enviada. Espera la aprobación del profesor.', 'success');
-                    setShowJoinCourse(false);
-                    setJoinCourseCode('');
-                    loadCourseData();
-                } catch (error) {
-                    console.error('Error uniéndose al curso:', error);
-                    toast.showToast('Error enviando solicitud', 'error');
-                }
-            };
-            
-            const handleUpdateProfile = async (e) => {
-                e.preventDefault();
-                
-                try {
-                    if (profileData.newPassword) {
-                        if (profileData.newPassword !== profileData.confirmPassword) {
-                            toast.showToast('Las contraseñas no coinciden', 'error');
-                            return;
-                        }
-                        
-                        const credential = firebase.auth.EmailAuthProvider.credential(
-                            currentUser.email, 
-                            profileData.currentPassword
-                        );
-                        await currentUser.reauthenticateWithCredential(credential);
-                        await currentUser.updatePassword(profileData.newPassword);
-                        toast.showToast('Contraseña actualizada', 'success');
-                    }
-                    
-                    if (profileData.fullName && profileData.fullName !== userData?.fullName) {
-                        const tempDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
-                        if (tempDoc.exists) {
-                            await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
-                                .update({ fullName: profileData.fullName });
-                        }
-                        toast.showToast('Nombre actualizado', 'success');
-                    }
-                    
-                    setShowProfile(false);
-                    setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
-                    loadCourseData();
-                } catch (error) {
-                    if (error.code === 'auth/wrong-password') {
-                        toast.showToast('Contraseña actual incorrecta', 'error');
-                    } else {
-                        toast.showToast('Error actualizando perfil', 'error');
-                    }
-                }
-            };
-            
-            const startQRScanner = () => {
-                setShowQRScanner(true);
-                
-                setTimeout(() => {
-                    const html5QrCode = new Html5Qrcode("qr-reader");
-                    scannerRef.current = html5QrCode;
-                    
-                    html5QrCode.start(
-                        { facingMode: "environment" },
-                        { fps: 10, qrbox: 250 },
-                        async (decodedText) => {
-                            try {
-                                const qrData = JSON.parse(decodedText);
-                                
-                                if (qrData.courseId && qrData.date && qrData.professorId) {
-                                    await registerAttendance(qrData);
-                                    html5QrCode.stop();
-                                    setShowQRScanner(false);
-                                } else {
-                                    toast.showToast('QR inválido', 'error');
-                                }
-                            } catch (error) {
-                                console.error('Error procesando QR:', error);
-                            }
-                        }
-                    ).catch(err => {
-                        console.error('Error iniciando escáner:', err);
-                        toast.showToast('Error accediendo a la cámara', 'error');
-                        setShowQRScanner(false);
-                    });
-                }, 100);
-            };
-            
-            const stopQRScanner = () => {
-                if (scannerRef.current) {
-                    scannerRef.current.stop().then(() => {
-                        setShowQRScanner(false);
-                    }).catch(err => {
-                        console.error('Error deteniendo escáner:', err);
-                        setShowQRScanner(false);
-                    });
-                } else {
-                    setShowQRScanner(false);
-                }
-            };
-            
-            const registerAttendance = async (qrData) => {
-                try {
-                    const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
-                    const attendanceDoc = await attendanceRef.get();
-                    
-                    const studentData = {
-                        studentId: currentUser.uid,
-                        studentName: userData?.fullName || currentUser.email,
-                        timestamp: new Date()
-                    };
-                    
-                    if (attendanceDoc.exists) {
-                        const existingData = attendanceDoc.data();
-                        const students = existingData.students || [];
-                        
-                        if (students.some(s => s.studentId === currentUser.uid)) {
-                            toast.showToast('Ya registraste tu asistencia hoy', 'info');
-                            return;
-                        }
-                        
-                        await attendanceRef.update({
-                            students: [...students, studentData]
-                        });
-                    } else {
-                        await attendanceRef.set({
-                            date: qrData.date,
-                            courseId: qrData.courseId,
-                            students: [studentData]
-                        });
-                    }
-                    
-                    toast.showToast('¡Asistencia registrada exitosamente!', 'success');
-                } catch (error) {
-                    console.error('Error registrando asistencia:', error);
-                    toast.showToast('Error registrando asistencia', 'error');
-                }
-            };
 
 
 
@@ -2599,42 +1785,40 @@
             }, []);
 
             const loadUserData = async () => {
-                // Los datos del usuario se cargarán junto con los datos del curso
-                setLoading(false);
+                try {
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        setUserData(userDoc.data());
+                    }
+                } catch (error) {
+                    console.error('Error cargando datos del usuario:', error);
+                } finally {
+                    setLoading(false);
+                }
             };
             
             const loadCourseData = async () => {
                 try {
-                    // Primero verificar si está en temp-students
-                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
-                    
-                    if (tempStudentDoc.exists) {
-                        // Estudiante pendiente de aprobación
-                        const tempData = tempStudentDoc.data();
-                        setUserData({...tempData, isPending: true});
-                        setProfessorName('Pendiente de aprobación');
-                        return;
-                    }
-                    
-                    // Buscar en todos los profesores para encontrar al estudiante
-                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
-                    
-                    for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`).get();
+                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${currentUser.uid}`).get();
+                    if (userDoc.exists) {
+                        const studentData = userDoc.data();
+                        const courseCode = studentData.courseCode;
                         
-                        for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
+                        if (courseCode) {
+                            const coursesQuery = await db.collection('artifacts/seminario-investigacion-app/courses')
+                                .where('courseCode', '==', courseCode)
+                                .limit(1)
+                                .get();
                             
-                            if (studentDoc.exists) {
-                                setUserData(studentDoc.data());
-                                
-                                const courseData = courseDoc.data();
+                            if (!coursesQuery.empty) {
+                                const courseData = coursesQuery.docs[0].data();
                                 setProfessorName(courseData.professorName || 'No asignado');
                                 setCourseInfo(courseData);
                                 
                                 // Crear contenido dinámico
                                 const contentArray = [];
                                 
+                                // Información general
                                 contentArray.push({
                                     id: 'info',
                                     type: 'info',
@@ -2643,8 +1827,10 @@
                                     unlocked: true
                                 });
                                 
+                                // Semanas dinámicas
                                 for (let i = 1; i <= courseData.weeks; i++) {
                                     const weekData = courseData.weeklyContent?.find(w => w.week === i);
+                                    // Asignar badges a esta semana según la configuración del profesor
                                     const weekBadges = courseData.availableBadges?.filter(badge => badge.maxWeek === i) || [];
                                     contentArray.push({
                                         id: i,
@@ -2654,16 +1840,18 @@
                                         content: weekData?.content || '',
                                         activities: weekData?.activities || [],
                                         badges: weekBadges,
-                                        unlocked: i === 1
+                                        unlocked: i === 1 // Solo la primera semana desbloqueada por defecto
                                     });
                                 }
                                 
                                 setDynamicContent(contentArray);
-                                return; // Salir una vez encontrado
+                            } else {
+                                setProfessorName('Curso no encontrado');
                             }
+                        } else {
+                            setProfessorName('Sin asignar');
                         }
                     }
-
                 } catch (error) {
                     console.error('Error cargando datos del curso:', error);
                     setProfessorName('Error cargando');
@@ -2719,52 +1907,6 @@
             if (loading) {
                 return <LoadingSpinner />;
             }
-            
-            if (userData?.isPending) {
-                return (
-                    <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
-                        <div className="max-w-2xl mx-auto">
-                            <div className="card rounded-xl p-8 text-center">
-                                <div className="mb-6">
-                                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <span className="text-3xl">⏳</span>
-                                    </div>
-                                    <h1 className="text-2xl font-bold mb-2">Registro Pendiente</h1>
-                                    <p className="text-lg" style={{color: 'var(--text-secondary)'}}>
-                                        Hola, <strong>{userData.fullName}</strong>
-                                    </p>
-                                </div>
-                                
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
-                                    <h2 className="font-semibold text-orange-800 mb-2">Tu registro está siendo revisado</h2>
-                                    <p className="text-orange-700 mb-4">
-                                        Te has registrado exitosamente con el código <strong>{userData.courseCode}</strong>.
-                                        El profesor debe aprobar tu solicitud antes de que puedas acceder al contenido del curso.
-                                    </p>
-                                    <p className="text-sm text-orange-600">
-                                        Recibirás acceso una vez que el profesor apruebe tu registro. 
-                                        Puedes cerrar esta página y volver más tarde.
-                                    </p>
-                                </div>
-                                
-                                <div className="flex justify-center gap-3">
-                                    <ThemeToggle />
-                                    <button
-                                        onClick={handleLogout}
-                                        className="btn btn-secondary flex items-center gap-2"
-                                    >
-                                        <LogOut />
-                                        Cerrar Sesión
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <footer className="mt-8 text-center text-xs" style={{color: 'var(--text-secondary)'}}>
-                            Developed by<br/>Leandro Flórez-Aristizábal, Ph.D
-                        </footer>
-                    </div>
-                );
-            }
 
             return (
                 <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
@@ -2794,28 +1936,6 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <button
-                                    onClick={startQRScanner}
-                                    className="btn btn-primary text-sm"
-                                    title="Registrar asistencia"
-                                >
-                                    📷 Asistencia
-                                </button>
-                                <button
-                                    onClick={() => setShowJoinCourse(true)}
-                                    className="btn btn-primary text-sm"
-                                    title="Unirse a un curso"
-                                >
-                                    + Unirse a Curso
-                                </button>
-                                <button
-                                    onClick={() => setShowProfile(true)}
-                                    className="btn btn-secondary flex items-center gap-2"
-                                    title="Perfil de usuario"
-                                >
-                                    <User />
-                                    <span className="hidden md:inline">Perfil</span>
-                                </button>
                                 <ThemeToggle />
                                 <button
                                     onClick={handleLogout}
@@ -2828,132 +1948,6 @@
                             </div>
                         </div>
                     </header>
-
-                    {showQRScanner && (
-                        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-                            <div className="card rounded-xl p-6 w-full max-w-md">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-bold">Escanear QR de Asistencia</h3>
-                                    <button onClick={stopQRScanner} className="text-2xl">×</button>
-                                </div>
-                                <div id="qr-reader" className="w-full"></div>
-                                <p className="text-sm text-center mt-4" style={{color: 'var(--text-secondary)'}}>
-                                    Apunta la cámara al código QR del profesor
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {showJoinCourse && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="card rounded-xl p-6 w-full max-w-md">
-                                <h3 className="text-lg font-bold mb-4">Unirse a un Curso</h3>
-                                <form onSubmit={handleJoinCourse}>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-bold mb-2">Código del Curso</label>
-                                        <input
-                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                            type="text"
-                                            placeholder="#codigo_del_profesor"
-                                            value={joinCourseCode}
-                                            onChange={(e) => {
-                                                let value = e.target.value;
-                                                if (value && !value.startsWith('#')) {
-                                                    value = '#' + value;
-                                                }
-                                                setJoinCourseCode(value);
-                                            }}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setShowJoinCourse(false);
-                                                setJoinCourseCode('');
-                                            }}
-                                            className="btn btn-secondary flex-1"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="btn btn-primary flex-1"
-                                        >
-                                            Enviar Solicitud
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {showProfile && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="card rounded-xl p-6 w-full max-w-md">
-                                <h3 className="text-lg font-bold mb-4">Perfil de Usuario</h3>
-                                <form onSubmit={handleUpdateProfile}>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-bold mb-2">Nombre Completo</label>
-                                        <input
-                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                            type="text"
-                                            placeholder={userData?.fullName || 'Tu nombre completo'}
-                                            value={profileData.fullName}
-                                            onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-                                        />
-                                    </div>
-                                    
-                                    <div className="border-t pt-4 mb-4">
-                                        <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
-                                        <div className="space-y-3">
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Contraseña actual"
-                                                value={profileData.currentPassword}
-                                                onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
-                                            />
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Nueva contraseña"
-                                                value={profileData.newPassword}
-                                                onChange={(e) => setProfileData({...profileData, newPassword: e.target.value})}
-                                            />
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Confirmar nueva contraseña"
-                                                value={profileData.confirmPassword}
-                                                onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
-                                            />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setShowProfile(false);
-                                                setProfileData({ fullName: '', currentPassword: '', newPassword: '', confirmPassword: '' });
-                                            }}
-                                            className="btn btn-secondary flex-1"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="btn btn-primary flex-1"
-                                        >
-                                            Guardar
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
 
                     <main className="container mx-auto max-w-6xl">
                         <div className="grid gap-6">
@@ -3206,14 +2200,9 @@
                     if (user) {
                         try {
                             const db = firebase.firestore();
-                            
-                            // Primero buscar en profesores
-                            let userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`).get();
-                            
+                            const userDoc = await db.doc(`artifacts/seminario-investigacion-app/users/${user.uid}`).get();
                             if (userDoc.exists) {
-                                setUserData({...userDoc.data(), userType: 'professor'});
-                            } else {
-                                setUserData({userType: 'student'});
+                                setUserData(userDoc.data());
                             }
                         } catch (error) {
                             console.error('Error cargando datos del usuario:', error);
