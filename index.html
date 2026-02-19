@@ -304,6 +304,7 @@
             const [courseCode, setCourseCode] = React.useState('');
             const [showPasswordReset, setShowPasswordReset] = React.useState(false);
             const [newPassword, setNewPassword] = React.useState('');
+            const [showPassword, setShowPassword] = React.useState(false);
 
             const validateEmail = (email) => {
                 const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
@@ -718,14 +719,23 @@
                                 <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     Contraseña
                                 </label>
-                                <input
-                                    className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
-                                    type="password"
-                                    placeholder="Mínimo 6 caracteres"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                />
+                                <div className="relative">
+                                    <input
+                                        className="input-field w-full py-3 px-4 pr-10 rounded-lg focus:outline-none"
+                                        type={showPassword ? 'text' : 'password'}
+                                        placeholder="Mínimo 6 caracteres"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? '🙉' : '🙈'}
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex flex-col gap-4 mt-6">
@@ -747,6 +757,7 @@
                                         setPassword('');
                                         setFullName('');
                                         setCourseCode('');
+                                        setShowPassword(false);
                                     }}
                                 >
                                     {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia Sesión'}
@@ -954,8 +965,10 @@
                         qrCodeRef.current.innerHTML = '';
                         new QRCode(qrCodeRef.current, {
                             text: qrData,
-                            width: 256,
-                            height: 256
+                            width: 512,
+                            height: 512,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff'
                         });
                     }
                 }, 100);
@@ -1088,6 +1101,8 @@
             const [deletePassword, setDeletePassword] = React.useState('');
             const [showDeletePassword, setShowDeletePassword] = React.useState(false);
             const [showProfile, setShowProfile] = React.useState(false);
+            const [showProfileCurrentPassword, setShowProfileCurrentPassword] = React.useState(false);
+            const [showProfileNewPassword, setShowProfileNewPassword] = React.useState(false);
             const [showChangeCourseCode, setShowChangeCourseCode] = React.useState(false);
             const [profileData, setProfileData] = React.useState({
                 fullName: '',
@@ -1137,10 +1152,10 @@
 
                 try {
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
-                    
+
                     // Remover de enrollments en la colección global
                     await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/enrollments/${studentId}`).delete();
-                    
+
                     toast.showToast('Estudiante removido exitosamente', 'success');
                     loadStudents();
                 } catch (error) {
@@ -1158,7 +1173,7 @@
 
                     // Eliminar de la colección del profesor
                     await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
-                    
+
                     // Eliminar de la colección global courses
                     await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
 
@@ -1355,27 +1370,44 @@
                                 <div className="border-t pt-4 mb-4">
                                     <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
                                     <div className="space-y-3">
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Contraseña actual"
-                                            value={profileData.currentPassword}
-                                            onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
-                                        />
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Nueva contraseña"
-                                            value={profileData.newPassword}
-                                            onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
-                                        />
-                                        <input
-                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                            type="password"
-                                            placeholder="Confirmar nueva contraseña"
-                                            value={profileData.confirmPassword}
-                                            onChange={(e) => setProfileData({ ...profileData, confirmPassword: e.target.value })}
-                                        />
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Contraseña Actual</label>
+                                            <div className="relative">
+                                                <input
+                                                    className="input-field w-full py-2 px-3 pr-10 rounded-lg focus:outline-none"
+                                                    type={showProfileCurrentPassword ? 'text' : 'password'}
+                                                    placeholder="Contraseña actual"
+                                                    value={profileData.currentPassword}
+                                                    onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                                    onClick={() => setShowProfileCurrentPassword(!showProfileCurrentPassword)}
+                                                >
+                                                    {showProfileCurrentPassword ? '🙉' : '🙈'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">Nueva Contraseña</label>
+                                            <div className="relative">
+                                                <input
+                                                    className="input-field w-full py-2 px-3 pr-10 rounded-lg focus:outline-none"
+                                                    type={showProfileNewPassword ? 'text' : 'password'}
+                                                    placeholder="Nueva contraseña"
+                                                    value={profileData.newPassword}
+                                                    onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                                    onClick={() => setShowProfileNewPassword(!showProfileNewPassword)}
+                                                >
+                                                    {showProfileNewPassword ? '🙉' : '🙈'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1457,12 +1489,15 @@
             if (showAttendance) {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const dates = Object.keys(attendanceData).sort().reverse();
+                const dates = Object.keys(attendanceData).sort();
 
                 const formatDateMmmDD = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
                     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                    return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}`;
+                    return {
+                        month: months[date.getMonth()],
+                        day: String(date.getDate()).padStart(2, '0')
+                    };
                 };
 
                 const formatDateMmmDDYY = (dateStr) => {
@@ -1485,10 +1520,10 @@
                                         <h2 className="text-2xl font-bold mb-2">Control de Asistencia</h2>
                                         <p className="text-2xl font-bold mb-4" style={{ color: 'var(--accent-color)' }}>{selectedCourse.name}</p>
                                         <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
-                                        <div className="bg-white p-4 rounded-lg inline-block">
+                                        <div className="bg-white p-8 rounded-lg inline-block shadow-lg" style={{ border: '4px solid #f0f0f0' }}>
                                             <div ref={qrCodeRef}></div>
                                         </div>
-                                        <p className="text-sm text-gray-600 mt-2">Los estudiantes deben escanear este código</p>
+                                        <p className="text-sm text-gray-600 mt-2">Escanea desde cualquier distancia</p>
                                     </div>
 
                                     <div>
@@ -1521,9 +1556,17 @@
                                         <thead>
                                             <tr className="border-b">
                                                 <th className="text-left p-3">Estudiante</th>
-                                                {dates.slice(0, 10).map(date => (
-                                                    <th key={date} className="text-center p-3">{formatDateMmmDD(date)}</th>
-                                                ))}
+                                                {dates.slice(0, 10).map(date => {
+                                                    const dateFormatted = formatDateMmmDD(date);
+                                                    return (
+                                                        <th key={date} className="text-center p-3">
+                                                            <div className="flex flex-col items-center">
+                                                                <div>{dateFormatted.month}</div>
+                                                                <div className="font-bold">{dateFormatted.day}</div>
+                                                            </div>
+                                                        </th>
+                                                    );
+                                                })}
                                                 <th className="text-center p-3">Total</th>
                                             </tr>
                                         </thead>
@@ -2013,7 +2056,7 @@
                                     className="btn btn-secondary"
                                     title="Cerrar Sesión"
                                 >
-                                    <LogOut />
+                                    Cerrar Sesión
                                 </button>
                                 <ThemeToggle />
                             </div>
@@ -2031,8 +2074,8 @@
                                     <button
                                         onClick={() => setSelectedCourse(course)}
                                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCourse?.id === course.id
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                             }`}
                                     >
                                         {course.name}
@@ -2114,8 +2157,8 @@
                                                     setShowRanking(false);
                                                 }}
                                                 className={`btn btn-secondary text-sm ${showPendingStudents
-                                                        ? 'bg-orange-200 text-orange-900'
-                                                        : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                                    ? 'bg-orange-200 text-orange-900'
+                                                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
                                                     }`}
                                             >
                                                 📋 {showPendingStudents ? 'Ocultar' : 'Pendientes'} ({pendingStudents.length})
@@ -2234,8 +2277,8 @@
                                                                             if (!hasEarned) return null;
                                                                             return (
                                                                                 <span key={badgeId} className={`px-1 py-0.5 text-xs rounded ${badgeStatus === 'earned'
-                                                                                        ? 'bg-green-100 text-green-800'
-                                                                                        : 'bg-red-100 text-red-800'
+                                                                                    ? 'bg-green-100 text-green-800'
+                                                                                    : 'bg-red-100 text-red-800'
                                                                                     }`}>
                                                                                     {badgeStatus === 'earned' ? '🏆' : '🔴'} {badge.name}
                                                                                 </span>
@@ -2325,8 +2368,8 @@
                                                                                         <button
                                                                                             onClick={() => changeBadgeStatus(student.id, badgeId, isEarned ? 'assigned' : 'earned')}
                                                                                             className={`w-full px-2 py-1 rounded text-xs hover:opacity-80 ${isEarned
-                                                                                                    ? 'bg-green-100 text-green-800'
-                                                                                                    : 'bg-red-100 text-red-800'
+                                                                                                ? 'bg-green-100 text-green-800'
+                                                                                                : 'bg-red-100 text-red-800'
                                                                                                 }`}
                                                                                             title={`Cambiar a ${isEarned ? 'asignado' : 'ganado'}`}
                                                                                         >
@@ -2476,6 +2519,8 @@
             const [dynamicContent, setDynamicContent] = React.useState([]);
             const [courseInfo, setCourseInfo] = React.useState(null);
             const [showProfile, setShowProfile] = React.useState(false);
+            const [showStudentCurrentPassword, setShowStudentCurrentPassword] = React.useState(false);
+            const [showStudentNewPassword, setShowStudentNewPassword] = React.useState(false);
             const [showJoinCourse, setShowJoinCourse] = React.useState(false);
             const [joinCourseCode, setJoinCourseCode] = React.useState('');
             const [showQRScanner, setShowQRScanner] = React.useState(false);
@@ -2834,9 +2879,8 @@
                                     <ThemeToggle />
                                     <button
                                         onClick={handleLogout}
-                                        className="btn btn-secondary flex items-center gap-2"
+                                        className="btn btn-secondary"
                                     >
-                                        <LogOut />
                                         Cerrar Sesión
                                     </button>
                                 </div>
@@ -2903,7 +2947,7 @@
                                     className="btn btn-secondary"
                                     title="Cerrar sesión"
                                 >
-                                    <LogOut />
+                                    Cerrar Sesión
                                 </button>
                                 <ThemeToggle />
                             </div>
@@ -2989,27 +3033,44 @@
                                     <div className="border-t pt-4 mb-4">
                                         <h4 className="font-semibold mb-2">Cambiar Contraseña (Opcional)</h4>
                                         <div className="space-y-3">
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Contraseña actual"
-                                                value={profileData.currentPassword}
-                                                onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
-                                            />
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Nueva contraseña"
-                                                value={profileData.newPassword}
-                                                onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
-                                            />
-                                            <input
-                                                className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
-                                                type="password"
-                                                placeholder="Confirmar nueva contraseña"
-                                                value={profileData.confirmPassword}
-                                                onChange={(e) => setProfileData({ ...profileData, confirmPassword: e.target.value })}
-                                            />
+                                            <div>
+                                                <label className="block text-sm font-bold mb-2">Contraseña Actual</label>
+                                                <div className="relative">
+                                                    <input
+                                                        className="input-field w-full py-2 px-3 pr-10 rounded-lg focus:outline-none"
+                                                        type={showStudentCurrentPassword ? 'text' : 'password'}
+                                                        placeholder="Contraseña actual"
+                                                        value={profileData.currentPassword}
+                                                        onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                                        onClick={() => setShowStudentCurrentPassword(!showStudentCurrentPassword)}
+                                                    >
+                                                        {showStudentCurrentPassword ? '🙉' : '🙈'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold mb-2">Nueva Contraseña</label>
+                                                <div className="relative">
+                                                    <input
+                                                        className="input-field w-full py-2 px-3 pr-10 rounded-lg focus:outline-none"
+                                                        type={showStudentNewPassword ? 'text' : 'password'}
+                                                        placeholder="Nueva contraseña"
+                                                        value={profileData.newPassword}
+                                                        onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                                        onClick={() => setShowStudentNewPassword(!showStudentNewPassword)}
+                                                    >
+                                                        {showStudentNewPassword ? '🙉' : '🙈'}
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -3078,10 +3139,10 @@
                                                                     const badgeStatusType = getBadgeStatusType(badgeId);
                                                                     return (
                                                                         <span key={index} className={`px-2 py-1 text-xs rounded-full ${badgeEarned
-                                                                                ? (badgeStatusType === 'earned'
-                                                                                    ? 'bg-green-100 text-green-800'
-                                                                                    : 'bg-red-100 text-red-800')
-                                                                                : 'bg-gray-100 text-gray-600'
+                                                                            ? (badgeStatusType === 'earned'
+                                                                                ? 'bg-green-100 text-green-800'
+                                                                                : 'bg-red-100 text-red-800')
+                                                                            : 'bg-gray-100 text-gray-600'
                                                                             }`}>
                                                                             {badgeEarned
                                                                                 ? (badgeStatusType === 'earned' ? '🏆' : '🔴')

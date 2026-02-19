@@ -11,152 +11,157 @@ const qrCodeRef = React.useRef(null);
 
 <!-- 3. Modificar el useEffect de selectedCourse -->
 React.useEffect(() => {
-    if (selectedCourse) {
-        loadStudents();
-        loadPendingStudents();
-        if (showAttendance) {
-            loadAttendanceData();
-            generateTodayQR();
-        }
-    }
+if (selectedCourse) {
+loadStudents();
+loadPendingStudents();
+if (showAttendance) {
+loadAttendanceData();
+generateTodayQR();
+}
+}
 }, [selectedCourse, showAttendance]);
 
 <!-- 4. Agregar estas funciones antes de createCourse -->
 const generateTodayQR = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const qrData = JSON.stringify({
-        courseId: selectedCourse.id,
-        date: today,
-        professorId: currentUser.uid
-    });
-    
-    setTimeout(() => {
-        if (qrCodeRef.current) {
-            qrCodeRef.current.innerHTML = '';
-            new QRCode(qrCodeRef.current, {
-                text: qrData,
-                width: 256,
-                height: 256
-            });
-        }
-    }, 100);
+const today = new Date().toISOString().split('T')[0];
+const qrData = JSON.stringify({
+courseId: selectedCourse.id,
+date: today,
+professorId: currentUser.uid
+});
+
+setTimeout(() => {
+if (qrCodeRef.current) {
+qrCodeRef.current.innerHTML = '';
+new QRCode(qrCodeRef.current, {
+text: qrData,
+width: 512,
+height: 512,
+colorDark: '#000000',
+colorLight: '#ffffff'
+});
+}
+}, 100);
 };
 
 const loadAttendanceData = async () => {
-    if (!selectedCourse) return;
-    
-    try {
-        const attendanceSnapshot = await db.collection(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance`).get();
-        
-        const attendanceByDate = {};
-        attendanceSnapshot.docs.forEach(doc => {
-            attendanceByDate[doc.id] = doc.data().students || [];
-        });
-        
-        setAttendanceData(attendanceByDate);
-    } catch (error) {
-        console.error('Error cargando asistencia:', error);
-    }
+if (!selectedCourse) return;
+
+try {
+const attendanceSnapshot = await
+db.collection(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance`).get();
+
+const attendanceByDate = {};
+attendanceSnapshot.docs.forEach(doc => {
+attendanceByDate[doc.id] = doc.data().students || [];
+});
+
+setAttendanceData(attendanceByDate);
+} catch (error) {
+console.error('Error cargando asistencia:', error);
+}
 };
 
 <!-- 5. Agregar vista de asistencia antes de showDeleteConfirm -->
 if (showAttendance) {
-    const today = new Date().toISOString().split('T')[0];
-    const dates = Object.keys(attendanceData).sort().reverse();
-    
-    return (
-        <div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)'}}>
-            <div className="max-w-6xl mx-auto">
-                <div className="card rounded-xl p-6 mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold">Control de Asistencia</h2>
-                        <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
+const today = new Date().toISOString().split('T')[0];
+const dates = Object.keys(attendanceData).sort();
+
+return (
+<div className="min-h-screen p-4 md:p-8" style={{backgroundColor: 'var(--bg-primary)' }}>
+    <div className="max-w-6xl mx-auto">
+        <div className="card rounded-xl p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Control de Asistencia</h2>
+                <button onClick={()=> setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+                <div className="text-center">
+                    <h3 className="font-semibold mb-4">QR de Hoy ({today})</h3>
+                    <div className="bg-white p-8 rounded-lg inline-block shadow-lg" style={{ border: '4px solid #e5e5e5'
+                        }}>
+                        <div ref={qrCodeRef}></div>
                     </div>
-                    
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="text-center">
-                            <h3 className="font-semibold mb-4">QR de Hoy ({today})</h3>
-                            <div className="bg-white p-4 rounded-lg inline-block">
-                                <div ref={qrCodeRef}></div>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-2">Los estudiantes deben escanear este código</p>
-                        </div>
-                        
-                        <div>
-                            <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
-                            <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
-                                {attendanceData[today] && attendanceData[today].length > 0 ? (
-                                    <ul className="space-y-2">
-                                        {attendanceData[today].map((record, idx) => (
-                                            <li key={idx} className="flex items-center gap-2 text-sm">
-                                                <span className="text-green-600">✓</span>
-                                                <span>{record.studentName}</span>
-                                                <span className="text-xs text-gray-500">
-                                                    ({new Date(record.timestamp?.toDate ? record.timestamp.toDate() : record.timestamp).toLocaleTimeString()})
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-gray-500 text-center">Aún no hay asistencias registradas hoy</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <p className="text-sm text-gray-600 mt-4">Escanea desde cualquier distancia</p>
                 </div>
-                
-                <div className="card rounded-xl p-6">
-                    <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b">
-                                    <th className="text-left p-3">Estudiante</th>
-                                    {dates.slice(0, 10).map(date => (
-                                        <th key={date} className="text-center p-3">{date}</th>
-                                    ))}
-                                    <th className="text-center p-3">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {students.map(student => {
-                                    const attendanceCount = dates.filter(date => 
-                                        attendanceData[date]?.some(record => record.studentId === student.id)
-                                    ).length;
-                                    
-                                    return (
-                                        <tr key={student.id} className="border-b hover:bg-gray-50">
-                                            <td className="p-3">{student.fullName}</td>
-                                            {dates.slice(0, 10).map(date => {
-                                                const attended = attendanceData[date]?.some(record => record.studentId === student.id);
-                                                return (
-                                                    <td key={date} className="text-center p-3">
-                                                        {attended ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                                                    </td>
-                                                );
-                                            })}
-                                            <td className="text-center p-3 font-semibold">{attendanceCount}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+
+                <div>
+                    <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
+                        {attendanceData[today] && attendanceData[today].length > 0 ? (
+                        <ul className="space-y-2">
+                            {attendanceData[today].map((record, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-sm">
+                                <span className="text-green-600">✓</span>
+                                <span>{record.studentName}</span>
+                                <span className="text-xs text-gray-500">
+                                    ({new Date(record.timestamp?.toDate ? record.timestamp.toDate() :
+                                    record.timestamp).toLocaleTimeString()})
+                                </span>
+                            </li>
+                            ))}
+                        </ul>
+                        ) : (
+                        <p className="text-gray-500 text-center">Aún no hay asistencias registradas hoy</p>
+                        )}
                     </div>
                 </div>
             </div>
         </div>
-    );
+
+        <div className="card rounded-xl p-6">
+            <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b">
+                            <th className="text-left p-3">Estudiante</th>
+                            {dates.slice(0, 10).map(date => (
+                            <th key={date} className="text-center p-3">{date}</th>
+                            ))}
+                            <th className="text-center p-3">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {students.map(student => {
+                        const attendanceCount = dates.filter(date =>
+                        attendanceData[date]?.some(record => record.studentId === student.id)
+                        ).length;
+
+                        return (
+                        <tr key={student.id} className="border-b hover:bg-gray-50">
+                            <td className="p-3">{student.fullName}</td>
+                            {dates.slice(0, 10).map(date => {
+                            const attended = attendanceData[date]?.some(record => record.studentId === student.id);
+                            return (
+                            <td key={date} className="text-center p-3">
+                                {attended ? <span className="text-green-600">✓</span> : <span
+                                    className="text-gray-300">-</span>}
+                            </td>
+                            );
+                            })}
+                            <td className="text-center p-3 font-semibold">{attendanceCount}</td>
+                        </tr>
+                        );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+);
 }
 
 <!-- 6. Agregar botón de asistencia antes de Pills de cursos -->
 <div className="card rounded-xl p-6 mb-6">
     <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Acciones Rápidas</h2>
-        <button
-            onClick={() => setShowAttendance(true)}
+        <button onClick={()=> setShowAttendance(true)}
             className="btn btn-primary"
             disabled={!selectedCourse}
-        >
+            >
             📋 Control de Asistencia
         </button>
     </div>
@@ -168,110 +173,107 @@ const scannerRef = React.useRef(null);
 
 <!-- 8. Agregar funciones de escaneo QR -->
 const startQRScanner = () => {
-    setShowQRScanner(true);
-    
-    setTimeout(() => {
-        const html5QrCode = new Html5Qrcode("qr-reader");
-        scannerRef.current = html5QrCode;
-        
-        html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: 250 },
-            async (decodedText) => {
-                try {
-                    const qrData = JSON.parse(decodedText);
-                    
-                    if (qrData.courseId && qrData.date && qrData.professorId) {
-                        await registerAttendance(qrData);
-                        html5QrCode.stop();
-                        setShowQRScanner(false);
-                    } else {
-                        toast.showToast('QR inválido', 'error');
-                    }
-                } catch (error) {
-                    console.error('Error procesando QR:', error);
-                }
-            }
-        ).catch(err => {
-            console.error('Error iniciando escáner:', err);
-            toast.showToast('Error accediendo a la cámara', 'error');
-            setShowQRScanner(false);
-        });
-    }, 100);
+setShowQRScanner(true);
+
+setTimeout(() => {
+const html5QrCode = new Html5Qrcode("qr-reader");
+scannerRef.current = html5QrCode;
+
+html5QrCode.start(
+{ facingMode: "environment" },
+{ fps: 10, qrbox: 250 },
+async (decodedText) => {
+try {
+const qrData = JSON.parse(decodedText);
+
+if (qrData.courseId && qrData.date && qrData.professorId) {
+await registerAttendance(qrData);
+html5QrCode.stop();
+setShowQRScanner(false);
+} else {
+toast.showToast('QR inválido', 'error');
+}
+} catch (error) {
+console.error('Error procesando QR:', error);
+}
+}
+).catch(err => {
+console.error('Error iniciando escáner:', err);
+toast.showToast('Error accediendo a la cámara', 'error');
+setShowQRScanner(false);
+});
+}, 100);
 };
 
 const stopQRScanner = () => {
-    if (scannerRef.current) {
-        scannerRef.current.stop().then(() => {
-            setShowQRScanner(false);
-        }).catch(err => {
-            console.error('Error deteniendo escáner:', err);
-            setShowQRScanner(false);
-        });
-    } else {
-        setShowQRScanner(false);
-    }
+if (scannerRef.current) {
+scannerRef.current.stop().then(() => {
+setShowQRScanner(false);
+}).catch(err => {
+console.error('Error deteniendo escáner:', err);
+setShowQRScanner(false);
+});
+} else {
+setShowQRScanner(false);
+}
 };
 
 const registerAttendance = async (qrData) => {
-    try {
-        const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
-        const attendanceDoc = await attendanceRef.get();
-        
-        const studentData = {
-            studentId: currentUser.uid,
-            studentName: userData?.fullName || currentUser.email,
-            timestamp: new Date()
-        };
-        
-        if (attendanceDoc.exists) {
-            const existingData = attendanceDoc.data();
-            const students = existingData.students || [];
-            
-            if (students.some(s => s.studentId === currentUser.uid)) {
-                toast.showToast('Ya registraste tu asistencia hoy', 'info');
-                return;
-            }
-            
-            await attendanceRef.update({
-                students: [...students, studentData]
-            });
-        } else {
-            await attendanceRef.set({
-                date: qrData.date,
-                courseId: qrData.courseId,
-                students: [studentData]
-            });
-        }
-        
-        toast.showToast('¡Asistencia registrada exitosamente!', 'success');
-    } catch (error) {
-        console.error('Error registrando asistencia:', error);
-        toast.showToast('Error registrando asistencia', 'error');
-    }
+try {
+const attendanceRef =
+db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
+const attendanceDoc = await attendanceRef.get();
+
+const studentData = {
+studentId: currentUser.uid,
+studentName: userData?.fullName || currentUser.email,
+timestamp: new Date()
+};
+
+if (attendanceDoc.exists) {
+const existingData = attendanceDoc.data();
+const students = existingData.students || [];
+
+if (students.some(s => s.studentId === currentUser.uid)) {
+toast.showToast('Ya registraste tu asistencia hoy', 'info');
+return;
+}
+
+await attendanceRef.update({
+students: [...students, studentData]
+});
+} else {
+await attendanceRef.set({
+date: qrData.date,
+courseId: qrData.courseId,
+students: [studentData]
+});
+}
+
+toast.showToast('¡Asistencia registrada exitosamente!', 'success');
+} catch (error) {
+console.error('Error registrando asistencia:', error);
+toast.showToast('Error registrando asistencia', 'error');
+}
 };
 
 <!-- 9. Agregar botón de asistencia en header de estudiante -->
-<button
-    onClick={startQRScanner}
-    className="btn btn-primary text-sm"
-    title="Registrar asistencia"
->
+<button onClick={startQRScanner} className="btn btn-primary text-sm" title="Registrar asistencia">
     📷 Asistencia
 </button>
 
 <!-- 10. Agregar modal de escáner QR antes de showJoinCourse -->
 {showQRScanner && (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-        <div className="card rounded-xl p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Escanear QR de Asistencia</h3>
-                <button onClick={stopQRScanner} className="text-2xl">×</button>
-            </div>
-            <div id="qr-reader" className="w-full"></div>
-            <p className="text-sm text-center mt-4" style={{color: 'var(--text-secondary)'}}>
-                Apunta la cámara al código QR del profesor
-            </p>
+<div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+    <div className="card rounded-xl p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Escanear QR de Asistencia</h3>
+            <button onClick={stopQRScanner} className="text-2xl">×</button>
         </div>
+        <div id="qr-reader" className="w-full"></div>
+        <p className="text-sm text-center mt-4" style={{color: 'var(--text-secondary)' }}>
+            Apunta la cámara al código QR del profesor
+        </p>
     </div>
+</div>
 )}
