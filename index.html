@@ -2541,6 +2541,7 @@
             const [qrZoomMin, setQrZoomMin] = React.useState(1);
             const [qrZoomMax, setQrZoomMax] = React.useState(1);
             const [qrZoomStep, setQrZoomStep] = React.useState(0.1);
+            const [qrNativeZoomMax, setQrNativeZoomMax] = React.useState(1);
             const [qrScannerErrorDetail, setQrScannerErrorDetail] = React.useState('');
             const [qrScannerAttemptLogs, setQrScannerAttemptLogs] = React.useState([]);
             const qrScannerStartInProgressRef = React.useRef(false);
@@ -2595,9 +2596,21 @@
                 }
 
                 try {
-                    await scannerRef.current.applyVideoConstraints({
-                        advanced: [{ zoom: zoomLevel }]
-                    });
+                    const nativeMax = Math.max(1, qrNativeZoomMax);
+                    const nativeZoomLevel = Math.min(zoomLevel, nativeMax);
+                    const digitalScale = Math.max(1, zoomLevel / nativeZoomLevel);
+
+                    if (nativeMax > 1) {
+                        await scannerRef.current.applyVideoConstraints({
+                            advanced: [{ zoom: nativeZoomLevel }]
+                        });
+                    }
+
+                    const videoElement = document.querySelector('#qr-reader video');
+                    if (videoElement) {
+                        videoElement.style.transformOrigin = 'center center';
+                        videoElement.style.transform = `scale(${digitalScale})`;
+                    }
                 } catch (error) {
                     console.error('Error aplicando zoom de cámara:', error);
                 }
@@ -2753,6 +2766,7 @@
                 setQrZoomMin(1);
                 setQrZoomMax(1);
                 setQrZoomStep(0.1);
+                setQrNativeZoomMax(1);
                 setQrScannerErrorDetail('');
                 setQrScannerAttemptLogs([]);
                 console.clear();
@@ -2856,21 +2870,24 @@
                         }
 
                         const activeScanner = scannerRef.current;
+                        setQrZoomSupported(true);
+                        setQrZoomMin(1);
+                        setQrZoomMax(20);
+                        setQrZoomStep(0.5);
+                        setQrZoomValue(1);
+
                         if (activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
                             const capabilities = activeScanner.getRunningTrackCapabilities();
                             if (capabilities && capabilities.zoom) {
                                 const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
-                                const maxZoomSupported = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
-                                const maxZoom = Math.min(maxZoomSupported, 15);
+                                const maxZoom = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
                                 const stepZoom = typeof capabilities.zoom.step === 'number' && capabilities.zoom.step > 0 ? capabilities.zoom.step : 0.1;
                                 const initialZoom = Math.max(minZoom, 1);
 
-                                setQrZoomSupported(true);
-                                setQrZoomMin(minZoom);
-                                setQrZoomMax(maxZoom);
-                                setQrZoomStep(stepZoom);
+                                setQrNativeZoomMax(maxZoom);
+                                setQrZoomStep(Math.max(0.5, stepZoom));
                                 setQrZoomValue(initialZoom);
-                                appendQRLog(`Zoom soportado: min ${minZoom}, max ${maxZoom}, step ${stepZoom}`);
+                                appendQRLog(`Zoom nativo soportado: min ${minZoom}, max ${maxZoom}, step ${stepZoom}. Zoom total habilitado hasta 20x (híbrido).`);
 
                                 try {
                                     await activeScanner.applyVideoConstraints({
@@ -2882,7 +2899,8 @@
                                     appendQRLog(`No se pudo aplicar zoom inicial: ${zoomError?.name || 'Error'} - ${zoomError?.message || 'Sin mensaje'}`);
                                 }
                             } else {
-                                appendQRLog('Este dispositivo no expone capacidad de zoom en la cámara.');
+                                setQrNativeZoomMax(1);
+                                appendQRLog('Este dispositivo no expone zoom nativo. Se usa zoom digital hasta 20x.');
                             }
                         }
                     } catch (err) {
@@ -2904,6 +2922,10 @@
                 if (scannerRef.current) {
                     scannerRef.current.stop().then(() => {
                         scannerRef.current = null;
+                        const videoElement = document.querySelector('#qr-reader video');
+                        if (videoElement) {
+                            videoElement.style.transform = 'scale(1)';
+                        }
                         setQrScannerErrorDetail('');
                         setQrScannerAttemptLogs([]);
                         pinchStartDistanceRef.current = null;
@@ -2912,6 +2934,10 @@
                     }).catch(err => {
                         console.error('Error deteniendo escáner:', err);
                         scannerRef.current = null;
+                        const videoElement = document.querySelector('#qr-reader video');
+                        if (videoElement) {
+                            videoElement.style.transform = 'scale(1)';
+                        }
                         setQrScannerErrorDetail('');
                         setQrScannerAttemptLogs([]);
                         pinchStartDistanceRef.current = null;
