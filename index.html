@@ -927,6 +927,45 @@
                 return coursesArray[0];
             };
 
+            const sortCoursesBySchedule = (coursesArray = []) => {
+                const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+                const shiftOrder = { 'DIURNO': 0, 'TARDE': 1, 'NOCTURNO': 2 };
+
+                return [...coursesArray].sort((a, b) => {
+                    const scheduleA = a.courseSchedule || [];
+                    const scheduleB = b.courseSchedule || [];
+
+                    if (scheduleA.length === 0) return 1;
+                    if (scheduleB.length === 0) return -1;
+
+                    // Obtener el primer día de cada curso (el más temprano en la semana)
+                    const firstDayA = scheduleA.reduce((min, item) => {
+                        const dayIndex = dayOrder.indexOf(item.dayKey);
+                        const minIndex = dayOrder.indexOf(min.dayKey);
+                        return dayIndex < minIndex ? item : min;
+                    });
+
+                    const firstDayB = scheduleB.reduce((min, item) => {
+                        const dayIndex = dayOrder.indexOf(item.dayKey);
+                        const minIndex = dayOrder.indexOf(min.dayKey);
+                        return dayIndex < minIndex ? item : min;
+                    });
+
+                    // Comparar por día primero
+                    const dayIndexA = dayOrder.indexOf(firstDayA.dayKey);
+                    const dayIndexB = dayOrder.indexOf(firstDayB.dayKey);
+
+                    if (dayIndexA !== dayIndexB) {
+                        return dayIndexA - dayIndexB;
+                    }
+
+                    // Si es el mismo día, comparar por jornada
+                    const shiftIndexA = shiftOrder[firstDayA.shift] || 3;
+                    const shiftIndexB = shiftOrder[firstDayB.shift] || 3;
+                    return shiftIndexA - shiftIndexB;
+                });
+            };
+
             const isCurrentClassTimeTeacher = (course) => {
                 const now = new Date();
                 const dayOfWeek = now.getDay();
@@ -2433,7 +2472,7 @@
                     <div className="card rounded-xl p-6 mb-6">
                         <h2 className="text-xl font-bold mb-4">Mis Cursos</h2>
                         <div className="flex flex-wrap gap-3">
-                            {courses.map(course => (
+                            {sortCoursesBySchedule(courses).map(course => (
                                 <div key={course.id} className="relative group">
                                     <button
                                         onClick={() => setSelectedCourse(course)}
@@ -3112,33 +3151,19 @@
 
             const startQRScanner = (forceShow = false) => {
                 // Verificar si es la hora correcta
-                console.log('\n=== QR SCANNER ATTEMPT ===');
-                console.log('selectedCourse completo:', selectedCourse);
-                console.log('courseInfo:', courseInfo);
-                console.log('courses:', courses);
-
                 if (!selectedCourse) {
-                    console.log('❌ FALLO: selectedCourse es null/undefined');
-                    console.log('=== QR SCANNER ATTEMPT END ===\n');
                     toast.showToast('Por favor selecciona un curso primero', 'error');
                     return;
                 }
 
                 if (!selectedCourse.courseSchedule) {
-                    console.log('❌ FALLO CRÍTICO: selectedCourse.courseSchedule NO EXISTE');
-                    console.log('Claves disponibles en selectedCourse:', Object.keys(selectedCourse));
-                    console.log('=== QR SCANNER ATTEMPT END ===\n');
                     toast.showToast('El curso no tiene horario configurado', 'error');
                     return;
                 }
 
                 const isCorrectTime = isCurrentClassTime(selectedCourse);
-                console.log('Resultado de validación de hora:', isCorrectTime);
-                console.log('forceShow:', forceShow);
 
                 if (!isCorrectTime && !forceShow) {
-                    console.log('⚠️ Bloqueada apertura de cámara. Mostrando modal de advertencia.');
-                    console.log('=== QR SCANNER ATTEMPT END ===\n');
                     setShowQRTimeWarning(true);
                     return;
                 }
@@ -3147,9 +3172,6 @@
                     appendQRLog('Inicio ignorado: el escáner ya está arrancando.');
                     return;
                 }
-
-                console.log('✅ Abriendo QR scanner');
-                console.log('=== QR SCANNER ATTEMPT END ===\n');
                 qrScannerStartInProgressRef.current = true;
                 setShowQRScanner(true);
                 setQrZoomSupported(false);
@@ -3438,25 +3460,55 @@
                 return coursesArray[0];
             };
 
+            const sortCoursesBySchedule = (coursesArray = []) => {
+                const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+                const shiftOrder = { 'DIURNO': 0, 'TARDE': 1, 'NOCTURNO': 2 };
+
+                return [...coursesArray].sort((a, b) => {
+                    const scheduleA = a.courseSchedule || [];
+                    const scheduleB = b.courseSchedule || [];
+
+                    if (scheduleA.length === 0) return 1;
+                    if (scheduleB.length === 0) return -1;
+
+                    // Obtener el primer día de cada curso (el más temprano en la semana)
+                    const firstDayA = scheduleA.reduce((min, item) => {
+                        const dayIndex = dayOrder.indexOf(item.dayKey);
+                        const minIndex = dayOrder.indexOf(min.dayKey);
+                        return dayIndex < minIndex ? item : min;
+                    });
+
+                    const firstDayB = scheduleB.reduce((min, item) => {
+                        const dayIndex = dayOrder.indexOf(item.dayKey);
+                        const minIndex = dayOrder.indexOf(min.dayKey);
+                        return dayIndex < minIndex ? item : min;
+                    });
+
+                    // Comparar por día primero
+                    const dayIndexA = dayOrder.indexOf(firstDayA.dayKey);
+                    const dayIndexB = dayOrder.indexOf(firstDayB.dayKey);
+
+                    if (dayIndexA !== dayIndexB) {
+                        return dayIndexA - dayIndexB;
+                    }
+
+                    // Si es el mismo día, comparar por jornada
+                    const shiftIndexA = shiftOrder[firstDayA.shift] || 3;
+                    const shiftIndexB = shiftOrder[firstDayB.shift] || 3;
+                    return shiftIndexA - shiftIndexB;
+                });
+            };
+
             const isCurrentClassTime = (course) => {
                 const now = new Date();
                 const dayOfWeek = now.getDay();
                 const hour = now.getHours();
-                const time = now.toLocaleTimeString();
-
-                console.log(`\n=== VALIDATION START ===`);
-                console.log(`Hora actual: ${time} (${hour}:00)`);
-                console.log(`Día: ${dayOfWeek} (SUN=0, SAT=6)`);
 
                 if (!course) {
-                    console.log('❌ FALLO: No hay curso seleccionado');
-                    console.log(`=== VALIDATION END ===\n`);
                     return false;
                 }
 
                 if (!course.courseSchedule || course.courseSchedule.length === 0) {
-                    console.log('❌ FALLO: El curso no tiene horario configurado');
-                    console.log(`=== VALIDATION END ===\n`);
                     return false;
                 }
 
@@ -3464,15 +3516,8 @@
                 const currentDayKey = dayKeys[dayOfWeek];
                 const currentShift = getShiftForHour(hour);
 
-                console.log(`Curso: ${course.name}`);
-                console.log(`Horario del curso:`, course.courseSchedule);
-                console.log(`Día de hoy: ${currentDayKey}`);
-                console.log(`Jornada actual: ${currentShift}`);
-
                 // Si no hay jornada activa, NO permitir QR
                 if (!currentShift) {
-                    console.log(`❌ BLOQUEADO: Fuera de horario (${hour}:00 no entra en ninguna jornada)`);
-                    console.log(`=== VALIDATION END ===\n`);
                     return false;
                 }
 
@@ -3480,21 +3525,14 @@
                 const todaySchedule = course.courseSchedule.find((item) => item.dayKey === currentDayKey);
 
                 if (!todaySchedule) {
-                    const scheduledDays = course.courseSchedule.map(s => `${s.dayName} (${s.shift})`).join(', ');
-                    console.log(`❌ BLOQUEADO: El curso se da en: ${scheduledDays}, pero hoy es ${currentDayKey}`);
-                    console.log(`=== VALIDATION END ===\n`);
                     return false;
                 }
 
                 // Verificar si la jornada actual coincide
                 if (todaySchedule.shift === currentShift) {
-                    console.log(`✅ PERMITIDO: Es ${currentDayKey} y la jornada es ${currentShift}`);
-                    console.log(`=== VALIDATION END ===\n`);
                     return true;
                 }
 
-                console.log(`❌ BLOQUEADO: Es ${currentDayKey} pero la jornada esperada es ${todaySchedule.shift}, no ${currentShift}`);
-                console.log(`=== VALIDATION END ===\n`);
                 return false;
             };
 
@@ -3555,10 +3593,6 @@
                         // Si no hay curso seleccionado, usar lógica inteligente
                         if (!selectedCourse) {
                             const defaultCourse = getDefaultCourseForNow(studentCourses);
-                            console.log('[LOAD-COURSES] Estableciendo curso por defecto:', {
-                                name: defaultCourse?.name,
-                                schedule: defaultCourse?.courseSchedule
-                            });
                             setSelectedCourse(defaultCourse);
                         }
 
@@ -3717,7 +3751,7 @@
 
                                 {courses.length > 1 && (
                                     <div className="mb-4 flex flex-wrap gap-2">
-                                        {courses.map((course, index) => (
+                                        {sortCoursesBySchedule(courses).map((course, index) => (
                                             <button
                                                 key={course.id}
                                                 onClick={() => setSelectedCourse(course)}
