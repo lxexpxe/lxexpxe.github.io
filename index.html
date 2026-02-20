@@ -812,7 +812,8 @@
                 university: '',
                 description: '',
                 weeks: 16,
-                weeklyContent: []
+                weeklyContent: [],
+                courseSchedule: []
             });
             const [showContentPreview, setShowContentPreview] = React.useState(false);
             const [previewContent, setPreviewContent] = React.useState(null);
@@ -820,6 +821,9 @@
             const [pendingStudents, setPendingStudents] = React.useState([]);
             const [showPendingStudents, setShowPendingStudents] = React.useState(false);
             const [showAttendance, setShowAttendance] = React.useState(false);
+            const [qrTeacherVisible, setQrTeacherVisible] = React.useState(true);
+            const [showQRTeacherWarning, setShowQRTeacherWarning] = React.useState(false);
+            const [forceShowTeacherQR, setForceShowTeacherQR] = React.useState(false);
             const [attendanceData, setAttendanceData] = React.useState({});
             const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
@@ -830,7 +834,141 @@
                 badges: [{ name: '', description: '' }]
             });
 
+            const courseDayOptions = [
+                { key: 'SUN', label: 'D', name: 'Domingo' },
+                { key: 'MON', label: 'L', name: 'Lunes' },
+                { key: 'TUE', label: 'M', name: 'Martes' },
+                { key: 'WED', label: 'M', name: 'Miércoles' },
+                { key: 'THU', label: 'J', name: 'Jueves' },
+                { key: 'FRI', label: 'V', name: 'Viernes' },
+                { key: 'SAT', label: 'S', name: 'Sábado' }
+            ];
+            const courseShiftOptions = ['DIURNO', 'TARDE', 'NOCTURNO'];
 
+            const normalizeCourseSchedule = (schedule = []) => {
+                return courseDayOptions
+                    .map((dayOption) => schedule.find((item) => item.dayKey === dayOption.key))
+                    .filter(Boolean)
+                    .map((item) => ({
+                        ...item,
+                        shift: item.shift || 'DIURNO'
+                    }));
+            };
+
+            const toggleScheduleDay = (currentSchedule = [], dayOption) => {
+                const exists = currentSchedule.some((item) => item.dayKey === dayOption.key);
+
+                if (exists) {
+                    return normalizeCourseSchedule(currentSchedule.filter((item) => item.dayKey !== dayOption.key));
+                }
+
+                return normalizeCourseSchedule([
+                    ...currentSchedule,
+                    {
+                        dayKey: dayOption.key,
+                        dayLabel: dayOption.label,
+                        dayName: dayOption.name,
+                        shift: 'DIURNO'
+                    }
+                ]);
+            };
+
+            const updateScheduleShift = (currentSchedule = [], dayKey, shift) => {
+                const updated = currentSchedule.map((item) => (
+                    item.dayKey === dayKey ? { ...item, shift } : item
+                ));
+                return normalizeCourseSchedule(updated);
+            };
+
+            const getShiftForHour = (hour) => {
+                if (hour >= 6 && hour < 12) return 'DIURNO';
+                if (hour >= 12 && hour < 18) return 'TARDE';
+                if (hour >= 18 && hour < 22) return 'NOCTURNO';
+                return null;
+            };
+
+            const getDefaultCourseForNow = (coursesArray = []) => {
+                if (coursesArray.length === 0) return null;
+
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const hour = now.getHours();
+                const currentShift = getShiftForHour(hour);
+
+                const dayKeys = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                const currentDayKey = dayKeys[dayOfWeek];
+
+                // 1. Buscar curso de HOY con JORNADA ACTUAL
+                if (currentShift) {
+                    const todayMatchingShift = coursesArray.find((course) => {
+                        const schedule = normalizeCourseSchedule(course.courseSchedule || []);
+                        return schedule.some((item) => item.dayKey === currentDayKey && item.shift === currentShift);
+                    });
+                    if (todayMatchingShift) return todayMatchingShift;
+                }
+
+                // 2. Buscar cualquier curso de HOY (sin importar jornada)
+                const todayAny = coursesArray.find((course) => {
+                    const schedule = normalizeCourseSchedule(course.courseSchedule || []);
+                    return schedule.some((item) => item.dayKey === currentDayKey);
+                });
+                if (todayAny) return todayAny;
+
+                // 3. Buscar primer curso para jornada actual de cualquier día
+                if (currentShift) {
+                    const anyMatchingShift = coursesArray.find((course) => {
+                        const schedule = normalizeCourseSchedule(course.courseSchedule || []);
+                        return schedule.some((item) => item.shift === currentShift);
+                    });
+                    if (anyMatchingShift) return anyMatchingShift;
+                }
+
+                // 4. Devolver el primer curso disponible
+                return coursesArray[0];
+            };
+
+            const isCurrentClassTimeTeacher = (course) => {
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const hour = now.getHours();
+
+                console.log(`[TEACHER-QR-CHECK] Verificando hora: ${now.toLocaleTimeString()}`);
+                console.log(`[TEACHER-QR-CHECK] Día: ${dayOfWeek}, Hora: ${hour}`);
+
+                if (!course || !course.courseSchedule || course.courseSchedule.length === 0) {
+                    console.log('[TEACHER-QR-CHECK] ERROR: course o courseSchedule vacío');
+                    return false;
+                }
+
+                const dayKeys = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                const currentDayKey = dayKeys[dayOfWeek];
+                const currentShift = getShiftForHour(hour);
+
+                console.log(`[TEACHER-QR-CHECK] Día: ${currentDayKey}, Jornada: ${currentShift}`);
+
+                // Si no hay jornada activa, NO permitir QR
+                if (!currentShift) {
+                    console.log('[TEACHER-QR-CHECK] BLOQUEADO: Fuera de horario de clases');
+                    return false;
+                }
+
+                // Verificar si el curso está programado para hoy
+                const todaySchedule = course.courseSchedule.find((item) => item.dayKey === currentDayKey);
+
+                if (!todaySchedule) {
+                    console.log(`[TEACHER-QR-CHECK] Curso no programado para ${currentDayKey}`);
+                    return false;
+                }
+
+                // Verificar si la jornada coincide
+                if (todaySchedule.shift === currentShift) {
+                    console.log('[TEACHER-QR-CHECK] ✓ PERMITIDO: Hora y jornada correctas');
+                    return true;
+                }
+
+                console.log(`[TEACHER-QR-CHECK] BLOQUEADO: Jornada no coincide. Esperada: ${todaySchedule.shift}, Actual: ${currentShift}`);
+                return false;
+            };
 
             React.useEffect(() => {
                 loadUserData();
@@ -843,10 +981,21 @@
                     loadPendingStudents();
                     if (showAttendance) {
                         loadAttendanceData();
-                        generateTodayQR();
+
+                        // Verificar si es la hora correcta para mostrar el QR
+                        const isCorrectTime = isCurrentClassTimeTeacher(selectedCourse);
+                        console.log('[TEACHER-QR] isCorrectTime:', isCorrectTime, 'forceShowTeacherQR:', forceShowTeacherQR);
+
+                        if (isCorrectTime || forceShowTeacherQR) {
+                            setQrTeacherVisible(true);
+                            generateTodayQR();
+                        } else {
+                            setQrTeacherVisible(false);
+                            setShowQRTeacherWarning(true);
+                        }
                     }
                 }
-            }, [selectedCourse, showAttendance]);
+            }, [selectedCourse, showAttendance, forceShowTeacherQR]);
 
             const loadUserData = async () => {
                 try {
@@ -870,7 +1019,8 @@
 
                     setCourses(coursesData);
                     if (coursesData.length > 0 && !selectedCourse) {
-                        setSelectedCourse(coursesData[0]);
+                        const defaultCourse = getDefaultCourseForNow(coursesData);
+                        setSelectedCourse(defaultCourse);
                     }
                 } catch (error) {
                     console.error('Error cargando cursos:', error);
@@ -1002,6 +1152,57 @@
                 }
             };
 
+            const markManualAttendance = async (student, date) => {
+                if (!selectedCourse) return;
+
+                try {
+                    const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance/${date}`);
+                    const attendanceDoc = await attendanceRef.get();
+
+                    const attendanceRecord = {
+                        studentId: student.id,
+                        studentName: student.fullName || student.email || 'Estudiante',
+                        timestamp: new Date(),
+                        source: 'manual'
+                    };
+
+                    if (attendanceDoc.exists) {
+                        const existingData = attendanceDoc.data();
+                        const studentsForDate = existingData.students || [];
+                        const alreadyMarked = studentsForDate.some(record => record.studentId === student.id);
+
+                        if (alreadyMarked) {
+                            toast.showToast('La asistencia ya estaba registrada', 'info');
+                            return;
+                        }
+
+                        await attendanceRef.update({
+                            students: [...studentsForDate, attendanceRecord]
+                        });
+                    } else {
+                        await attendanceRef.set({
+                            date,
+                            courseId: selectedCourse.id,
+                            professorId: currentUser.uid,
+                            students: [attendanceRecord]
+                        });
+                    }
+
+                    setAttendanceData(prev => {
+                        const current = prev[date] || [];
+                        return {
+                            ...prev,
+                            [date]: [...current, attendanceRecord]
+                        };
+                    });
+
+                    toast.showToast(`Asistencia manual registrada para ${student.fullName || student.email}`, 'success');
+                } catch (error) {
+                    console.error('Error registrando asistencia manual:', error);
+                    toast.showToast('Error registrando asistencia manual', 'error');
+                }
+            };
+
             const createCourse = async () => {
                 if (!newCourse.name || !newCourse.code || !newCourse.university) {
                     toast.showToast('Nombre, código y universidad son requeridos', 'error');
@@ -1016,6 +1217,7 @@
                         courseCode: courseCode,
                         university: newCourse.university,
                         description: newCourse.description,
+                        courseSchedule: normalizeCourseSchedule(newCourse.courseSchedule || []),
                         weeks: newCourse.weeks,
                         professorId: currentUser.uid,
                         professorEmail: currentUser.email,
@@ -1051,7 +1253,8 @@
                             professorId: currentUser.uid,
                             professorName: userData?.fullName || currentUser.email,
                             createdAt: new Date(),
-                            content: newCourse.description || ''
+                            content: newCourse.description || '',
+                            courseSchedule: normalizeCourseSchedule(newCourse.courseSchedule || [])
                         });
                         console.log('✓ Documento creado en colección global courses:', docRef.id);
                     } catch (globalError) {
@@ -1061,7 +1264,7 @@
 
                     toast.showToast('Curso creado exitosamente', 'success');
                     setShowCreateCourse(false);
-                    setNewCourse({ name: '', code: '', university: '', description: '', weeks: 16, weeklyContent: [] });
+                    setNewCourse({ name: '', code: '', university: '', description: '', weeks: 16, weeklyContent: [], courseSchedule: [] });
                     loadCourses();
                 } catch (error) {
                     console.error('Error creando curso:', error);
@@ -1268,6 +1471,7 @@
                         university: selectedCourse.university || '',
                         courseName: selectedCourse.name || '',
                         courseCode: selectedCourse.courseCode || '',
+                        courseSchedule: normalizeCourseSchedule(selectedCourse.courseSchedule || []),
                         period: selectedCourse.period || '',
                         group: selectedCourse.group || '',
                         programs: selectedCourse.programs || '',
@@ -1301,6 +1505,7 @@
                             university: weekContent.university,
                             name: weekContent.courseName,
                             courseCode: weekContent.courseCode,
+                            courseSchedule: normalizeCourseSchedule(weekContent.courseSchedule || []),
                             period: weekContent.period,
                             group: weekContent.group,
                             programs: weekContent.programs,
@@ -1501,6 +1706,11 @@
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const dates = Object.keys(attendanceData).sort();
+                const sortedStudents = [...students].sort((a, b) => {
+                    const nameA = (a.fullName || a.email || '').toLowerCase();
+                    const nameB = (b.fullName || b.email || '').toLowerCase();
+                    return nameA.localeCompare(nameB, 'es');
+                });
 
                 const formatDateMmmDD = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
@@ -1523,7 +1733,16 @@
                         <div className="max-w-6xl mx-auto">
                             <div className="card rounded-xl p-6 mb-6">
                                 <div className="flex justify-end items-center mb-4">
-                                    <button onClick={() => setShowAttendance(false)} className="btn btn-secondary">← Volver</button>
+                                    <button
+                                        onClick={() => {
+                                            setShowAttendance(false);
+                                            setForceShowTeacherQR(false);
+                                            setShowQRTeacherWarning(false);
+                                        }}
+                                        className="btn btn-secondary"
+                                    >
+                                        ← Volver
+                                    </button>
                                 </div>
 
                                 <div className="grid md:grid-cols-2 gap-6">
@@ -1531,15 +1750,38 @@
                                         <h2 className="text-2xl font-bold mb-2">Control de Asistencia</h2>
                                         <p className="text-2xl font-bold mb-4" style={{ color: 'var(--accent-color)' }}>{selectedCourse.name}</p>
                                         <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
-                                        <div className="bg-white p-8 rounded-lg inline-block shadow-lg" style={{ border: '4px solid #f0f0f0' }}>
-                                            <div ref={qrCodeRef}></div>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mt-2">Escanea desde cualquier distancia</p>
+
+                                        {qrTeacherVisible ? (
+                                            <>
+                                                <div className="bg-white p-8 rounded-lg inline-block shadow-lg" style={{ border: '4px solid #f0f0f0' }}>
+                                                    <div ref={qrCodeRef}></div>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-2">Escanea desde cualquier distancia</p>
+                                            </>
+                                        ) : (
+                                            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 w-full max-w-sm text-center">
+                                                <div className="text-3xl mb-3">🔒</div>
+                                                <h4 className="font-semibold text-yellow-900 mb-2">QR Oculto</h4>
+                                                <p className="text-sm text-yellow-800 mb-4">
+                                                    La clase no está programada para este momento
+                                                </p>
+                                                <button
+                                                    onClick={() => {
+                                                        setForceShowTeacherQR(true);
+                                                        setQrTeacherVisible(true);
+                                                        setTimeout(() => generateTodayQR(), 100);
+                                                    }}
+                                                    className="btn btn-primary text-sm"
+                                                >
+                                                    Mostrar QR
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div>
+                                    <div className="flex flex-col h-full min-h-0">
                                         <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
-                                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
+                                        <div className="bg-gray-50 rounded-lg p-4 flex-1 min-h-0 overflow-y-auto">
                                             {attendanceData[today] && attendanceData[today].length > 0 ? (
                                                 <ul className="space-y-2">
                                                     {attendanceData[today].map((record, idx) => (
@@ -1582,7 +1824,7 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {students.map(student => {
+                                            {sortedStudents.map(student => {
                                                 const attendanceCount = dates.filter(date =>
                                                     attendanceData[date]?.some(record => record.studentId === student.id)
                                                 ).length;
@@ -1594,7 +1836,18 @@
                                                             const attended = attendanceData[date]?.some(record => record.studentId === student.id);
                                                             return (
                                                                 <td key={date} className="text-center p-3">
-                                                                    {attended ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
+                                                                    {attended ? (
+                                                                        <span className="text-green-600">✓</span>
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="text-gray-400 hover:text-green-600 font-semibold"
+                                                                            title="Registrar asistencia manual"
+                                                                            onClick={() => markManualAttendance(student, date)}
+                                                                        >
+                                                                            -
+                                                                        </button>
+                                                                    )}
                                                                 </td>
                                                             );
                                                         })}
@@ -1751,6 +2004,56 @@
                                                         placeholder="3"
                                                     />
                                                 </div>
+                                            </div>
+
+                                            <div className="mt-4">
+                                                <label className="block text-sm font-bold mb-2">Días y Jornada del Curso</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {courseDayOptions.map((dayOption) => {
+                                                        const isSelected = (weekContent.courseSchedule || []).some((item) => item.dayKey === dayOption.key);
+                                                        return (
+                                                            <button
+                                                                key={dayOption.key}
+                                                                type="button"
+                                                                onClick={() => setWeekContent({
+                                                                    ...weekContent,
+                                                                    courseSchedule: toggleScheduleDay(weekContent.courseSchedule || [], dayOption)
+                                                                })}
+                                                                className={`w-10 h-10 rounded-full text-sm font-bold border-2 transition-all ${isSelected
+                                                                    ? 'bg-blue-500 text-white border-blue-500'
+                                                                    : 'bg-transparent border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-500'
+                                                                    }`}
+                                                                title={dayOption.name}
+                                                            >
+                                                                {dayOption.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {(weekContent.courseSchedule || []).length > 0 && (
+                                                    <div className="grid md:grid-cols-2 gap-3 mt-4">
+                                                        {normalizeCourseSchedule(weekContent.courseSchedule || []).map((scheduleItem) => (
+                                                            <div key={scheduleItem.dayKey}>
+                                                                <label className="block text-sm font-medium mb-1">
+                                                                    {scheduleItem.dayName}
+                                                                </label>
+                                                                <select
+                                                                    className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                                                    value={scheduleItem.shift || 'DIURNO'}
+                                                                    onChange={(e) => setWeekContent({
+                                                                        ...weekContent,
+                                                                        courseSchedule: updateScheduleShift(weekContent.courseSchedule || [], scheduleItem.dayKey, e.target.value)
+                                                                    })}
+                                                                >
+                                                                    {courseShiftOptions.map((shiftOption) => (
+                                                                        <option key={shiftOption} value={shiftOption}>{shiftOption}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -2008,6 +2311,56 @@
                                             value={newCourse.weeks}
                                             onChange={(e) => setNewCourse({ ...newCourse, weeks: parseInt(e.target.value) })}
                                         />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2">Días y Jornada del Curso</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {courseDayOptions.map((dayOption) => {
+                                                const isSelected = (newCourse.courseSchedule || []).some((item) => item.dayKey === dayOption.key);
+                                                return (
+                                                    <button
+                                                        key={dayOption.key}
+                                                        type="button"
+                                                        onClick={() => setNewCourse({
+                                                            ...newCourse,
+                                                            courseSchedule: toggleScheduleDay(newCourse.courseSchedule || [], dayOption)
+                                                        })}
+                                                        className={`w-10 h-10 rounded-full text-sm font-bold border-2 transition-all ${isSelected
+                                                            ? 'bg-blue-500 text-white border-blue-500'
+                                                            : 'bg-transparent border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-500'
+                                                            }`}
+                                                        title={dayOption.name}
+                                                    >
+                                                        {dayOption.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {(newCourse.courseSchedule || []).length > 0 && (
+                                            <div className="grid md:grid-cols-2 gap-3 mt-4">
+                                                {normalizeCourseSchedule(newCourse.courseSchedule || []).map((scheduleItem) => (
+                                                    <div key={scheduleItem.dayKey}>
+                                                        <label className="block text-sm font-medium mb-1">
+                                                            {scheduleItem.dayName}
+                                                        </label>
+                                                        <select
+                                                            className="input-field w-full py-2 px-3 rounded-lg focus:outline-none"
+                                                            value={scheduleItem.shift || 'DIURNO'}
+                                                            onChange={(e) => setNewCourse({
+                                                                ...newCourse,
+                                                                courseSchedule: updateScheduleShift(newCourse.courseSchedule || [], scheduleItem.dayKey, e.target.value)
+                                                            })}
+                                                        >
+                                                            {courseShiftOptions.map((shiftOption) => (
+                                                                <option key={shiftOption} value={shiftOption}>{shiftOption}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -2529,12 +2882,16 @@
             const [professorName, setProfessorName] = React.useState('');
             const [dynamicContent, setDynamicContent] = React.useState([]);
             const [courseInfo, setCourseInfo] = React.useState(null);
+            const [courses, setCourses] = React.useState([]);
+            const [selectedCourse, setSelectedCourse] = React.useState(null);
             const [showProfile, setShowProfile] = React.useState(false);
             const [showStudentCurrentPassword, setShowStudentCurrentPassword] = React.useState(false);
             const [showStudentNewPassword, setShowStudentNewPassword] = React.useState(false);
             const [showJoinCourse, setShowJoinCourse] = React.useState(false);
             const [joinCourseCode, setJoinCourseCode] = React.useState('');
             const [showQRScanner, setShowQRScanner] = React.useState(false);
+            const [forceShowQR, setForceShowQR] = React.useState(false);
+            const [showQRTimeWarning, setShowQRTimeWarning] = React.useState(false);
             const scannerRef = React.useRef(null);
             const [qrZoomSupported, setQrZoomSupported] = React.useState(false);
             const [qrZoomValue, setQrZoomValue] = React.useState(1);
@@ -2753,12 +3110,46 @@
                 }
             };
 
-            const startQRScanner = () => {
+            const startQRScanner = (forceShow = false) => {
+                // Verificar si es la hora correcta
+                console.log('\n=== QR SCANNER ATTEMPT ===');
+                console.log('selectedCourse completo:', selectedCourse);
+                console.log('courseInfo:', courseInfo);
+                console.log('courses:', courses);
+
+                if (!selectedCourse) {
+                    console.log('❌ FALLO: selectedCourse es null/undefined');
+                    console.log('=== QR SCANNER ATTEMPT END ===\n');
+                    toast.showToast('Por favor selecciona un curso primero', 'error');
+                    return;
+                }
+
+                if (!selectedCourse.courseSchedule) {
+                    console.log('❌ FALLO CRÍTICO: selectedCourse.courseSchedule NO EXISTE');
+                    console.log('Claves disponibles en selectedCourse:', Object.keys(selectedCourse));
+                    console.log('=== QR SCANNER ATTEMPT END ===\n');
+                    toast.showToast('El curso no tiene horario configurado', 'error');
+                    return;
+                }
+
+                const isCorrectTime = isCurrentClassTime(selectedCourse);
+                console.log('Resultado de validación de hora:', isCorrectTime);
+                console.log('forceShow:', forceShow);
+
+                if (!isCorrectTime && !forceShow) {
+                    console.log('⚠️ Bloqueada apertura de cámara. Mostrando modal de advertencia.');
+                    console.log('=== QR SCANNER ATTEMPT END ===\n');
+                    setShowQRTimeWarning(true);
+                    return;
+                }
+
                 if (qrScannerStartInProgressRef.current) {
                     appendQRLog('Inicio ignorado: el escáner ya está arrancando.');
                     return;
                 }
 
+                console.log('✅ Abriendo QR scanner');
+                console.log('=== QR SCANNER ATTEMPT END ===\n');
                 qrScannerStartInProgressRef.current = true;
                 setShowQRScanner(true);
                 setQrZoomSupported(false);
@@ -2769,7 +3160,7 @@
                 setQrNativeZoomMax(1);
                 setQrScannerErrorDetail('');
                 setQrScannerAttemptLogs([]);
-                console.clear();
+                // NO hacer console.clear() aquí para mantener los logs de validación
                 console.log('[QR-SCANNER] Iniciando diagnóstico de cámara...');
                 pinchStartDistanceRef.current = null;
                 pinchStartZoomRef.current = 1;
@@ -3000,12 +3391,123 @@
                 }
             };
 
+            const getShiftForHour = (hour) => {
+                if (hour >= 6 && hour < 12) return 'DIURNO';
+                if (hour >= 12 && hour < 18) return 'TARDE';
+                if (hour >= 18 && hour < 22) return 'NOCTURNO';
+                return null;
+            };
 
+            const getDefaultCourseForNow = (coursesArray = []) => {
+                if (coursesArray.length === 0) return null;
+
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const hour = now.getHours();
+                const currentShift = getShiftForHour(hour);
+
+                const dayKeys = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                const currentDayKey = dayKeys[dayOfWeek];
+
+                // 1. Buscar curso de HOY con JORNADA ACTUAL
+                if (currentShift) {
+                    const todayMatchingShift = coursesArray.find((course) => {
+                        const schedule = (course.courseSchedule || []);
+                        return schedule.some((item) => item.dayKey === currentDayKey && item.shift === currentShift);
+                    });
+                    if (todayMatchingShift) return todayMatchingShift;
+                }
+
+                // 2. Buscar cualquier curso de HOY (sin importar jornada)
+                const todayAny = coursesArray.find((course) => {
+                    const schedule = (course.courseSchedule || []);
+                    return schedule.some((item) => item.dayKey === currentDayKey);
+                });
+                if (todayAny) return todayAny;
+
+                // 3. Buscar primer curso para jornada actual de cualquier día
+                if (currentShift) {
+                    const anyMatchingShift = coursesArray.find((course) => {
+                        const schedule = (course.courseSchedule || []);
+                        return schedule.some((item) => item.shift === currentShift);
+                    });
+                    if (anyMatchingShift) return anyMatchingShift;
+                }
+
+                // 4. Devolver el primer curso disponible
+                return coursesArray[0];
+            };
+
+            const isCurrentClassTime = (course) => {
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const hour = now.getHours();
+                const time = now.toLocaleTimeString();
+
+                console.log(`\n=== VALIDATION START ===`);
+                console.log(`Hora actual: ${time} (${hour}:00)`);
+                console.log(`Día: ${dayOfWeek} (SUN=0, SAT=6)`);
+
+                if (!course) {
+                    console.log('❌ FALLO: No hay curso seleccionado');
+                    console.log(`=== VALIDATION END ===\n`);
+                    return false;
+                }
+
+                if (!course.courseSchedule || course.courseSchedule.length === 0) {
+                    console.log('❌ FALLO: El curso no tiene horario configurado');
+                    console.log(`=== VALIDATION END ===\n`);
+                    return false;
+                }
+
+                const dayKeys = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                const currentDayKey = dayKeys[dayOfWeek];
+                const currentShift = getShiftForHour(hour);
+
+                console.log(`Curso: ${course.name}`);
+                console.log(`Horario del curso:`, course.courseSchedule);
+                console.log(`Día de hoy: ${currentDayKey}`);
+                console.log(`Jornada actual: ${currentShift}`);
+
+                // Si no hay jornada activa, NO permitir QR
+                if (!currentShift) {
+                    console.log(`❌ BLOQUEADO: Fuera de horario (${hour}:00 no entra en ninguna jornada)`);
+                    console.log(`=== VALIDATION END ===\n`);
+                    return false;
+                }
+
+                // Verificar si el curso está programado para hoy
+                const todaySchedule = course.courseSchedule.find((item) => item.dayKey === currentDayKey);
+
+                if (!todaySchedule) {
+                    const scheduledDays = course.courseSchedule.map(s => `${s.dayName} (${s.shift})`).join(', ');
+                    console.log(`❌ BLOQUEADO: El curso se da en: ${scheduledDays}, pero hoy es ${currentDayKey}`);
+                    console.log(`=== VALIDATION END ===\n`);
+                    return false;
+                }
+
+                // Verificar si la jornada actual coincide
+                if (todaySchedule.shift === currentShift) {
+                    console.log(`✅ PERMITIDO: Es ${currentDayKey} y la jornada es ${currentShift}`);
+                    console.log(`=== VALIDATION END ===\n`);
+                    return true;
+                }
+
+                console.log(`❌ BLOQUEADO: Es ${currentDayKey} pero la jornada esperada es ${todaySchedule.shift}, no ${currentShift}`);
+                console.log(`=== VALIDATION END ===\n`);
+                return false;
+            };
 
             React.useEffect(() => {
                 loadUserData();
                 loadCourseData();
             }, []);
+
+            React.useEffect(() => {
+                if (selectedCourse) {
+                    loadCourseContent(selectedCourse);
+                }
+            }, [selectedCourse]);
 
             const loadUserData = async () => {
                 // Los datos del usuario se cargarán junto con los datos del curso
@@ -3025,8 +3527,9 @@
                         return;
                     }
 
-                    // Buscar en todos los profesores para encontrar al estudiante
+                    // Buscar en todos los profesores para encontrar TODOS los cursos del estudiante
                     const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
+                    const studentCourses = [];
 
                     for (const professorDoc of professorsSnapshot.docs) {
                         const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`).get();
@@ -3035,47 +3538,76 @@
                             const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
 
                             if (studentDoc.exists) {
-                                setUserData(studentDoc.data());
-
                                 const courseData = courseDoc.data();
-                                setProfessorName(courseData.professorName || 'No asignado');
-                                setCourseInfo(courseData);
-
-                                // Crear contenido dinámico
-                                const contentArray = [];
-
-                                contentArray.push({
-                                    id: 'info',
-                                    type: 'info',
-                                    title: 'Información General del Curso',
-                                    description: 'Datos del curso y badges disponibles',
-                                    unlocked: true
+                                studentCourses.push({
+                                    id: courseDoc.id,
+                                    professorId: professorDoc.id,
+                                    studentData: studentDoc.data(),
+                                    ...courseData
                                 });
-
-                                for (let i = 1; i <= courseData.weeks; i++) {
-                                    const weekData = courseData.weeklyContent?.find(w => w.week === i);
-                                    const weekBadges = courseData.availableBadges?.filter(badge => badge.maxWeek === i) || [];
-                                    contentArray.push({
-                                        id: i,
-                                        week: i,
-                                        title: weekData?.title || `Semana ${i}`,
-                                        description: weekData?.description || 'Contenido por definir',
-                                        content: weekData?.content || '',
-                                        activities: weekData?.activities || [],
-                                        badges: weekBadges,
-                                        unlocked: i === 1
-                                    });
-                                }
-
-                                setDynamicContent(contentArray);
-                                return; // Salir una vez encontrado
                             }
                         }
+                    }
+
+                    if (studentCourses.length > 0) {
+                        setCourses(studentCourses);
+
+                        // Si no hay curso seleccionado, usar lógica inteligente
+                        if (!selectedCourse) {
+                            const defaultCourse = getDefaultCourseForNow(studentCourses);
+                            console.log('[LOAD-COURSES] Estableciendo curso por defecto:', {
+                                name: defaultCourse?.name,
+                                schedule: defaultCourse?.courseSchedule
+                            });
+                            setSelectedCourse(defaultCourse);
+                        }
+
+                        setUserData(studentCourses[0].studentData);
                     }
 
                 } catch (error) {
                     console.error('Error cargando datos del curso:', error);
                     setProfessorName('Error cargando');
+                }
+            };
+
+            const loadCourseContent = async (course) => {
+                try {
+                    if (!course) return;
+
+                    setUserData(course.studentData);
+                    setProfessorName(course.professorName || 'No asignado');
+                    setCourseInfo(course);
+
+                    // Crear contenido dinámico
+                    const contentArray = [];
+
+                    contentArray.push({
+                        id: 'info',
+                        type: 'info',
+                        title: 'Información General del Curso',
+                        description: 'Datos del curso y badges disponibles',
+                        unlocked: true
+                    });
+
+                    for (let i = 1; i <= course.weeks; i++) {
+                        const weekData = course.weeklyContent?.find(w => w.week === i);
+                        const weekBadges = course.availableBadges?.filter(badge => badge.maxWeek === i) || [];
+                        contentArray.push({
+                            id: i,
+                            week: i,
+                            title: weekData?.title || `Semana ${i}`,
+                            description: weekData?.description || 'Contenido por definir',
+                            content: weekData?.content || '',
+                            activities: weekData?.activities || [],
+                            badges: weekBadges,
+                            unlocked: i === 1
+                        });
+                    }
+
+                    setDynamicContent(contentArray);
+                } catch (error) {
+                    console.error('Error cargando contenido del curso:', error);
                 }
             };
 
@@ -3182,6 +3714,24 @@
                                 <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     {courseInfo?.name || 'Cargando...'}
                                 </h1>
+
+                                {courses.length > 1 && (
+                                    <div className="mb-4 flex flex-wrap gap-2">
+                                        {courses.map((course, index) => (
+                                            <button
+                                                key={course.id}
+                                                onClick={() => setSelectedCourse(course)}
+                                                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${selectedCourse?.id === course.id
+                                                    ? 'bg-blue-500 text-white'
+                                                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                                    }`}
+                                            >
+                                                {course.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                                     <User />
                                     <span>Hola, <strong>{userData?.fullName || currentUser.email.split('@')[0]}</strong></span>
@@ -3210,7 +3760,7 @@
                                     +
                                 </button>
                                 <button
-                                    onClick={startQRScanner}
+                                    onClick={() => startQRScanner(false)}
                                     className="btn btn-secondary"
                                     title="Registrar asistencia"
                                 >
@@ -3234,6 +3784,63 @@
                             </div>
                         </div>
                     </header>
+
+                    {showQRTimeWarning && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="card rounded-xl p-6 w-full max-w-md">
+                                <div className="flex items-start gap-3 mb-4">
+                                    <div className="text-4xl">🕐</div>
+                                    <div>
+                                        <h3 className="text-lg font-bold">No es la hora de clase</h3>
+                                        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                                            Estás intentando escanear en un horario distinto al programado.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                                    <p className="text-sm font-semibold text-red-900 mb-2">⏰ Hora actual:</p>
+                                    <p className="text-lg font-bold text-red-700">{new Date().toLocaleTimeString()}</p>
+                                </div>
+
+                                {selectedCourse?.courseSchedule && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                                        <p className="text-sm font-semibold text-blue-900 mb-2">📅 Horario de tu clase:</p>
+                                        <div className="text-sm text-blue-800 space-y-1">
+                                            {selectedCourse.courseSchedule.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-center">
+                                                    <span className="font-medium">{item.dayName}</span>
+                                                    <span className="bg-blue-200 text-blue-900 px-2 py-1 rounded text-xs font-bold">{item.shift}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p className="text-sm text-gray-600 mb-4">
+                                    🔓 Puedes escanear igualmente si lo necesitas, pero recuerda que puede indicar asistencia en la hora incorrecta.
+                                </p>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowQRTimeWarning(false)}
+                                        className="btn btn-secondary flex-1"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowQRTimeWarning(false);
+                                            startQRScanner(true);
+                                        }}
+                                        className="btn btn-primary flex-1"
+                                    >
+                                        Escanear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {showQRScanner && (
                         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
