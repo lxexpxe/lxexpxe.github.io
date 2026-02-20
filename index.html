@@ -2860,7 +2860,8 @@
                             const capabilities = activeScanner.getRunningTrackCapabilities();
                             if (capabilities && capabilities.zoom) {
                                 const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
-                                const maxZoom = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
+                                const maxZoomSupported = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
+                                const maxZoom = Math.min(maxZoomSupported, 15);
                                 const stepZoom = typeof capabilities.zoom.step === 'number' && capabilities.zoom.step > 0 ? capabilities.zoom.step : 0.1;
                                 const initialZoom = Math.max(minZoom, 1);
 
@@ -3231,7 +3232,7 @@
                                             <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{qrZoomValue.toFixed(1)}x</span>
                                         </div>
                                         <div className="flex items-center justify-center gap-2 mb-3">
-                                            {[1, 2, 3]
+                                            {[1, 3, 5]
                                                 .filter((zoomPreset) => zoomPreset >= qrZoomMin && zoomPreset <= qrZoomMax)
                                                 .map((zoomPreset) => (
                                                     <button
@@ -3278,30 +3279,6 @@
                                 <p className="text-sm text-center mt-4" style={{ color: 'var(--text-secondary)' }}>
                                     Apunta la cámara al código QR del profesor. Usa este control para acercar la cámara sin hacer zoom del navegador.
                                 </p>
-                                {qrScannerErrorDetail && (
-                                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)' }}>
-                                        <p className="text-xs font-semibold mb-1" style={{ color: 'var(--error-color)' }}>
-                                            Diagnóstico de cámara
-                                        </p>
-                                        <p className="text-xs break-words" style={{ color: 'var(--text-primary)' }}>
-                                            {qrScannerErrorDetail}
-                                        </p>
-                                    </div>
-                                )}
-                                {qrScannerAttemptLogs.length > 0 && (
-                                    <details className="mt-3">
-                                        <summary className="text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                                            Ver log técnico del escáner
-                                        </summary>
-                                        <div className="mt-2 p-2 rounded-lg max-h-32 overflow-auto" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}>
-                                            {qrScannerAttemptLogs.map((logLine, index) => (
-                                                <p key={`qr-log-${index}`} className="text-xs break-words" style={{ color: 'var(--text-secondary)' }}>
-                                                    {logLine}
-                                                </p>
-                                            ))}
-                                        </div>
-                                    </details>
-                                )}
                             </div>
                         </div>
                     )}
