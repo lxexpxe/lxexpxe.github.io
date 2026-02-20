@@ -215,6 +215,17 @@
             transform: scale(1.1);
             box-shadow: 0 8px 25px rgba(77, 150, 255, 0.4);
         }
+
+        #qr-reader {
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        #qr-reader video {
+            width: 100% !important;
+            height: auto !important;
+            object-fit: cover;
+        }
     </style>
 </head>
 
@@ -2525,12 +2536,91 @@
             const [joinCourseCode, setJoinCourseCode] = React.useState('');
             const [showQRScanner, setShowQRScanner] = React.useState(false);
             const scannerRef = React.useRef(null);
+            const [qrZoomSupported, setQrZoomSupported] = React.useState(false);
+            const [qrZoomValue, setQrZoomValue] = React.useState(1);
+            const [qrZoomMin, setQrZoomMin] = React.useState(1);
+            const [qrZoomMax, setQrZoomMax] = React.useState(1);
+            const [qrZoomStep, setQrZoomStep] = React.useState(0.1);
+            const pinchStartDistanceRef = React.useRef(null);
+            const pinchStartZoomRef = React.useRef(1);
             const [profileData, setProfileData] = React.useState({
                 fullName: '',
                 currentPassword: '',
                 newPassword: '',
                 confirmPassword: ''
             });
+
+            const getTouchDistance = (touches) => {
+                if (!touches || touches.length < 2) {
+                    return 0;
+                }
+
+                const [firstTouch, secondTouch] = touches;
+                const deltaX = firstTouch.clientX - secondTouch.clientX;
+                const deltaY = firstTouch.clientY - secondTouch.clientY;
+                return Math.hypot(deltaX, deltaY);
+            };
+
+            const clampQRZoom = (zoomLevel) => {
+                return Math.min(qrZoomMax, Math.max(qrZoomMin, zoomLevel));
+            };
+
+            const applyQRZoom = async (zoomLevel) => {
+                if (!scannerRef.current || !qrZoomSupported) {
+                    return;
+                }
+
+                try {
+                    await scannerRef.current.applyVideoConstraints({
+                        advanced: [{ zoom: zoomLevel }]
+                    });
+                } catch (error) {
+                    console.error('Error aplicando zoom de cámara:', error);
+                }
+            };
+
+            const handleQRZoomChange = async (zoomLevel) => {
+                const numericZoom = Number(zoomLevel);
+                const clampedZoom = clampQRZoom(numericZoom);
+                setQrZoomValue(clampedZoom);
+                await applyQRZoom(clampedZoom);
+            };
+
+            const handleQRPinchStart = (event) => {
+                if (!qrZoomSupported || event.touches.length !== 2) {
+                    return;
+                }
+
+                event.preventDefault();
+                pinchStartDistanceRef.current = getTouchDistance(event.touches);
+                pinchStartZoomRef.current = qrZoomValue;
+            };
+
+            const handleQRPinchMove = async (event) => {
+                if (!qrZoomSupported || event.touches.length !== 2 || !pinchStartDistanceRef.current) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const currentDistance = getTouchDistance(event.touches);
+                if (!currentDistance) {
+                    return;
+                }
+
+                const scaleFactor = currentDistance / pinchStartDistanceRef.current;
+                const targetZoom = pinchStartZoomRef.current * scaleFactor;
+                const clampedTargetZoom = clampQRZoom(targetZoom);
+
+                if (Math.abs(clampedTargetZoom - qrZoomValue) >= Math.max(qrZoomStep, 0.05)) {
+                    setQrZoomValue(clampedTargetZoom);
+                    await applyQRZoom(clampedTargetZoom);
+                }
+            };
+
+            const handleQRPinchEnd = () => {
+                pinchStartDistanceRef.current = null;
+            };
 
             const handleJoinCourse = async (e) => {
                 e.preventDefault();
@@ -2628,22 +2718,39 @@
 
             const startQRScanner = () => {
                 setShowQRScanner(true);
+                setQrZoomSupported(false);
+                setQrZoomValue(1);
+                setQrZoomMin(1);
+                setQrZoomMax(1);
+                setQrZoomStep(0.1);
+                pinchStartDistanceRef.current = null;
+                pinchStartZoomRef.current = 1;
 
                 setTimeout(() => {
                     const html5QrCode = new Html5Qrcode("qr-reader");
                     scannerRef.current = html5QrCode;
 
                     html5QrCode.start(
-                        { facingMode: "environment" },
-                        { fps: 10, qrbox: 250 },
+                        {
+                            facingMode: "environment",
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            advanced: [{ focusMode: "continuous" }]
+                        },
+                        {
+                            fps: 15,
+                            qrbox: { width: 280, height: 280 },
+                            aspectRatio: 1
+                        },
                         async (decodedText) => {
                             try {
                                 const qrData = JSON.parse(decodedText);
 
                                 if (qrData.courseId && qrData.date && qrData.professorId) {
                                     await registerAttendance(qrData);
-                                    html5QrCode.stop();
-                                    setShowQRScanner(false);
+                                    html5QrCode.stop().finally(() => {
+                                        setShowQRScanner(false);
+                                    });
                                 } else {
                                     toast.showToast('QR inválido', 'error');
                                 }
@@ -2651,7 +2758,27 @@
                                 console.error('Error procesando QR:', error);
                             }
                         }
-                    ).catch(err => {
+                    ).then(async () => {
+                        if (typeof html5QrCode.getRunningTrackCapabilities === 'function') {
+                            const capabilities = html5QrCode.getRunningTrackCapabilities();
+                            if (capabilities && capabilities.zoom) {
+                                const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
+                                const maxZoom = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
+                                const stepZoom = typeof capabilities.zoom.step === 'number' && capabilities.zoom.step > 0 ? capabilities.zoom.step : 0.1;
+                                const initialZoom = Math.max(minZoom, 1);
+
+                                setQrZoomSupported(true);
+                                setQrZoomMin(minZoom);
+                                setQrZoomMax(maxZoom);
+                                setQrZoomStep(stepZoom);
+                                setQrZoomValue(initialZoom);
+
+                                await html5QrCode.applyVideoConstraints({
+                                    advanced: [{ zoom: initialZoom }]
+                                });
+                            }
+                        }
+                    }).catch(err => {
                         console.error('Error iniciando escáner:', err);
                         toast.showToast('Error accediendo a la cámara', 'error');
                         setShowQRScanner(false);
@@ -2662,12 +2789,20 @@
             const stopQRScanner = () => {
                 if (scannerRef.current) {
                     scannerRef.current.stop().then(() => {
+                        scannerRef.current = null;
+                        pinchStartDistanceRef.current = null;
+                        pinchStartZoomRef.current = 1;
                         setShowQRScanner(false);
                     }).catch(err => {
                         console.error('Error deteniendo escáner:', err);
+                        scannerRef.current = null;
+                        pinchStartDistanceRef.current = null;
+                        pinchStartZoomRef.current = 1;
                         setShowQRScanner(false);
                     });
                 } else {
+                    pinchStartDistanceRef.current = null;
+                    pinchStartZoomRef.current = 1;
                     setShowQRScanner(false);
                 }
             };
@@ -2961,9 +3096,68 @@
                                     <h3 className="text-lg font-bold">Escanear QR de Asistencia</h3>
                                     <button onClick={stopQRScanner} className="text-2xl">×</button>
                                 </div>
-                                <div id="qr-reader" className="w-full"></div>
+                                <div
+                                    id="qr-reader"
+                                    className="w-full"
+                                    style={{ touchAction: 'none' }}
+                                    onTouchStart={handleQRPinchStart}
+                                    onTouchMove={handleQRPinchMove}
+                                    onTouchEnd={handleQRPinchEnd}
+                                    onTouchCancel={handleQRPinchEnd}
+                                ></div>
+                                {qrZoomSupported && (
+                                    <div className="mt-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-semibold">Zoom de cámara</span>
+                                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{qrZoomValue.toFixed(1)}x</span>
+                                        </div>
+                                        <div className="flex items-center justify-center gap-2 mb-3">
+                                            {[1, 2, 3]
+                                                .filter((zoomPreset) => zoomPreset >= qrZoomMin && zoomPreset <= qrZoomMax)
+                                                .map((zoomPreset) => (
+                                                    <button
+                                                        key={zoomPreset}
+                                                        type="button"
+                                                        className="btn btn-secondary"
+                                                        style={{
+                                                            minWidth: '56px',
+                                                            opacity: Math.abs(qrZoomValue - zoomPreset) < Math.max(qrZoomStep, 0.1) / 2 ? 1 : 0.8
+                                                        }}
+                                                        onClick={() => handleQRZoomChange(zoomPreset)}
+                                                    >
+                                                        {zoomPreset}x
+                                                    </button>
+                                                ))}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => handleQRZoomChange(Math.max(qrZoomMin, qrZoomValue - qrZoomStep))}
+                                            >
+                                                -
+                                            </button>
+                                            <input
+                                                type="range"
+                                                min={qrZoomMin}
+                                                max={qrZoomMax}
+                                                step={qrZoomStep}
+                                                value={qrZoomValue}
+                                                onChange={(e) => handleQRZoomChange(e.target.value)}
+                                                className="w-full"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => handleQRZoomChange(Math.min(qrZoomMax, qrZoomValue + qrZoomStep))}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 <p className="text-sm text-center mt-4" style={{ color: 'var(--text-secondary)' }}>
-                                    Apunta la cámara al código QR del profesor
+                                    Apunta la cámara al código QR del profesor. Usa este control para acercar la cámara sin hacer zoom del navegador.
                                 </p>
                             </div>
                         </div>
