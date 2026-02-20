@@ -2541,6 +2541,9 @@
             const [qrZoomMin, setQrZoomMin] = React.useState(1);
             const [qrZoomMax, setQrZoomMax] = React.useState(1);
             const [qrZoomStep, setQrZoomStep] = React.useState(0.1);
+            const [qrScannerErrorDetail, setQrScannerErrorDetail] = React.useState('');
+            const [qrScannerAttemptLogs, setQrScannerAttemptLogs] = React.useState([]);
+            const qrScannerStartInProgressRef = React.useRef(false);
             const pinchStartDistanceRef = React.useRef(null);
             const pinchStartZoomRef = React.useRef(1);
             const [profileData, setProfileData] = React.useState({
@@ -2563,6 +2566,27 @@
 
             const clampQRZoom = (zoomLevel) => {
                 return Math.min(qrZoomMax, Math.max(qrZoomMin, zoomLevel));
+            };
+
+            const appendQRLog = (message) => {
+                const now = new Date().toLocaleTimeString();
+                const line = `[${now}] ${message}`;
+                console.log('[QR-SCANNER]', line);
+                setQrScannerAttemptLogs((prevLogs) => [...prevLogs, line]);
+            };
+
+            const formatQRError = (error) => {
+                if (!error) {
+                    return 'Error desconocido';
+                }
+
+                if (typeof error === 'string') {
+                    return error;
+                }
+
+                const errorName = error?.name || 'Error';
+                const errorMessage = error?.message || error?.toString?.() || 'Sin mensaje';
+                return `${errorName}: ${errorMessage}`;
             };
 
             const applyQRZoom = async (zoomLevel) => {
@@ -2717,50 +2741,123 @@
             };
 
             const startQRScanner = () => {
+                if (qrScannerStartInProgressRef.current) {
+                    appendQRLog('Inicio ignorado: el escáner ya está arrancando.');
+                    return;
+                }
+
+                qrScannerStartInProgressRef.current = true;
                 setShowQRScanner(true);
                 setQrZoomSupported(false);
                 setQrZoomValue(1);
                 setQrZoomMin(1);
                 setQrZoomMax(1);
                 setQrZoomStep(0.1);
+                setQrScannerErrorDetail('');
+                setQrScannerAttemptLogs([]);
+                console.clear();
+                console.log('[QR-SCANNER] Iniciando diagnóstico de cámara...');
                 pinchStartDistanceRef.current = null;
                 pinchStartZoomRef.current = 1;
 
-                setTimeout(() => {
-                    const html5QrCode = new Html5Qrcode("qr-reader");
-                    scannerRef.current = html5QrCode;
+                setTimeout(async () => {
+                    try {
+                        if (scannerRef.current) {
+                            appendQRLog('Liberando instancia anterior del escáner...');
+                            try {
+                                await scannerRef.current.stop();
+                            } catch (stopError) {
+                                appendQRLog(`Stop previo omitido: ${formatQRError(stopError)}`);
+                            }
+                            try {
+                                await scannerRef.current.clear();
+                            } catch (clearError) {
+                                appendQRLog(`Clear previo omitido: ${formatQRError(clearError)}`);
+                            }
+                            scannerRef.current = null;
+                        }
 
-                    html5QrCode.start(
-                        {
-                            facingMode: "environment",
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 },
-                            advanced: [{ focusMode: "continuous" }]
-                        },
-                        {
+                        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                            throw new Error('Este navegador no soporta acceso a cámara (mediaDevices).');
+                        }
+
+                        if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                            throw new Error('La cámara requiere HTTPS. En móvil usa https:// o localhost seguro.');
+                        }
+
+                        const scanConfig = {
                             fps: 15,
                             qrbox: { width: 280, height: 280 },
                             aspectRatio: 1
-                        },
-                        async (decodedText) => {
-                            try {
-                                const qrData = JSON.parse(decodedText);
+                        };
 
-                                if (qrData.courseId && qrData.date && qrData.professorId) {
-                                    await registerAttendance(qrData);
-                                    html5QrCode.stop().finally(() => {
-                                        setShowQRScanner(false);
-                                    });
-                                } else {
-                                    toast.showToast('QR inválido', 'error');
+                        const cameraConstraintsFallback = [
+                            {
+                                facingMode: "environment",
+                                width: { ideal: 1920 },
+                                height: { ideal: 1080 },
+                                advanced: [{ focusMode: "continuous" }]
+                            },
+                            {
+                                facingMode: { ideal: "environment" },
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            },
+                            { facingMode: "environment" },
+                            { facingMode: { ideal: "user" } }
+                        ];
+
+                        let startError = null;
+                        let started = false;
+
+                        for (let index = 0; index < cameraConstraintsFallback.length; index++) {
+                            const cameraConfig = cameraConstraintsFallback[index];
+                            const html5QrCode = new Html5Qrcode("qr-reader");
+                            appendQRLog(`Intento ${index + 1}: ${JSON.stringify(cameraConfig)}`);
+
+                            try {
+                                await html5QrCode.start(
+                                    cameraConfig,
+                                    scanConfig,
+                                    async (decodedText) => {
+                                        try {
+                                            const qrData = JSON.parse(decodedText);
+
+                                            if (qrData.courseId && qrData.date && qrData.professorId) {
+                                                await registerAttendance(qrData);
+                                                html5QrCode.stop().finally(() => {
+                                                    setShowQRScanner(false);
+                                                });
+                                            } else {
+                                                toast.showToast('QR inválido', 'error');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error procesando QR:', error);
+                                        }
+                                    }
+                                );
+                                started = true;
+                                scannerRef.current = html5QrCode;
+                                appendQRLog(`Intento ${index + 1}: cámara iniciada correctamente`);
+                                break;
+                            } catch (err) {
+                                startError = err;
+                                appendQRLog(`Intento ${index + 1}: ${formatQRError(err)}`);
+                                try {
+                                    await html5QrCode.clear();
+                                } catch (clearError) {
+                                    appendQRLog(`Intento ${index + 1}: clear omitido (${formatQRError(clearError)})`);
                                 }
-                            } catch (error) {
-                                console.error('Error procesando QR:', error);
                             }
                         }
-                    ).then(async () => {
-                        if (typeof html5QrCode.getRunningTrackCapabilities === 'function') {
-                            const capabilities = html5QrCode.getRunningTrackCapabilities();
+
+                        if (!started) {
+                            throw startError || new Error('No se pudo iniciar la cámara');
+                        }
+
+                        const activeScanner = scannerRef.current;
+                        if (activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
+                            const capabilities = activeScanner.getRunningTrackCapabilities();
                             if (capabilities && capabilities.zoom) {
                                 const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
                                 const maxZoom = typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1;
@@ -2772,35 +2869,57 @@
                                 setQrZoomMax(maxZoom);
                                 setQrZoomStep(stepZoom);
                                 setQrZoomValue(initialZoom);
+                                appendQRLog(`Zoom soportado: min ${minZoom}, max ${maxZoom}, step ${stepZoom}`);
 
-                                await html5QrCode.applyVideoConstraints({
-                                    advanced: [{ zoom: initialZoom }]
-                                });
+                                try {
+                                    await activeScanner.applyVideoConstraints({
+                                        advanced: [{ zoom: initialZoom }]
+                                    });
+                                    appendQRLog(`Zoom inicial aplicado: ${initialZoom.toFixed(1)}x`);
+                                } catch (zoomError) {
+                                    console.error('Zoom no soportado en este dispositivo:', zoomError);
+                                    appendQRLog(`No se pudo aplicar zoom inicial: ${zoomError?.name || 'Error'} - ${zoomError?.message || 'Sin mensaje'}`);
+                                }
+                            } else {
+                                appendQRLog('Este dispositivo no expone capacidad de zoom en la cámara.');
                             }
                         }
-                    }).catch(err => {
+                    } catch (err) {
                         console.error('Error iniciando escáner:', err);
-                        toast.showToast('Error accediendo a la cámara', 'error');
-                        setShowQRScanner(false);
-                    });
+                        const fullError = formatQRError(err);
+                        setQrScannerErrorDetail(fullError);
+                        appendQRLog(`Fallo final: ${fullError}`);
+                        toast.showToast('Error de cámara', 'error');
+                        scannerRef.current = null;
+                        appendQRLog('El modal permanece abierto para revisar diagnóstico y reintentar.');
+                    } finally {
+                        qrScannerStartInProgressRef.current = false;
+                    }
                 }, 100);
             };
 
             const stopQRScanner = () => {
+                qrScannerStartInProgressRef.current = false;
                 if (scannerRef.current) {
                     scannerRef.current.stop().then(() => {
                         scannerRef.current = null;
+                        setQrScannerErrorDetail('');
+                        setQrScannerAttemptLogs([]);
                         pinchStartDistanceRef.current = null;
                         pinchStartZoomRef.current = 1;
                         setShowQRScanner(false);
                     }).catch(err => {
                         console.error('Error deteniendo escáner:', err);
                         scannerRef.current = null;
+                        setQrScannerErrorDetail('');
+                        setQrScannerAttemptLogs([]);
                         pinchStartDistanceRef.current = null;
                         pinchStartZoomRef.current = 1;
                         setShowQRScanner(false);
                     });
                 } else {
+                    setQrScannerErrorDetail('');
+                    setQrScannerAttemptLogs([]);
                     pinchStartDistanceRef.current = null;
                     pinchStartZoomRef.current = 1;
                     setShowQRScanner(false);
@@ -3159,6 +3278,30 @@
                                 <p className="text-sm text-center mt-4" style={{ color: 'var(--text-secondary)' }}>
                                     Apunta la cámara al código QR del profesor. Usa este control para acercar la cámara sin hacer zoom del navegador.
                                 </p>
+                                {qrScannerErrorDetail && (
+                                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)' }}>
+                                        <p className="text-xs font-semibold mb-1" style={{ color: 'var(--error-color)' }}>
+                                            Diagnóstico de cámara
+                                        </p>
+                                        <p className="text-xs break-words" style={{ color: 'var(--text-primary)' }}>
+                                            {qrScannerErrorDetail}
+                                        </p>
+                                    </div>
+                                )}
+                                {qrScannerAttemptLogs.length > 0 && (
+                                    <details className="mt-3">
+                                        <summary className="text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                                            Ver log técnico del escáner
+                                        </summary>
+                                        <div className="mt-2 p-2 rounded-lg max-h-32 overflow-auto" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}>
+                                            {qrScannerAttemptLogs.map((logLine, index) => (
+                                                <p key={`qr-log-${index}`} className="text-xs break-words" style={{ color: 'var(--text-secondary)' }}>
+                                                    {logLine}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </details>
+                                )}
                             </div>
                         </div>
                     )}
