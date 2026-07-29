@@ -1,4 +1,4 @@
-# Seminario de Investigación - Aplicación Web
+# Plataforma Académica - Aplicación Web
 
 ## Configuración de Firebase
 

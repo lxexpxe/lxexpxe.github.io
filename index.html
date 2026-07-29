@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seminario de Investigación</title>
+    <title>Plataforma Académica</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -332,7 +332,7 @@
                         to_name: fullName || email.split('@')[0],
                         to_email: email,
                         verification_code: code,
-                        from_name: 'Seminario de Investigación'
+                        from_name: 'Plataforma Académica'
                     };
 
                     const result = await emailjs.send(
@@ -2317,7 +2317,7 @@
                                         <input
                                             className="input-field w-full py-3 px-4 rounded-lg focus:outline-none"
                                             type="text"
-                                            placeholder="#SEMINARIO_2024"
+                                            placeholder="#CURSO_2024"
                                             value={newCourse.code}
                                             onChange={(e) => {
                                                 let value = e.target.value;
