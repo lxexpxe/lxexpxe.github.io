@@ -1,0 +1,114 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // No hay campo "role" separado en la app. professors/{uid} en sí casi
+    // siempre es un doc "fantasma" (solo contenedor de subcolecciones, sin
+    // datos propios) — pero profile/data SIEMPRE se escribe en el registro,
+    // así que es la fuente de verdad confiable de "¿es profesor?".
+    function isProfessor() {
+      return exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(request.auth.uid)/profile/data);
+    }
+
+    function ownsCourse(profId, courseId) {
+      return exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(profId)/courses/$(courseId));
+    }
+
+    match /artifacts/academic-platform {
+
+      match /professors/{profId} {
+        // Lectura amplia: el flujo de "unirse a curso por código" recorre todos
+        // los profesores para encontrar el curso. Nada sensible vive en este doc
+        // (el perfil real está en profile/data, restringido abajo).
+        allow read: if signedIn();
+        allow write: if signedIn() && request.auth.uid == profId;
+
+        match /profile/data {
+          allow read, write: if signedIn() && request.auth.uid == profId;
+        }
+
+        match /courses/{courseId} {
+          // Necesario para: búsqueda por código de curso, y estudiantes
+          // matriculados viendo contenido semanal / badges disponibles.
+          allow read: if signedIn();
+          allow write: if signedIn() && request.auth.uid == profId;
+
+          match /students/{studentId} {
+            // El profesor ve/gestiona todo su roster; cada estudiante solo su
+            // propio registro (nunca lo escribe directamente: badges/aprobación
+            // los maneja el profesor).
+            allow read: if signedIn() && (request.auth.uid == profId || request.auth.uid == studentId);
+            allow write: if signedIn() && request.auth.uid == profId;
+          }
+        }
+      }
+
+      match /courses/{courseId} {
+        // Catálogo global: hoy solo se escribe, nada lo lee (ver README). Se
+        // deja lectura abierta por si se usa a futuro; lo que importa es que
+        // solo el profesor dueño del curso pueda crear/modificar/borrar.
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.professorId == request.auth.uid;
+        allow update, delete: if signedIn() && (
+          resource.data.professorId == request.auth.uid ||
+          ownsCourse(request.auth.uid, courseId)
+        );
+
+        match /attendance/{date} {
+          allow read: if signedIn() && (
+            resource == null ||
+            ownsCourse(request.auth.uid, courseId) ||
+            exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(resource.data.professorId)/courses/$(courseId)/students/$(request.auth.uid))
+          );
+
+          // Crear: el profesor dueño (marcado manual), o un estudiante
+          // matriculado registrando su propio primer check-in del día.
+          allow create: if signedIn() && (
+            ownsCourse(request.auth.uid, courseId) ||
+            (
+              request.resource.data.professorId is string &&
+              exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(request.resource.data.professorId)/courses/$(courseId)/students/$(request.auth.uid))
+            )
+          );
+
+          // Actualizar: el profesor dueño puede reescribir libremente su propio
+          // registro de asistencia. Un estudiante matriculado solo puede
+          // *agregarse a sí mismo* al final del arreglo students — no puede
+          // tocar ni borrar los registros de otros.
+          allow update: if signedIn() && (
+            ownsCourse(request.auth.uid, courseId) ||
+            (
+              exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(resource.data.professorId)/courses/$(courseId)/students/$(request.auth.uid)) &&
+              request.resource.data.professorId == resource.data.professorId &&
+              request.resource.data.students.size() == resource.data.students.size() + 1 &&
+              request.resource.data.students[0:resource.data.students.size()] == resource.data.students &&
+              request.resource.data.students[resource.data.students.size()].studentId == request.auth.uid
+            )
+          );
+        }
+
+        match /enrollments/{studentId} {
+          // Nada lo lee hoy tampoco; se deja lectura abierta y escritura
+          // restringida al profesor dueño (así se crea/borra en approveStudent).
+          allow read: if signedIn();
+          allow write: if signedIn() && ownsCourse(request.auth.uid, courseId);
+        }
+      }
+
+      match /temp-students/{studentId} {
+        // El estudiante gestiona su propia solicitud pendiente; cualquier
+        // profesor puede listarlas (para encontrar solicitudes de su curso) y
+        // borrarlas al aprobar/rechazar. Un estudiante NO puede leer las
+        // solicitudes de otros.
+        allow create, update: if signedIn() && request.auth.uid == studentId;
+        allow read: if signedIn() && (request.auth.uid == studentId || isProfessor());
+        allow delete: if signedIn() && isProfessor();
+      }
+    }
+  }
+}

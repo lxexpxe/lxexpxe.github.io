@@ -1,13 +1,19 @@
 {
-  "name": "firestore-inspector",
+  "name": "academic-platform-dev-tools",
   "private": true,
   "version": "1.0.0",
-  "description": "Herramienta local para inspeccionar la estructura de Firestore del proyecto. No forma parte del sitio publicado.",
-  "main": "inspect-firestore.js",
+  "description": "Herramientas locales de administración/staging para el proyecto de Firestore. No forman parte del sitio publicado.",
   "scripts": {
-    "inspect": "node inspect-firestore.js"
+    "inspect": "node inspect-firestore.js",
+    "rules:test": "cd .. && ./scripts/node_modules/.bin/firebase emulators:exec --only firestore \"node scripts/rules-test.js\"",
+    "smoke:local": "node smoke-test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-tools": "^15.24.0",
+    "playwright": "^1.62.0"
   }
 }

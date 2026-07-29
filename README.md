@@ -21,51 +21,36 @@ window.FIREBASE_CONFIG = {
 
 ## Configuración de Firestore
 
-Aplica las siguientes reglas de seguridad en tu consola de Firebase:
+Las reglas de seguridad viven en [`firestore.rules`](firestore.rules) — es la fuente
+de verdad, escrita para el modelo de datos real de la app (`professors/{uid}/...`,
+`courses/{id}/...`, `temp-students/{uid}`), no un diseño aparte. Para aplicarlas:
+copia el contenido de `firestore.rules` en Firebase Console → tu proyecto →
+Firestore Database → pestaña Reglas → Publicar.
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Reglas para usuarios
-    match /artifacts/academic-platform/users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Permitir que profesores lean todos los usuarios
-      allow read: if request.auth != null && 
-        exists(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)).data.userType == 'professor';
-      
-      // Permitir que profesores actualicen badges de estudiantes de su curso
-      allow update: if request.auth != null && 
-        exists(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)).data.userType == 'professor' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgesEarned', 'lastBadgeEarned', 'badgeStatus']);
-      
-      // Permitir que profesores eliminen estudiantes
-      allow delete: if request.auth != null && 
-        exists(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)).data.userType == 'professor';
-    }
-    
-    // Reglas para cursos
-    match /artifacts/academic-platform/courses/{courseId} {
-      // Profesores pueden leer/escribir sus propios cursos
-      allow read, write: if request.auth != null && 
-        request.auth.uid == resource.data.professorId;
-      
-      // Profesores pueden crear cursos
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.professorId;
-      
-      // Estudiantes pueden leer cursos de su código
-      allow read: if request.auth != null && 
-        exists(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/artifacts/academic-platform/users/$(request.auth.uid)).data.courseCode == resource.data.courseCode;
-    }
-  }
-}
+### Probar cambios a las reglas antes de publicarlas (staging local)
+
+No edites `firestore.rules` y publiques directo — usa el Emulator Suite de
+Firebase como ambiente de staging, y el set de pruebas en
+[`scripts/rules-test.js`](scripts/rules-test.js) que cubre los casos que deben
+funcionar (profesor dueño de sus datos, estudiante leyendo lo suyo) y los que
+deben bloquearse (un estudiante escribiéndose badges, leyendo el roster de
+otro, o suplantando asistencia ajena).
+
+Requisitos: Node 18+ y **JDK 21+** (el emulador de Firestore no corre con
+versiones más viejas de Java).
+
+```bash
+cd scripts
+npm install
+# si tu JDK 21 no es el que resuelve `java` por defecto:
+export PATH="/usr/local/opt/openjdk@21/bin:$PATH"
+
+cd ..
+./scripts/node_modules/.bin/firebase emulators:exec --only firestore "node scripts/rules-test.js"
 ```
+
+Si algo falla, ajusta `firestore.rules`, vuelve a correr las pruebas, y solo
+cuando pasen todas copia el archivo a Firebase Console.
 
 ## Tipos de Usuario
 
