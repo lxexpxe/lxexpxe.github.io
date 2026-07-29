@@ -1,0 +1,13 @@
+{
+  "name": "firestore-inspector",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Herramienta local para inspeccionar la estructura de Firestore del proyecto. No forma parte del sitio publicado.",
+  "main": "inspect-firestore.js",
+  "scripts": {
+    "inspect": "node inspect-firestore.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

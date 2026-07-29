@@ -1,6 +1,7 @@
 # Firebase configuration with sensitive data
 firebase-config.js
 serviceAccountKey.json
+scripts/firestore-structure.json
 
 # Node modules
 node_modules/

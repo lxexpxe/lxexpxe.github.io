@@ -487,7 +487,7 @@
 
                     if (pendingUserData.userType === 'professor') {
                         // Crear profesor con estructura profile
-                        await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`)
+                        await db.doc(`artifacts/academic-platform/professors/${user.uid}/profile/data`)
                             .set(userData);
                     } else {
                         // Para estudiantes, solo guardamos los datos básicos
@@ -497,7 +497,7 @@
                         userData.courseCode = pendingUserData.courseCode;
 
                         // Crear documento temporal del estudiante
-                        await db.doc(`artifacts/seminario-investigacion-app/temp-students/${user.uid}`)
+                        await db.doc(`artifacts/academic-platform/temp-students/${user.uid}`)
                             .set(userData);
                     }
 
@@ -1038,7 +1038,7 @@
 
             const loadUserData = async () => {
                 try {
-                    const userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`).get();
+                    const userDoc = await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/profile/data`).get();
                     if (userDoc.exists) {
                         setUserData(userDoc.data());
                     }
@@ -1049,7 +1049,7 @@
 
             const loadCourses = async () => {
                 try {
-                    const coursesQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).get();
+                    const coursesQuery = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses`).get();
 
                     const coursesData = coursesQuery.docs.map(doc => ({
                         id: doc.id,
@@ -1073,7 +1073,7 @@
                 if (!selectedCourse) return;
 
                 try {
-                    const studentsQuery = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
+                    const studentsQuery = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students`)
                         .get();
 
                     const studentsData = studentsQuery.docs.map(doc => ({
@@ -1092,7 +1092,7 @@
                 if (!selectedCourse) return;
 
                 try {
-                    const tempStudentsQuery = await db.collection('artifacts/seminario-investigacion-app/temp-students')
+                    const tempStudentsQuery = await db.collection('artifacts/academic-platform/temp-students')
                         .where('courseCode', '==', selectedCourse.courseCode)
                         .get();
 
@@ -1117,11 +1117,11 @@
                         lastBadgeEarned: null
                     };
 
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
                         .set(studentInfo);
 
                     // Agregar a enrollments en la colección global
-                    await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/enrollments/${studentData.id}`)
+                    await db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/enrollments/${studentData.id}`)
                         .set({
                             studentId: studentData.id,
                             fullName: studentData.fullName,
@@ -1129,7 +1129,7 @@
                             enrolledAt: new Date()
                         });
 
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentData.id}`).delete();
+                    await db.doc(`artifacts/academic-platform/temp-students/${studentData.id}`).delete();
 
                     toast.showToast('Estudiante aprobado exitosamente', 'success');
                     loadStudents();
@@ -1142,7 +1142,7 @@
 
             const rejectStudent = async (studentId) => {
                 try {
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${studentId}`).delete();
+                    await db.doc(`artifacts/academic-platform/temp-students/${studentId}`).delete();
                     toast.showToast('Estudiante rechazado', 'success');
                     loadPendingStudents();
                 } catch (error) {
@@ -1178,7 +1178,7 @@
                 if (!selectedCourse) return;
 
                 try {
-                    const attendanceSnapshot = await db.collection(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance`).get();
+                    const attendanceSnapshot = await db.collection(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance`).get();
 
                     const attendanceByDate = {};
                     attendanceSnapshot.docs.forEach(doc => {
@@ -1195,7 +1195,7 @@
                 if (!selectedCourse) return;
 
                 try {
-                    const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/attendance/${date}`);
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
                     const attendanceDoc = await attendanceRef.get();
 
                     const attendanceRecord = {
@@ -1267,7 +1267,7 @@
                         badges: []
                     };
 
-                    const docRef = await db.collection(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses`).add(courseData);
+                    const docRef = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses`).add(courseData);
 
                     // Crear estructura inicial de semanas
                     const weeklyContent = [];
@@ -1286,7 +1286,7 @@
 
                     // Crear documento en la colección global courses
                     try {
-                        await db.doc(`artifacts/seminario-investigacion-app/courses/${docRef.id}`).set({
+                        await db.doc(`artifacts/academic-platform/courses/${docRef.id}`).set({
                             courseName: `Catálogo: ${newCourse.name}`,
                             courseCode: courseCode,
                             professorId: currentUser.uid,
@@ -1313,7 +1313,7 @@
 
             const assignBadge = async (studentId, badgeId, earned = true) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
+                    const studentRef = db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
 
                     if (studentDoc.exists) {
@@ -1375,7 +1375,7 @@
 
             const updateBadgeStatus = async (studentId, badgeId, newStatus) => {
                 try {
-                    const studentRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
+                    const studentRef = db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`);
                     const studentDoc = await studentRef.get();
 
                     if (studentDoc.exists) {
@@ -1404,10 +1404,10 @@
                 }
 
                 try {
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentId}`).delete();
 
                     // Remover de enrollments en la colección global
-                    await db.doc(`artifacts/seminario-investigacion-app/courses/${selectedCourse.id}/enrollments/${studentId}`).delete();
+                    await db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/enrollments/${studentId}`).delete();
 
                     toast.showToast('Estudiante removido exitosamente', 'success');
                     loadStudents();
@@ -1425,10 +1425,10 @@
                     await currentUser.reauthenticateWithCredential(credential);
 
                     // Eliminar de la colección del profesor
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${showDeleteConfirm}`).delete();
 
                     // Eliminar de la colección global courses
-                    await db.doc(`artifacts/seminario-investigacion-app/courses/${showDeleteConfirm}`).delete();
+                    await db.doc(`artifacts/academic-platform/courses/${showDeleteConfirm}`).delete();
 
                     toast.showToast('Curso eliminado exitosamente', 'success');
                     setShowDeleteConfirm(null);
@@ -1465,7 +1465,7 @@
                     }
 
                     if (profileData.fullName && profileData.fullName !== userData?.fullName) {
-                        await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/profile/data`)
+                        await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/profile/data`)
                             .update({ fullName: profileData.fullName });
                         toast.showToast('Nombre actualizado', 'success');
                         loadUserData();
@@ -1491,7 +1491,7 @@
                 }
 
                 try {
-                    await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
                         .update({ courseCode: newCourseCode });
 
                     toast.showToast('Código del curso actualizado', 'success');
@@ -1536,7 +1536,7 @@
 
             const saveWeekContent = async () => {
                 try {
-                    const courseRef = db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`);
+                    const courseRef = db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`);
 
                     if (editingWeek === 0) {
                         // Guardar información general
@@ -1582,7 +1582,7 @@
                     setShowEditContent(false);
                     await loadCourses();
                     // Actualizar el curso seleccionado con los nuevos datos
-                    const updatedCourseData = await db.doc(`artifacts/seminario-investigacion-app/professors/${currentUser.uid}/courses/${selectedCourse.id}`).get();
+                    const updatedCourseData = await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`).get();
                     if (updatedCourseData.exists) {
                         setSelectedCourse({ id: selectedCourse.id, ...updatedCourseData.data() });
                     }
@@ -3064,22 +3064,22 @@
 
                 try {
                     // Verificar si ya está pendiente con este código
-                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                    const tempStudentDoc = await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`).get();
                     if (tempStudentDoc.exists && tempStudentDoc.data().courseCode === joinCourseCode) {
                         toast.showToast('Ya tienes una solicitud pendiente para este curso', 'error');
                         return;
                     }
 
                     // Verificar si ya está aprobado en algún curso con este código
-                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
+                    const professorsSnapshot = await db.collection('artifacts/academic-platform/professors').get();
 
                     for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`)
+                        const coursesSnapshot = await db.collection(`artifacts/academic-platform/professors/${professorDoc.id}/courses`)
                             .where('courseCode', '==', joinCourseCode)
                             .get();
 
                         for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
+                            const studentDoc = await db.doc(`artifacts/academic-platform/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
 
                             if (studentDoc.exists) {
                                 toast.showToast('Ya estás registrado en este curso', 'error');
@@ -3088,7 +3088,7 @@
                         }
                     }
 
-                    await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
+                    await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`)
                         .set({
                             email: currentUser.email,
                             fullName: userData?.fullName || currentUser.email.split('@')[0],
@@ -3129,9 +3129,9 @@
                     }
 
                     if (profileData.fullName && profileData.fullName !== userData?.fullName) {
-                        const tempDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                        const tempDoc = await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`).get();
                         if (tempDoc.exists) {
-                            await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`)
+                            await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`)
                                 .update({ fullName: profileData.fullName });
                         }
                         toast.showToast('Nombre actualizado', 'success');
@@ -3369,7 +3369,7 @@
             const registerAttendance = async (qrData) => {
                 try {
                     // Verificar que el estudiante esté matriculado en el curso
-                    const professorCoursesRef = db.collection(`artifacts/seminario-investigacion-app/professors/${qrData.professorId}/courses/${qrData.courseId}/students`);
+                    const professorCoursesRef = db.collection(`artifacts/academic-platform/professors/${qrData.professorId}/courses/${qrData.courseId}/students`);
                     const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
 
                     if (!studentDoc.exists) {
@@ -3377,7 +3377,7 @@
                         return;
                     }
 
-                    const attendanceRef = db.doc(`artifacts/seminario-investigacion-app/courses/${qrData.courseId}/attendance/${qrData.date}`);
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${qrData.courseId}/attendance/${qrData.date}`);
                     const attendanceDoc = await attendanceRef.get();
 
                     const studentData = {
@@ -3555,7 +3555,7 @@
             const loadCourseData = async () => {
                 try {
                     // Primero verificar si está en temp-students
-                    const tempStudentDoc = await db.doc(`artifacts/seminario-investigacion-app/temp-students/${currentUser.uid}`).get();
+                    const tempStudentDoc = await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`).get();
 
                     if (tempStudentDoc.exists) {
                         // Estudiante pendiente de aprobación
@@ -3566,14 +3566,14 @@
                     }
 
                     // Buscar en todos los profesores para encontrar TODOS los cursos del estudiante
-                    const professorsSnapshot = await db.collection('artifacts/seminario-investigacion-app/professors').get();
+                    const professorsSnapshot = await db.collection('artifacts/academic-platform/professors').get();
                     const studentCourses = [];
 
                     for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses`).get();
+                        const coursesSnapshot = await db.collection(`artifacts/academic-platform/professors/${professorDoc.id}/courses`).get();
 
                         for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
+                            const studentDoc = await db.doc(`artifacts/academic-platform/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
 
                             if (studentDoc.exists) {
                                 const courseData = courseDoc.data();
@@ -4327,7 +4327,7 @@
                             const db = firebase.firestore();
 
                             // Primero buscar en profesores
-                            let userDoc = await db.doc(`artifacts/seminario-investigacion-app/professors/${user.uid}/profile/data`).get();
+                            let userDoc = await db.doc(`artifacts/academic-platform/professors/${user.uid}/profile/data`).get();
 
                             if (userDoc.exists) {
                                 setUserData({ ...userDoc.data(), userType: 'professor' });
