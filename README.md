@@ -64,6 +64,32 @@ usuarios de Firebase Authentication con su nombre/rol/curso — no solo el
 correo — y borrar varios a la vez, con limpieza automática de sus rastros en
 Firestore. Vive en [`scripts/admin-console/`](scripts/admin-console/).
 
+**Por qué hay un servidor de por medio (arquitectura):**
+El SDK de Firebase que corre en el navegador nunca puede listar ni borrar
+usuarios de Authentication — esa es una capacidad exclusiva del Admin SDK, y
+las credenciales del Admin SDK (`serviceAccountKey.json`) no pueden vivir en
+una página que abres en el navegador. Por eso son dos piezas:
+
+- [`public/index.html`](scripts/admin-console/public/index.html) — la página
+  que abres. Hace un login real contra Firebase Auth (mismo proyecto que la
+  app) con `signInWithEmailAndPassword`, y luego habla con el servidor local
+  mandando el ID token en cada petición (`Authorization: Bearer <token>`).
+  No tiene ni ve el service account.
+- [`server.js`](scripts/admin-console/server.js) — un servidor Express que
+  corre en tu máquina (`http://127.0.0.1:4321`, solo localhost) y sí tiene el
+  Admin SDK. En cada petición valida el token con
+  `auth.verifyIdToken()` y revisa que el correo esté en
+  `admin-emails.json` (`requireAdmin`) antes de hacer nada. Expone dos rutas:
+  - `GET /api/users` — pagina todos los usuarios de Auth
+    (`auth.listUsers()`) y los cruza con Firestore (`buildIdentityMap()`)
+    recorriendo `professors/*/profile`, `professors/*/courses/*/students` y
+    `temp-students` para resolver nombre/rol/curso de cada `uid`. Ese cruce
+    se dispara en paralelo con `Promise.all` (secuencial tardaba ~7s con los
+    datos reales; así queda en 1-2s).
+  - `POST /api/users/delete` — recibe una lista de `uid`, y por cada uno
+    aplica la limpieza de Firestore según su rol (ver abajo) antes de
+    `auth.deleteUser()`.
+
 **Qué borra según el rol del usuario:**
 - **Estudiante matriculado:** su registro en cada curso (roster + badges) y
   su matrícula global.
