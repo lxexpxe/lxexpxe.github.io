@@ -2,6 +2,7 @@
 firebase-config.js
 serviceAccountKey.json
 scripts/firestore-structure.json
+scripts/admin-console/admin-emails.json
 
 # Node modules
 node_modules/

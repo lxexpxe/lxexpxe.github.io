@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Consola de administración — Plataforma Académica</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<style>
+    :root {
+        --bg: #f9fafb; --card: #ffffff; --text: #1f2937; --sub: #6b7280;
+        --border: #e5e7eb; --accent: #4D96FF; --danger: #ef4444; --danger-bg: #fef2f2;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 2rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; max-width: 480px; margin: 4rem auto; }
+    .wide { max-width: 1200px; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+    input, button { font: inherit; }
+    input[type=email], input[type=password], input[type=search] {
+        width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.75rem;
+    }
+    button { cursor: pointer; border: none; border-radius: 8px; padding: 0.6rem 1rem; font-weight: 600; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .error { color: var(--danger); font-size: 0.875rem; margin: -0.5rem 0 0.75rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; background: var(--card); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: #f3f4f6; cursor: pointer; user-select: none; }
+    tr:hover td { background: #fafafa; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap; }
+    .pill { display: inline-block; background: #eef2ff; color: #4338ca; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; margin: 0.1rem; }
+    .pill-pending { background: #fffbeb; color: #92400e; }
+    .pill-orphan { background: #f3f4f6; color: #6b7280; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+    .modal { background: var(--card); border-radius: 12px; padding: 1.5rem; max-width: 560px; max-height: 80vh; overflow-y: auto; }
+    .modal ul { padding-left: 1.2rem; }
+    .hidden { display: none; }
+    .hint { color: var(--sub); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<div id="login-view" class="card">
+    <h1>Consola de administración</h1>
+    <p class="hint">Inicia sesión con una cuenta autorizada (ver <code>admin-emails.json</code>).</p>
+    <div id="login-error" class="error hidden"></div>
+    <form id="login-form">
+        <input type="email" id="login-email" placeholder="Correo" required>
+        <input type="password" id="login-password" placeholder="Contraseña" required>
+        <button type="submit" class="btn-primary" style="width:100%">Iniciar sesión</button>
+    </form>
+</div>
+
+<div id="app-view" class="wide hidden">
+    <div class="toolbar">
+        <div>
+            <h1 style="margin-bottom:0.25rem">Usuarios (<span id="count">0</span>)</h1>
+            <span class="hint" id="session-info"></span>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center">
+            <input type="search" id="search" placeholder="Buscar por correo o nombre..." style="width:260px; margin:0">
+            <button id="btn-refresh" class="btn-secondary">Recargar</button>
+            <button id="btn-delete" class="btn-danger" disabled>Eliminar seleccionados (<span id="sel-count">0</span>)</button>
+            <button id="btn-logout" class="btn-secondary">Salir</button>
+        </div>
+    </div>
+    <div style="overflow-x:auto">
+        <table>
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="select-all"></th>
+                    <th data-sort="email">Correo</th>
+                    <th data-sort="fullName">Nombre</th>
+                    <th data-sort="role">Rol</th>
+                    <th>Curso(s)</th>
+                    <th data-sort="creationTime">Creado</th>
+                    <th data-sort="lastSignInTime">Último acceso</th>
+                </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBEKzy25wj-qIVJcyqkCors2b8zPostu7E",
+    authDomain: "seminario-de-investigaci-283c8.firebaseapp.com",
+    projectId: "seminario-de-investigaci-283c8"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+const API = '';
+let allUsers = [];
+let sortKey = 'email';
+let sortDir = 1;
+
+const $ = (sel) => document.querySelector(sel);
+const show = (el) => el.classList.remove('hidden');
+const hide = (el) => el.classList.add('hidden');
+
+async function apiFetch(path, opts = {}) {
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch(API + path, {
+        ...opts,
+        headers: { ...(opts.headers || {}), 'Authorization': 'Bearer ' + idToken, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error de servidor');
+    return data;
+}
+
+$('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hide($('#login-error'));
+    const btn = $('#login-form button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Ingresando...';
+    try {
+        await auth.signInWithEmailAndPassword($('#login-email').value, $('#login-password').value);
+        btn.textContent = 'Cargando usuarios...';
+    } catch (err) {
+        $('#login-error').textContent = err.message;
+        show($('#login-error'));
+        btn.disabled = false;
+        btn.textContent = 'Iniciar sesión';
+    }
+});
+
+$('#btn-logout').addEventListener('click', () => auth.signOut());
+
+auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+        hide($('#app-view'));
+        show($('#login-view'));
+        const btn = $('#login-form button[type=submit]');
+        btn.disabled = false;
+        btn.textContent = 'Iniciar sesión';
+        return;
+    }
+    try {
+        await loadUsers();
+        hide($('#login-view'));
+        show($('#app-view'));
+        $('#session-info').textContent = 'Sesión: ' + user.email;
+    } catch (err) {
+        $('#login-error').textContent = err.message;
+        show($('#login-error'));
+        await auth.signOut();
+    }
+});
+
+async function loadUsers() {
+    const data = await apiFetch('/api/users');
+    allUsers = data.users;
+    render();
+}
+
+$('#btn-refresh').addEventListener('click', loadUsers);
+$('#search').addEventListener('input', render);
+document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        sortDir = sortKey === key ? -sortDir : 1;
+        sortKey = key;
+        render();
+    });
+});
+
+// Selección persistente por uid — independiente del DOM, para que sobreviva
+// a un re-render (p.ej. al cambiar el filtro de búsqueda o el orden).
+const selectedUidSet = new Set();
+let currentFilteredRows = [];
+
+function render() {
+    const q = $('#search').value.toLowerCase();
+    currentFilteredRows = allUsers.filter(u =>
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.fullName || '').toLowerCase().includes(q)
+    );
+    currentFilteredRows.sort((a, b) => {
+        const av = a[sortKey] || '';
+        const bv = b[sortKey] || '';
+        return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+
+    $('#count').textContent = allUsers.length;
+    $('#rows').innerHTML = currentFilteredRows.map(u => `
+        <tr>
+            <td><input type="checkbox" class="row-check" data-uid="${u.uid}" ${selectedUidSet.has(u.uid) ? 'checked' : ''}></td>
+            <td>${u.email || '(sin correo)'}</td>
+            <td>${u.fullName || '<span class="hint">—</span>'}</td>
+            <td>${roleBadge(u)}</td>
+            <td>${(u.courses || []).map(c => `<span class="pill">${c.courseName}</span>`).join('') || (u.pending ? `<span class="pill pill-pending">solicitó ${u.pendingCourseCode || ''}</span>` : '')}</td>
+            <td>${fmtDate(u.creationTime)}</td>
+            <td>${fmtDate(u.lastSignInTime)}</td>
+        </tr>
+    `).join('');
+
+    document.querySelectorAll('.row-check').forEach(cb => cb.addEventListener('change', (e) => {
+        if (e.target.checked) selectedUidSet.add(e.target.dataset.uid);
+        else selectedUidSet.delete(e.target.dataset.uid);
+        updateSelCount();
+    }));
+    updateSelCount();
+}
+
+function roleBadge(u) {
+    if (u.role === 'sin rastro en Firestore') return '<span class="pill pill-orphan">huérfano</span>';
+    if (u.role === 'estudiante (pendiente)') return '<span class="pill pill-pending">pendiente</span>';
+    return `<span class="pill">${u.role}</span>`;
+}
+
+function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+$('#select-all').addEventListener('change', (e) => {
+    for (const u of currentFilteredRows) {
+        if (e.target.checked) selectedUidSet.add(u.uid);
+        else selectedUidSet.delete(u.uid);
+    }
+    render();
+});
+
+function selectedUids() {
+    return [...selectedUidSet];
+}
+
+function updateSelCount() {
+    const n = selectedUidSet.size;
+    $('#sel-count').textContent = n;
+    $('#btn-delete').disabled = n === 0;
+}
+
+$('#btn-delete').addEventListener('click', () => {
+    const uids = selectedUids();
+    const users = allUsers.filter(u => uids.includes(u.uid));
+    openConfirmModal(users);
+});
+
+function openConfirmModal(users) {
+    const root = $('#modal-root');
+    root.innerHTML = `
+    <div class="modal-backdrop">
+        <div class="modal">
+            <h1>¿Eliminar ${users.length} usuario(s)?</h1>
+            <p class="hint">Esto borra la cuenta de Authentication y limpia sus rastros en Firestore. Es irreversible.</p>
+            <ul>
+                ${users.map(u => `
+                    <li>
+                        <strong>${u.email}</strong> (${u.fullName || 'sin nombre'}, ${u.role})
+                        ${u.role === 'profesor' && u.courses.length > 0
+                            ? `<br><span style="color:var(--danger)">⚠ tiene ${u.courses.length} curso(s) — NO se borrarán, quedarán huérfanos</span>`
+                            : (u.courses.length > 0 ? `<br><span class="hint">se borra su registro en: ${u.courses.map(c => c.courseName).join(', ')}</span>` : '')}
+                        ${u.pending ? '<br><span class="hint">se borra su solicitud pendiente</span>' : ''}
+                    </li>
+                `).join('')}
+            </ul>
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem">
+                <button class="btn-secondary" id="modal-cancel">Cancelar</button>
+                <button class="btn-danger" id="modal-confirm">Sí, eliminar</button>
+            </div>
+            <div id="modal-progress" class="hidden hint" style="margin-top:0.75rem"></div>
+        </div>
+    </div>`;
+
+    $('#modal-cancel').addEventListener('click', () => root.innerHTML = '');
+    $('#modal-confirm').addEventListener('click', async () => {
+        $('#modal-confirm').disabled = true;
+        $('#modal-cancel').disabled = true;
+        show($('#modal-progress'));
+        $('#modal-progress').textContent = 'Eliminando...';
+        try {
+            const data = await apiFetch('/api/users/delete', {
+                method: 'POST',
+                body: JSON.stringify({ uids: users.map(u => u.uid) })
+            });
+            const failed = data.results.filter(r => !r.ok);
+            $('#modal-progress').textContent = failed.length === 0
+                ? `Listo: ${data.results.length} eliminados.`
+                : `${data.results.length - failed.length} eliminados, ${failed.length} fallaron: ` + failed.map(f => `${f.uid} (${f.error})`).join('; ');
+            for (const r of data.results) if (r.ok) selectedUidSet.delete(r.uid);
+            await loadUsers();
+            setTimeout(() => { root.innerHTML = ''; }, failed.length ? 4000 : 1200);
+        } catch (err) {
+            $('#modal-progress').textContent = 'Error: ' + err.message;
+        }
+    });
+}
+</script>
+</body>
+</html>

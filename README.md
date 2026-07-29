@@ -56,3 +56,39 @@ cuando pasen todas copia el archivo a Firebase Console.
 
 - **Estudiantes:** Usar correos con dominio `@icesi.edu.co`
 - **Profesores:** Usar correos con dominio `@u.icesi.edu.co`
+
+## Consola de administración de usuarios
+
+Herramienta local (no forma parte del sitio publicado) para ver todos los
+usuarios de Firebase Authentication con su nombre/rol/curso — no solo el
+correo — y borrar varios a la vez, con limpieza automática de sus rastros en
+Firestore. Vive en [`scripts/admin-console/`](scripts/admin-console/).
+
+**Qué borra según el rol del usuario:**
+- **Estudiante matriculado:** su registro en cada curso (roster + badges) y
+  su matrícula global.
+- **Estudiante pendiente:** su solicitud en `temp-students`.
+- **Profesor:** solo su perfil. A propósito **no** se tocan sus cursos —
+  quedarían huérfanos, y la consola te avisa antes de confirmar.
+- **Sin rastro en Firestore ("huérfano"):** solo la cuenta de Auth.
+
+**Configuración (primera vez):**
+```bash
+cd scripts/admin-console
+cp admin-emails.example.json admin-emails.json   # si no existe ya
+# edita admin-emails.json con los correos autorizados a entrar
+```
+`admin-emails.json` está en `.gitignore` — nunca se sube.
+
+**Uso:**
+```bash
+cd scripts
+npm install
+npm run admin-console
+```
+Abre `http://127.0.0.1:4321`, inicia sesión con un correo de la allowlist
+(cuenta real de Firebase Auth de ese proyecto) y ya tienes la tabla.
+
+Corre solo en tu máquina — usa el mismo `serviceAccountKey.json` que los
+demás scripts, así que **nunca lo expongas a internet** (no hagas port
+forwarding, no lo despliegues).

@@ -6,9 +6,11 @@
   "scripts": {
     "inspect": "node inspect-firestore.js",
     "rules:test": "cd .. && ./scripts/node_modules/.bin/firebase emulators:exec --only firestore \"node scripts/rules-test.js\"",
-    "smoke:local": "node smoke-test.js"
+    "smoke:local": "node smoke-test.js",
+    "admin-console": "node admin-console/server.js"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "firebase-admin": "^12.0.0"
   },
   "devDependencies": {
