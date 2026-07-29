@@ -18,3 +18,7 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
+# Firebase emulator artifacts
+firestore-debug.log
+ui-debug.log
+.firebase/
