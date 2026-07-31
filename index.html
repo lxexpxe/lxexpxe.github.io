@@ -3138,15 +3138,20 @@
                         return;
                     }
 
-                    // Verificar que el código corresponda a un curso real
-                    const matchingCourses = await db.collectionGroup('courses').where('courseCode', '==', joinCourseCode).get();
-                    if (matchingCourses.empty) {
+                    // Verificar que el código corresponda a un curso real. La consulta
+                    // también puede devolver el doc del catálogo global (courses/{id} en
+                    // la raíz, que guarda una copia de courseCode pero no tiene
+                    // subcolección students) — se filtra para quedarnos solo con los
+                    // cursos reales dentro de professors/{uid}/courses.
+                    const matchingCoursesSnap = await db.collectionGroup('courses').where('courseCode', '==', joinCourseCode).get();
+                    const matchingCourses = matchingCoursesSnap.docs.filter(d => d.ref.path.includes('/professors/'));
+                    if (matchingCourses.length === 0) {
                         toast.showToast('Ese código de curso no existe. Verifica con tu profesor.', 'error');
                         return;
                     }
 
                     // Verificar si ya está aprobado en alguno de los cursos que coinciden
-                    for (const courseDoc of matchingCourses.docs) {
+                    for (const courseDoc of matchingCourses) {
                         const studentDoc = await courseDoc.ref.collection('students').doc(currentUser.uid).get();
                         if (studentDoc.exists) {
                             toast.showToast('Ya estás registrado en este curso', 'error');
