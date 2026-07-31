@@ -104,6 +104,12 @@ async function main() {
     );
 
     await check(
+        'Búsqueda de curso por código vía collectionGroup (necesaria porque professors/{uid} suele ser un doc fantasma)',
+        student2.collectionGroup('courses').where('courseCode', '==', '#HCI').get(),
+        true
+    );
+
+    await check(
         'Estudiante 2 crea su propia solicitud pendiente (temp-students)',
         student2.doc(`artifacts/${NS}/temp-students/${STUDENT_2}`).set({ email: 's2@icesi.edu.co', courseCode: '#HCI' }),
         true

@@ -324,6 +324,16 @@
 
             const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+            const courseCodeExists = async (code) => {
+                // collectionGroup en vez de recorrer professors -> courses: la
+                // mayoría de los docs professors/{uid} son "fantasma" (solo
+                // contenedor, sin datos propios) y una consulta normal de
+                // colección los salta por completo, dejando invisibles los
+                // cursos de esos profesores.
+                const snap = await db.collectionGroup('courses').where('courseCode', '==', code).get();
+                return !snap.empty;
+            };
+
             const sendVerificationEmail = async (email, code, fullName) => {
                 try {
                     emailjs.init('145MnHTSSDkBVKZAU');
@@ -477,6 +487,14 @@
                     );
                     const user = userCredential.user;
 
+                    if (pendingUserData.userType === 'student') {
+                        const validCode = await courseCodeExists(pendingUserData.courseCode);
+                        if (!validCode) {
+                            await user.delete();
+                            throw new Error('Curso no encontrado');
+                        }
+                    }
+
                     const userData = {
                         email: pendingUserData.email,
                         fullName: pendingUserData.fullName,
@@ -516,7 +534,13 @@
                     } else if (err.code === 'permission-denied') {
                         errorMessage = 'Error de permisos en Firestore. Verifica las reglas de seguridad.';
                     } else if (err.message === 'Curso no encontrado') {
-                        errorMessage = 'El código de curso no existe. Verifica con tu profesor.';
+                        errorMessage = 'El código de curso no existe. Verifica con tu profesor y llena el formulario de nuevo.';
+                        // Volver al formulario con los datos ya escritos (excepto la
+                        // contraseña) para que solo tenga que corregir el código.
+                        setShowCodeVerification(false);
+                        setVerificationCode('');
+                        setGeneratedCode('');
+                        setPendingUserData(null);
                     }
 
                     toast.showToast(errorMessage, 'error');
@@ -2928,6 +2952,9 @@
             const [showStudentNewPassword, setShowStudentNewPassword] = React.useState(false);
             const [showJoinCourse, setShowJoinCourse] = React.useState(false);
             const [joinCourseCode, setJoinCourseCode] = React.useState('');
+            const [editingPendingCode, setEditingPendingCode] = React.useState(false);
+            const [pendingCodeInput, setPendingCodeInput] = React.useState('');
+            const [fixingPendingCode, setFixingPendingCode] = React.useState(false);
             const [showQRScanner, setShowQRScanner] = React.useState(false);
             const [forceShowQR, setForceShowQR] = React.useState(false);
             const [showQRTimeWarning, setShowQRTimeWarning] = React.useState(false);
@@ -3055,6 +3082,47 @@
                 pinchStartDistanceRef.current = null;
             };
 
+            const courseCodeExists = async (code) => {
+                // collectionGroup en vez de recorrer professors -> courses: la
+                // mayoría de los docs professors/{uid} son "fantasma" (solo
+                // contenedor, sin datos propios) y una consulta normal de
+                // colección los salta por completo, dejando invisibles los
+                // cursos de esos profesores.
+                const snap = await db.collectionGroup('courses').where('courseCode', '==', code).get();
+                return !snap.empty;
+            };
+
+            const handleFixPendingCode = async (e) => {
+                e.preventDefault();
+                let code = pendingCodeInput.trim();
+                if (code && !code.startsWith('#')) code = '#' + code;
+
+                if (!code.startsWith('#') || code.length < 2) {
+                    toast.showToast('Ingresa un código de curso válido (#codigo)', 'error');
+                    return;
+                }
+
+                setFixingPendingCode(true);
+                try {
+                    const valid = await courseCodeExists(code);
+                    if (!valid) {
+                        toast.showToast('Ese código de curso no existe. Verifica con tu profesor.', 'error');
+                        return;
+                    }
+
+                    await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`).update({ courseCode: code });
+                    toast.showToast('Código actualizado. Esperando aprobación del profesor.', 'success');
+                    setEditingPendingCode(false);
+                    setPendingCodeInput('');
+                    loadCourseData();
+                } catch (error) {
+                    console.error('Error actualizando código de curso:', error);
+                    toast.showToast('Error actualizando el código', 'error');
+                } finally {
+                    setFixingPendingCode(false);
+                }
+            };
+
             const handleJoinCourse = async (e) => {
                 e.preventDefault();
                 if (!joinCourseCode.startsWith('#')) {
@@ -3070,21 +3138,19 @@
                         return;
                     }
 
-                    // Verificar si ya está aprobado en algún curso con este código
-                    const professorsSnapshot = await db.collection('artifacts/academic-platform/professors').get();
+                    // Verificar que el código corresponda a un curso real
+                    const matchingCourses = await db.collectionGroup('courses').where('courseCode', '==', joinCourseCode).get();
+                    if (matchingCourses.empty) {
+                        toast.showToast('Ese código de curso no existe. Verifica con tu profesor.', 'error');
+                        return;
+                    }
 
-                    for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/academic-platform/professors/${professorDoc.id}/courses`)
-                            .where('courseCode', '==', joinCourseCode)
-                            .get();
-
-                        for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/academic-platform/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
-
-                            if (studentDoc.exists) {
-                                toast.showToast('Ya estás registrado en este curso', 'error');
-                                return;
-                            }
+                    // Verificar si ya está aprobado en alguno de los cursos que coinciden
+                    for (const courseDoc of matchingCourses.docs) {
+                        const studentDoc = await courseDoc.ref.collection('students').doc(currentUser.uid).get();
+                        if (studentDoc.exists) {
+                            toast.showToast('Ya estás registrado en este curso', 'error');
+                            return;
                         }
                     }
 
@@ -3722,6 +3788,51 @@
                                         Puedes cerrar esta página y volver más tarde.
                                     </p>
                                 </div>
+
+                                {editingPendingCode ? (
+                                    <form onSubmit={handleFixPendingCode} className="text-left mb-6">
+                                        <label className="block text-sm font-bold mb-2">
+                                            Nuevo código de curso
+                                        </label>
+                                        <input
+                                            className="input-field w-full py-3 px-4 rounded-lg focus:outline-none mb-3"
+                                            type="text"
+                                            placeholder="#codigo_del_profesor"
+                                            value={pendingCodeInput}
+                                            onChange={(e) => setPendingCodeInput(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-3">
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary flex-1"
+                                                disabled={fixingPendingCode}
+                                            >
+                                                {fixingPendingCode && <Loader2 className="w-5 h-5" />}
+                                                Guardar código
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => { setEditingPendingCode(false); setPendingCodeInput(''); }}
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+                                        ¿El profesor no encuentra tu solicitud? Puede que el código tenga un error.{' '}
+                                        <button
+                                            type="button"
+                                            className="font-semibold underline"
+                                            style={{ color: 'var(--accent-color)' }}
+                                            onClick={() => { setEditingPendingCode(true); setPendingCodeInput(userData.courseCode || ''); }}
+                                        >
+                                            Corregir código de curso
+                                        </button>
+                                    </p>
+                                )}
 
                                 <div className="flex justify-center gap-3">
                                     <ThemeToggle />
