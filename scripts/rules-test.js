@@ -133,6 +133,27 @@ async function main() {
         true
     );
 
+    await check(
+        'Estudiante 1 corrige su propio fullName (único campo que cambia)',
+        student1.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).update({ fullName: 'Nombre Corregido' }),
+        true
+    );
+
+    await check(
+        'Profesor A archiva un doc de asistencia en attendance-archive ("Nuevo Semestre")',
+        profA.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance-archive/2026-08-02`).set({
+            date: '2026-08-02', courseId: COURSE_A, professorId: PROF_A,
+            students: [{ studentId: STUDENT_1, studentName: 'Estudiante 1', timestamp: new Date(), source: 'manual' }]
+        }),
+        true
+    );
+
+    await check(
+        'Profesor A borra un doc de asistencia de su curso ("Nuevo Semestre")',
+        profA.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-02`).delete(),
+        true
+    );
+
     console.log('\n--- Casos que DEBEN bloquearse ---');
 
     await check(
@@ -192,6 +213,30 @@ async function main() {
     await check(
         'Estudiante NO puede borrar el curso de un profesor',
         student1.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}`).delete(),
+        false
+    );
+
+    await check(
+        'Estudiante 2 NO puede cambiar el fullName de Estudiante 1',
+        student2.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).update({ fullName: 'Suplantado' }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede colar un cambio de badges junto con su fullName',
+        student1.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).update({ fullName: 'Otro Nombre', badgesEarned: ['b1', 'b2', 'b3'] }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede leer attendance-archive del curso',
+        student1.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance-archive/2026-08-02`).get(),
+        false
+    );
+
+    await check(
+        'Profesor B NO puede borrar asistencia del curso de Profesor A',
+        profB.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-04`).delete(),
         false
     );
 

@@ -825,6 +825,9 @@
             const [showQRTeacherWarning, setShowQRTeacherWarning] = React.useState(false);
             const [forceShowTeacherQR, setForceShowTeacherQR] = React.useState(false);
             const [attendanceData, setAttendanceData] = React.useState({});
+            const [showNewSemesterConfirm, setShowNewSemesterConfirm] = React.useState(false);
+            const [newSemesterPeriod, setNewSemesterPeriod] = React.useState('');
+            const [newSemesterLoading, setNewSemesterLoading] = React.useState(false);
             const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
@@ -1188,6 +1191,59 @@
                     setAttendanceData(attendanceByDate);
                 } catch (error) {
                     console.error('Error cargando asistencia:', error);
+                }
+            };
+
+            const chunkArray = (arr, size) => {
+                const chunks = [];
+                for (let i = 0; i < arr.length; i += size) {
+                    chunks.push(arr.slice(i, i + size));
+                }
+                return chunks;
+            };
+
+            const startNewSemester = async () => {
+                if (!selectedCourse) return;
+
+                setNewSemesterLoading(true);
+                try {
+                    const attendanceCollection = db.collection(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance`);
+                    const attendanceSnapshot = await attendanceCollection.get();
+
+                    if (!attendanceSnapshot.empty) {
+                        // No se borra el historial: se archiva en otra colección
+                        // (fuera de lo que lee loadAttendanceData) para que la
+                        // tabla del semestre actual arranque vacía sin perder los
+                        // registros de semestres anteriores.
+                        // 200 docs por lote (400 operaciones: set + delete cada uno,
+                        // bajo el límite de 500 operaciones por batch de Firestore).
+                        for (const chunk of chunkArray(attendanceSnapshot.docs, 200)) {
+                            const batch = db.batch();
+                            chunk.forEach(doc => {
+                                const archiveRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance-archive/${doc.id}`);
+                                batch.set(archiveRef, { ...doc.data(), archivedPeriod: selectedCourse.period || null });
+                                batch.delete(doc.ref);
+                            });
+                            await batch.commit();
+                        }
+                    }
+
+                    const trimmedPeriod = newSemesterPeriod.trim();
+                    if (trimmedPeriod) {
+                        await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`)
+                            .update({ period: trimmedPeriod });
+                        setSelectedCourse(prev => prev && prev.id === selectedCourse.id ? { ...prev, period: trimmedPeriod } : prev);
+                    }
+
+                    setAttendanceData({});
+                    setShowNewSemesterConfirm(false);
+                    setNewSemesterPeriod('');
+                    toast.showToast('Nuevo semestre iniciado: la tabla de asistencia quedó en blanco', 'success');
+                } catch (error) {
+                    console.error('Error iniciando nuevo semestre:', error);
+                    toast.showToast('Error iniciando nuevo semestre', 'error');
+                } finally {
+                    setNewSemesterLoading(false);
                 }
             };
 
@@ -1848,7 +1904,7 @@
                                         <thead>
                                             <tr className="border-b">
                                                 <th className="text-left p-3">Estudiante</th>
-                                                {dates.slice(0, 10).map(date => {
+                                                {dates.slice(-10).map(date => {
                                                     const dateFormatted = formatDateMmmDD(date);
                                                     return (
                                                         <th key={date} className="text-center p-3">
@@ -1871,7 +1927,7 @@
                                                 return (
                                                     <tr key={student.id} className="border-b hover:bg-gray-50">
                                                         <td className="p-3">{student.fullName}</td>
-                                                        {dates.slice(0, 10).map(date => {
+                                                        {dates.slice(-10).map(date => {
                                                             const attended = attendanceData[date]?.some(record => record.studentId === student.id);
                                                             return (
                                                                 <td key={date} className="text-center p-3">
@@ -1897,6 +1953,48 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (showNewSemesterConfirm) {
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="card rounded-xl p-6 w-full max-w-md mx-4">
+                            <h3 className="text-lg font-bold mb-4">Iniciar Nuevo Semestre</h3>
+                            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                                Esto archiva el historial de asistencia actual de <strong>{selectedCourse?.name}</strong> (no
+                                se borra, solo deja de mostrarse) y reinicia en blanco la tabla de fechas. El roster de
+                                estudiantes no se toca.
+                            </p>
+                            <label className="block text-sm font-medium mb-2">Nuevo periodo (opcional, ej. 2026-1)</label>
+                            <input
+                                className="input-field w-full py-3 px-4 rounded-lg focus:outline-none mb-4"
+                                type="text"
+                                placeholder="2026-1"
+                                value={newSemesterPeriod}
+                                onChange={(e) => setNewSemesterPeriod(e.target.value)}
+                            />
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowNewSemesterConfirm(false);
+                                        setNewSemesterPeriod('');
+                                    }}
+                                    className="btn btn-secondary flex-1"
+                                    disabled={newSemesterLoading}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={startNewSemester}
+                                    className="btn btn-primary flex-1"
+                                    disabled={newSemesterLoading}
+                                >
+                                    {newSemesterLoading ? 'Iniciando...' : 'Iniciar Nuevo Semestre'}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2512,12 +2610,24 @@
                             <div className="card rounded-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-bold">{selectedCourse.name}</h2>
-                                    <button
-                                        onClick={() => editWeekContent(0)}
-                                        className="btn btn-secondary text-sm"
-                                    >
-                                        ✏️ Editar Información General
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setNewSemesterPeriod(selectedCourse.period || '');
+                                                setShowNewSemesterConfirm(true);
+                                            }}
+                                            className="btn btn-secondary text-sm"
+                                            title="Archiva el historial de asistencia y reinicia la tabla para un semestre nuevo"
+                                        >
+                                            🆕 Nuevo Semestre
+                                        </button>
+                                        <button
+                                            onClick={() => editWeekContent(0)}
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            ✏️ Editar Información General
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                     {Array.from({ length: selectedCourse.weeks }, (_, i) => i + 1).map(weekNum => {
@@ -2943,6 +3053,8 @@
             const qrScannerStartInProgressRef = React.useRef(false);
             const pinchStartDistanceRef = React.useRef(null);
             const pinchStartZoomRef = React.useRef(1);
+            const courseDataReadyRef = React.useRef(false);
+            const scanHandledRef = React.useRef(false);
             const [profileData, setProfileData] = React.useState({
                 fullName: '',
                 currentPassword: '',
@@ -3062,6 +3174,15 @@
                     return;
                 }
 
+                if (!courseDataReadyRef.current) {
+                    // Evita registrar el nombre real del estudiante con un
+                    // valor de respaldo (ej. el usuario del correo) mientras
+                    // loadCourseData() todavía está resolviendo sus cursos
+                    // aprobados en segundo plano.
+                    toast.showToast('Espera un momento a que carguen tus datos e inténtalo de nuevo', 'info');
+                    return;
+                }
+
                 try {
                     // Verificar si ya está pendiente con este código
                     const tempStudentDoc = await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`).get();
@@ -3134,6 +3255,15 @@
                             await db.doc(`artifacts/academic-platform/temp-students/${currentUser.uid}`)
                                 .update({ fullName: profileData.fullName });
                         }
+
+                        // Cada curso guarda su propia copia de fullName en el roster
+                        // del profesor, así que hay que propagar el cambio a todos los
+                        // cursos donde el estudiante ya está aprobado, no solo al primero.
+                        await Promise.all(courses.map(course =>
+                            db.doc(`artifacts/academic-platform/professors/${course.professorId}/courses/${course.id}/students/${currentUser.uid}`)
+                                .update({ fullName: profileData.fullName })
+                        ));
+
                         toast.showToast('Nombre actualizado', 'success');
                     }
 
@@ -3186,6 +3316,7 @@
                 console.log('[QR-SCANNER] Iniciando diagnóstico de cámara...');
                 pinchStartDistanceRef.current = null;
                 pinchStartZoomRef.current = 1;
+                scanHandledRef.current = false;
 
                 setTimeout(async () => {
                     try {
@@ -3251,8 +3382,14 @@
                                             const qrData = JSON.parse(decodedText);
 
                                             if (qrData.courseId && qrData.date && qrData.professorId) {
+                                                // Marcar el escaneo como resuelto ANTES de tocar el
+                                                // track de video: el setup de zoom que sigue corriendo
+                                                // en paralelo (más abajo) puede fallar al leer
+                                                // capacidades de un track que este stop() ya detuvo,
+                                                // y eso no debe mostrarse como "Error de cámara".
+                                                scanHandledRef.current = true;
                                                 await registerAttendance(qrData);
-                                                html5QrCode.stop().finally(() => {
+                                                html5QrCode.stop().catch(() => {}).finally(() => {
                                                     setShowQRScanner(false);
                                                 });
                                             } else {
@@ -3289,7 +3426,7 @@
                         setQrZoomStep(0.5);
                         setQrZoomValue(1);
 
-                        if (activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
+                        if (!scanHandledRef.current && activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
                             const capabilities = activeScanner.getRunningTrackCapabilities();
                             if (capabilities && capabilities.zoom) {
                                 const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
@@ -3321,7 +3458,13 @@
                         const fullError = formatQRError(err);
                         setQrScannerErrorDetail(fullError);
                         appendQRLog(`Fallo final: ${fullError}`);
-                        toast.showToast('Error de cámara', 'error');
+                        if (!scanHandledRef.current) {
+                            // Si ya se registró la asistencia con éxito, esta excepción
+                            // es solo fallout de detener la cámara/leer capacidades de
+                            // un track que el propio escaneo exitoso ya cerró — no es un
+                            // error real que el usuario deba ver.
+                            toast.showToast('Error de cámara', 'error');
+                        }
                         scannerRef.current = null;
                         appendQRLog('El modal permanece abierto para revisar diagnóstico y reintentar.');
                     } finally {
@@ -3603,6 +3746,10 @@
                 } catch (error) {
                     console.error('Error cargando datos del curso:', error);
                     setProfessorName('Error cargando');
+                } finally {
+                    // Se marca listo en todos los caminos (incluido error) para
+                    // no dejar bloqueado permanentemente el botón "Unirse a un curso".
+                    courseDataReadyRef.current = true;
                 }
             };
 

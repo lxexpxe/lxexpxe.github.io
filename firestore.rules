@@ -44,6 +44,14 @@ service cloud.firestore {
             // los maneja el profesor).
             allow read: if signedIn() && (request.auth.uid == profId || request.auth.uid == studentId);
             allow write: if signedIn() && request.auth.uid == profId;
+
+            // Excepción puntual: el estudiante puede corregir su propio
+            // fullName (se copia como snapshot al aprobar en cada curso, así
+            // que un cambio de perfil debe poder propagarse a todos). Solo se
+            // permite si fullName es el ÚNICO campo que cambia — badges,
+            // approvedAt, etc. siguen bloqueados para el estudiante.
+            allow update: if signedIn() && request.auth.uid == studentId &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName']);
           }
         }
       }
@@ -90,6 +98,16 @@ service cloud.firestore {
               request.resource.data.students[resource.data.students.size()].studentId == request.auth.uid
             )
           );
+
+          // Solo el profesor dueño puede borrar un doc de asistencia — lo usa
+          // "Nuevo Semestre" al moverlo a attendance-archive.
+          allow delete: if signedIn() && ownsCourse(request.auth.uid, courseId);
+        }
+
+        match /attendance-archive/{date} {
+          // Historial archivado por "Nuevo Semestre": nadie más que el
+          // profesor dueño necesita verlo o tocarlo.
+          allow read, write: if signedIn() && ownsCourse(request.auth.uid, courseId);
         }
 
         match /enrollments/{studentId} {
