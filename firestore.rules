@@ -19,6 +19,17 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(profId)/courses/$(courseId));
     }
 
+    // Regla aparte para collectionGroup('courses'): las reglas anidadas de
+    // más abajo (dentro de /artifacts/academic-platform/...) solo cubren
+    // lecturas por ruta directa/subcolección — una consulta collectionGroup
+    // necesita su propia regla con wildcard recursivo para autorizarse,
+    // aunque el permiso real (mismo: cualquier autenticado) sea idéntico.
+    // Esto es lo que permite buscar un curso por código sin depender de que
+    // el doc professors/{uid} "exista" (la mayoría son fantasma).
+    match /{path=**}/courses/{courseId} {
+      allow read: if signedIn();
+    }
+
     match /artifacts/academic-platform {
 
       match /professors/{profId} {
