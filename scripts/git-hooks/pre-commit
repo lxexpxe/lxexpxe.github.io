@@ -1,0 +1,20 @@
+#!/bin/sh
+# Aviso (NO bloqueante) de que la rama local puede estar desactualizada antes
+# de comitear. Vive dentro del repo para poder compartirse entre máquinas con:
+#   git config core.hooksPath scripts/git-hooks
+# Git siempre ejecuta los hooks con el directorio de trabajo en la raíz del
+# repo, así que no hace falta resolver ninguna ruta aquí.
+
+git fetch --quiet origin main 2>/dev/null || exit 0
+
+behind=$(git rev-list --count HEAD..origin/main 2>/dev/null)
+
+if [ -n "$behind" ] && [ "$behind" -gt 0 ] 2>/dev/null; then
+  echo ""
+  echo "⚠️  Aviso: tu rama local está $behind commit(s) detrás de origin/main."
+  echo "   Vas a comitear sobre una base desactualizada. Considera hacer 'git pull'"
+  echo "   antes de seguir, para evitar sorpresas al hacer push después."
+  echo ""
+fi
+
+exit 0

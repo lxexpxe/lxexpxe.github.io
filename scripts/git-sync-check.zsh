@@ -24,6 +24,22 @@ _lxexpxe_git_sync_check() {
   [[ "$ahead" -gt 0 ]] && echo "ℹ️  lxexpxe.github.io: tienes $ahead commit(s) locales sin subir — corre 'git push'."
 }
 
+# Repite el chequeo en cada prompt (no solo al hacer cd), para que una
+# ventana/pestaña dejada abierta mucho tiempo (ej. VS Code) también se
+# refresque sola — pero sin hacer `git fetch` en cada Enter: se limita a
+# como mucho una vez cada _LXEXPXE_CHECK_INTERVAL_SECONDS.
+_LXEXPXE_LAST_CHECK=0
+_LXEXPXE_CHECK_INTERVAL_SECONDS=600
+_lxexpxe_git_sync_check_throttled() {
+  [[ "$PWD" == "$_LXEXPXE_REPO_DIR"* ]] || return
+  local now
+  now=$(date +%s)
+  (( now - _LXEXPXE_LAST_CHECK < _LXEXPXE_CHECK_INTERVAL_SECONDS )) && return
+  _LXEXPXE_LAST_CHECK=$now
+  _lxexpxe_git_sync_check
+}
+
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _lxexpxe_git_sync_check
+add-zsh-hook precmd _lxexpxe_git_sync_check_throttled
 [[ "$PWD" == "$_LXEXPXE_REPO_DIR"* ]] && _lxexpxe_git_sync_check
