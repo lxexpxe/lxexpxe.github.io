@@ -1178,6 +1178,47 @@
                 }
             };
 
+            const approveAllPending = async () => {
+                if (pendingStudents.length === 0) return;
+                if (!confirm(`¿Aprobar a los ${pendingStudents.length} estudiante(s) pendientes de este curso?`)) {
+                    return;
+                }
+
+                const results = await Promise.allSettled(pendingStudents.map(async (studentData) => {
+                    const studentInfo = {
+                        ...studentData,
+                        approvedAt: new Date(),
+                        badgesEarned: [],
+                        badgeStatus: {},
+                        lastBadgeEarned: null
+                    };
+
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${studentData.id}`)
+                        .set(studentInfo);
+
+                    await db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/enrollments/${studentData.id}`)
+                        .set({
+                            studentId: studentData.id,
+                            fullName: studentData.fullName,
+                            email: studentData.email,
+                            enrolledAt: new Date()
+                        });
+
+                    await db.doc(`artifacts/academic-platform/temp-students/${studentData.id}`).delete();
+                }));
+
+                const failed = results.filter(r => r.status === 'rejected').length;
+                const approved = results.length - failed;
+                if (failed > 0) {
+                    console.error('Fallos aprobando estudiantes:', results.filter(r => r.status === 'rejected'));
+                    toast.showToast(`${approved} aprobado(s), ${failed} fallaron`, approved > 0 ? 'info' : 'error');
+                } else {
+                    toast.showToast(`${approved} estudiante(s) aprobado(s)`, 'success');
+                }
+                loadStudents();
+                loadPendingStudents();
+            };
+
             const generateTodayQR = () => {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1495,6 +1536,28 @@
                     console.error('Error removiendo estudiante:', error);
                     toast.showToast('Error removiendo estudiante', 'error');
                 }
+            };
+
+            const removeAllStudents = async () => {
+                if (students.length === 0) return;
+                if (!confirm(`¿Estás seguro de que quieres remover a los ${students.length} estudiante(s) de este curso? Esta acción no se puede deshacer.`)) {
+                    return;
+                }
+
+                const results = await Promise.allSettled(students.map(async (student) => {
+                    await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}/students/${student.id}`).delete();
+                    await db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/enrollments/${student.id}`).delete();
+                }));
+
+                const failed = results.filter(r => r.status === 'rejected').length;
+                const removed = results.length - failed;
+                if (failed > 0) {
+                    console.error('Fallos removiendo estudiantes:', results.filter(r => r.status === 'rejected'));
+                    toast.showToast(`${removed} removido(s), ${failed} fallaron`, removed > 0 ? 'info' : 'error');
+                } else {
+                    toast.showToast(`${removed} estudiante(s) removido(s)`, 'success');
+                }
+                loadStudents();
             };
 
             const deleteCourse = async () => {
@@ -2710,6 +2773,14 @@
                                         >
                                             {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
                                         </button>
+                                        {!showPendingStudents && !showRanking && students.length > 0 && (
+                                            <button
+                                                onClick={removeAllStudents}
+                                                className="btn btn-secondary text-sm bg-red-100 text-red-800 hover:bg-red-200"
+                                            >
+                                                🗑️ Remover Todos
+                                            </button>
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                                 Código para compartir: <strong>{selectedCourse.courseCode}</strong>
@@ -2731,8 +2802,18 @@
                                 {showPendingStudents ? (
                                     <div className="space-y-4">
                                         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                            <h3 className="font-semibold text-orange-800 mb-2">Estudiantes Pendientes de Aprobación</h3>
-                                            <p className="text-sm text-orange-700 mb-4">Estos estudiantes se han registrado y esperan tu aprobación para unirse al curso.</p>
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div>
+                                                    <h3 className="font-semibold text-orange-800 mb-2">Estudiantes Pendientes de Aprobación</h3>
+                                                    <p className="text-sm text-orange-700">Estos estudiantes se han registrado y esperan tu aprobación para unirse al curso.</p>
+                                                </div>
+                                                <button
+                                                    onClick={approveAllPending}
+                                                    className="px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 text-sm whitespace-nowrap"
+                                                >
+                                                    ✓ Aprobar Todas ({pendingStudents.length})
+                                                </button>
+                                            </div>
                                         </div>
                                         {pendingStudents.map(student => (
                                             <div key={student.id} className="border rounded-lg p-4 bg-white">
