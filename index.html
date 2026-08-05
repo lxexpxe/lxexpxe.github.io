@@ -852,6 +852,7 @@
             const [showNewSemesterConfirm, setShowNewSemesterConfirm] = React.useState(false);
             const [newSemesterPeriod, setNewSemesterPeriod] = React.useState('');
             const [newSemesterLoading, setNewSemesterLoading] = React.useState(false);
+            const [creatingTodayRecord, setCreatingTodayRecord] = React.useState(false);
             const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
@@ -1044,10 +1045,7 @@
             React.useEffect(() => {
                 if (selectedCourse) {
                     loadStudents();
-                    loadPendingStudents();
                     if (showAttendance) {
-                        loadAttendanceData();
-
                         // Verificar si es la hora correcta para mostrar el QR
                         const isCorrectTime = isCurrentClassTimeTeacher(selectedCourse);
                         console.log('[TEACHER-QR] isCorrectTime:', isCorrectTime, 'forceShowTeacherQR:', forceShowTeacherQR);
@@ -1062,6 +1060,56 @@
                     }
                 }
             }, [selectedCourse, showAttendance, forceShowTeacherQR]);
+
+            // Listener en tiempo real (en vez de recargar manualmente después de
+            // cada aprobar/rechazar): con varias aprobaciones seguidas, cada
+            // recarga manual competía por ser la última en resolver, y la que
+            // ganaba la carrera podía pisar el estado con una foto ya vieja,
+            // dejando estudiantes ya aprobados marcados como pendientes hasta
+            // recargar la página. onSnapshot siempre converge al estado real
+            // del servidor sin importar el orden de resolución.
+            React.useEffect(() => {
+                if (!selectedCourse) {
+                    setPendingStudents([]);
+                    return;
+                }
+
+                const unsubscribe = db.collection('artifacts/academic-platform/temp-students')
+                    .where('courseCode', '==', selectedCourse.courseCode)
+                    .onSnapshot(
+                        (snapshot) => {
+                            setPendingStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        },
+                        (error) => {
+                            console.error('Error escuchando estudiantes pendientes:', error);
+                        }
+                    );
+
+                return () => unsubscribe();
+            }, [selectedCourse?.courseCode]);
+
+            // Listener en tiempo real de asistencia mientras la pantalla del QR
+            // está abierta: antes había que salir a home y volver para ver un
+            // escaneo nuevo, porque loadAttendanceData() solo leía una vez.
+            React.useEffect(() => {
+                if (!selectedCourse || !showAttendance) return;
+
+                const unsubscribe = db.collection(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance`)
+                    .onSnapshot(
+                        (snapshot) => {
+                            const attendanceByDate = {};
+                            snapshot.docs.forEach(doc => {
+                                attendanceByDate[doc.id] = doc.data().students || [];
+                            });
+                            setAttendanceData(attendanceByDate);
+                        },
+                        (error) => {
+                            console.error('Error escuchando asistencia:', error);
+                        }
+                    );
+
+                return () => unsubscribe();
+            }, [selectedCourse?.id, showAttendance]);
 
             const loadUserData = async () => {
                 try {
@@ -1115,25 +1163,6 @@
                 }
             };
 
-            const loadPendingStudents = async () => {
-                if (!selectedCourse) return;
-
-                try {
-                    const tempStudentsQuery = await db.collection('artifacts/academic-platform/temp-students')
-                        .where('courseCode', '==', selectedCourse.courseCode)
-                        .get();
-
-                    const pendingData = tempStudentsQuery.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                    setPendingStudents(pendingData);
-                } catch (error) {
-                    console.error('Error cargando estudiantes pendientes:', error);
-                }
-            };
-
             const approveStudent = async (studentData) => {
                 try {
                     const studentInfo = {
@@ -1160,7 +1189,6 @@
 
                     toast.showToast('Estudiante aprobado exitosamente', 'success');
                     loadStudents();
-                    loadPendingStudents();
                 } catch (error) {
                     console.error('Error aprobando estudiante:', error);
                     toast.showToast('Error aprobando estudiante', 'error');
@@ -1171,7 +1199,6 @@
                 try {
                     await db.doc(`artifacts/academic-platform/temp-students/${studentId}`).delete();
                     toast.showToast('Estudiante rechazado', 'success');
-                    loadPendingStudents();
                 } catch (error) {
                     console.error('Error rechazando estudiante:', error);
                     toast.showToast('Error rechazando estudiante', 'error');
@@ -1216,7 +1243,6 @@
                     toast.showToast(`${approved} estudiante(s) aprobado(s)`, 'success');
                 }
                 loadStudents();
-                loadPendingStudents();
             };
 
             const generateTodayQR = () => {
@@ -1240,23 +1266,6 @@
                         });
                     }
                 }, 100);
-            };
-
-            const loadAttendanceData = async () => {
-                if (!selectedCourse) return;
-
-                try {
-                    const attendanceSnapshot = await db.collection(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance`).get();
-
-                    const attendanceByDate = {};
-                    attendanceSnapshot.docs.forEach(doc => {
-                        attendanceByDate[doc.id] = doc.data().students || [];
-                    });
-
-                    setAttendanceData(attendanceByDate);
-                } catch (error) {
-                    console.error('Error cargando asistencia:', error);
-                }
             };
 
             const chunkArray = (arr, size) => {
@@ -1309,6 +1318,37 @@
                     toast.showToast('Error iniciando nuevo semestre', 'error');
                 } finally {
                     setNewSemesterLoading(false);
+                }
+            };
+
+            const createTodayAttendanceRecord = async () => {
+                if (!selectedCourse) return;
+
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+                setCreatingTodayRecord(true);
+                try {
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${today}`);
+                    const existing = await attendanceRef.get();
+                    if (existing.exists) {
+                        toast.showToast('Ya existe un registro de asistencia para hoy', 'info');
+                        return;
+                    }
+
+                    await attendanceRef.set({
+                        date: today,
+                        courseId: selectedCourse.id,
+                        professorId: currentUser.uid,
+                        students: []
+                    });
+
+                    toast.showToast('Registro de hoy creado en la tabla de asistencia', 'success');
+                } catch (error) {
+                    console.error('Error creando el registro de asistencia de hoy:', error);
+                    toast.showToast('Error creando el registro de hoy', 'error');
+                } finally {
+                    setCreatingTodayRecord(false);
                 }
             };
 
@@ -1962,7 +2002,19 @@
                                     </div>
 
                                     <div className="flex flex-col h-full min-h-0">
-                                        <h3 className="font-semibold mb-4">Asistencia de Hoy</h3>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="font-semibold">Asistencia de Hoy</h3>
+                                            {attendanceData[today] === undefined && (
+                                                <button
+                                                    onClick={createTodayAttendanceRecord}
+                                                    disabled={creatingTodayRecord}
+                                                    className="btn btn-secondary text-xs px-3 py-1"
+                                                    title="Crea el registro de hoy en la tabla de asistencia sin esperar el primer escaneo"
+                                                >
+                                                    {creatingTodayRecord ? 'Creando...' : '+ Crear día de hoy'}
+                                                </button>
+                                            )}
+                                        </div>
                                         <div className="bg-gray-50 rounded-lg p-4 flex-1 min-h-0 overflow-y-auto">
                                             {attendanceData[today] && attendanceData[today].length > 0 ? (
                                                 <ul className="space-y-2">
