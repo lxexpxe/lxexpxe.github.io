@@ -2964,7 +2964,11 @@
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        {students.map(student => {
+                                        {[...students].sort((a, b) => {
+                                            const nameA = (a.fullName || a.email || '').toLowerCase();
+                                            const nameB = (b.fullName || b.email || '').toLowerCase();
+                                            return nameA.localeCompare(nameB, 'es');
+                                        }).map(student => {
                                             const isExpanded = expandedStudent === student.id;
                                             return (
                                                 <div key={student.id} className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
