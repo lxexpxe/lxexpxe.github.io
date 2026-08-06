@@ -99,13 +99,22 @@ service cloud.firestore {
           // registro de asistencia. Un estudiante matriculado solo puede
           // *agregarse a sí mismo* al final del arreglo students — no puede
           // tocar ni borrar los registros de otros.
+          // El chequeo de "prefijo sin cambios" (students[0:N] == students viejo)
+          // se salta cuando el arreglo viejo está vacío: el motor de reglas de
+          // Firestore no soporta slices vacíos (students[0:0]) — revienta con un
+          // error interno de índice fuera de rango en vez de devolver [], que es
+          // justo el caso real de un doc creado por el botón "Crear día de hoy"
+          // (students: []) antes de que nadie escanee.
           allow update: if signedIn() && (
             ownsCourse(request.auth.uid, courseId) ||
             (
               exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(resource.data.professorId)/courses/$(courseId)/students/$(request.auth.uid)) &&
               request.resource.data.professorId == resource.data.professorId &&
               request.resource.data.students.size() == resource.data.students.size() + 1 &&
-              request.resource.data.students[0:resource.data.students.size()] == resource.data.students &&
+              (
+                resource.data.students.size() == 0 ||
+                request.resource.data.students[0:resource.data.students.size()] == resource.data.students
+              ) &&
               request.resource.data.students[resource.data.students.size()].studentId == request.auth.uid
             )
           );

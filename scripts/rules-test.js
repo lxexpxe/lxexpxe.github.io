@@ -62,6 +62,11 @@ async function main() {
             date: '2026-08-04', courseId: COURSE_A, professorId: PROF_A,
             students: [{ studentId: STUDENT_2, studentName: 'Estudiante 2', timestamp: new Date() }]
         });
+        // Simula el botón "Crear día de hoy": doc de asistencia pre-creado por
+        // el profesor con students vacío, antes de que nadie escanee.
+        await db.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-05`).set({
+            date: '2026-08-05', courseId: COURSE_A, professorId: PROF_A, students: []
+        });
     });
 
     const profA = testEnv.authenticatedContext(PROF_A).firestore();
@@ -125,6 +130,14 @@ async function main() {
         'Estudiante 1 se auto-registra en asistencia (primer check-in del día, incluye professorId)',
         student1.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-01`).set({
             date: '2026-08-01', courseId: COURSE_A, professorId: PROF_A,
+            students: [{ studentId: STUDENT_1, studentName: 'Estudiante 1', timestamp: new Date() }]
+        }),
+        true
+    );
+
+    await check(
+        'Estudiante 1 se auto-registra en un doc de asistencia ya creado con students=[] ("Crear día de hoy")',
+        student1.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-05`).update({
             students: [{ studentId: STUDENT_1, studentName: 'Estudiante 1', timestamp: new Date() }]
         }),
         true
