@@ -5215,21 +5215,31 @@
                                 </radialGradient>
                             </defs>
                             <image href="assets/expedition-map-bg.png" x="0" y="0" width="1200" height="460" preserveAspectRatio="xMidYMid slice" />
-                            {EXPEDITION_MISSIONS.slice(0, -1).map(m => {
+                            {EXPEDITION_MISSIONS.slice(0, -1).map((m, i) => {
                                 const a = EXPEDITION_MAP_POSITIONS[m.wk];
                                 const b = EXPEDITION_MAP_POSITIONS[m.wk + 1];
                                 const midX = (a.x + b.x) / 2;
                                 const unlockedB = isMissionUnlocked(progress, m.wk + 1);
-                                // Por defecto el camino sale/entra de cada nodo en
-                                // horizontal (tangente hacia el punto medio). En
-                                // los tramos 5→6 y 8→9 se fuerza la llegada por
-                                // ARRIBA del nodo destino, y en 6→7 y 9→10 la
-                                // salida por ABAJO del nodo de origen — así el
-                                // camino rodea esos nodos en vez de cruzar recto.
-                                let c1 = { x: midX, y: a.y };
-                                let c2 = { x: midX, y: b.y };
-                                if (m.wk === 5 || m.wk === 8) { c2 = { x: b.x, y: b.y - 60 }; }
-                                if (m.wk === 6 || m.wk === 9) { c1 = { x: a.x, y: a.y + 60 }; }
+                                let c1, c2;
+                                if (m.wk === 5 || m.wk === 8) {
+                                    // Entra al nodo siguiente por ARRIBA.
+                                    c1 = { x: midX, y: a.y };
+                                    c2 = { x: b.x, y: b.y - 60 };
+                                } else if (m.wk === 6 || m.wk === 9) {
+                                    // Sale del nodo actual por ABAJO.
+                                    c1 = { x: a.x, y: a.y + 60 };
+                                    c2 = { x: midX, y: b.y };
+                                } else {
+                                    // Ola vertical decorativa alternada: sin esto,
+                                    // los tramos donde ambos nodos tienen una altura
+                                    // parecida se ven casi rectos. El signo alterna
+                                    // por tramo para que el camino ondule de forma
+                                    // pareja en vez de solo curvarse donde la
+                                    // diferencia de altura entre nodos ya es grande.
+                                    const wave = (i % 2 === 0) ? -45 : 45;
+                                    c1 = { x: a.x + (b.x - a.x) * 0.33, y: a.y + wave };
+                                    c2 = { x: a.x + (b.x - a.x) * 0.66, y: b.y + wave };
+                                }
                                 return (
                                     <path
                                         key={m.wk}
