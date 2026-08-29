@@ -47,6 +47,7 @@ async function main() {
     const STUDENT_1 = 'student1';
     const STUDENT_2 = 'student2';
     const STUDENT_3_NOT_ENROLLED = 'student3';
+    const TEAM_A = 'teamA';
 
     // --- Seed baseline data with admin (rules bypassed) ---
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -66,6 +67,12 @@ async function main() {
         // el profesor con students vacío, antes de que nadie escanee.
         await db.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-05`).set({
             date: '2026-08-05', courseId: COURSE_A, professorId: PROF_A, students: []
+        });
+        await db.doc(`artifacts/${NS}/teams/${TEAM_A}`).set({
+            name: 'Equipo A', memberUids: [STUDENT_1], professorId: PROF_A, createdAt: new Date()
+        });
+        await db.doc(`artifacts/${NS}/progress/${TEAM_A}`).set({
+            '1': { status: 'open', note: '', crystals: 0 }
         });
     });
 
@@ -173,6 +180,36 @@ async function main() {
         true
     );
 
+    await check(
+        'Cualquier profesor crea un equipo de la expedición',
+        profA.doc(`artifacts/${NS}/teams/otroEquipo`).set({ name: 'Otro Equipo', memberUids: [STUDENT_2], professorId: PROF_A, createdAt: new Date() }),
+        true
+    );
+
+    await check(
+        'Estudiante 2 (no es del equipo) puede LEER el equipo de Estudiante 1',
+        student2.doc(`artifacts/${NS}/teams/${TEAM_A}`).get(),
+        true
+    );
+
+    await check(
+        'Estudiante 1 (miembro del equipo) envía su propio avance: status y note',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.status': 'submitted', '1.note': 'Bitácora lista' }),
+        true
+    );
+
+    await check(
+        'Profesor A califica el avance del equipo: crystals y status:"done"',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.status': 'done', '1.crystals': 80 }),
+        true
+    );
+
+    await check(
+        'Cualquier profesor publica un anuncio de la expedición',
+        profA.doc(`artifacts/${NS}/announcements/annA`).set({ text: 'Nueva señal detectada', date: new Date().toISOString(), professorId: PROF_A }),
+        true
+    );
+
     console.log('\n--- Casos que DEBEN bloquearse ---');
 
     await check(
@@ -256,6 +293,36 @@ async function main() {
     await check(
         'Profesor B NO puede borrar asistencia del curso de Profesor A',
         profB.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-04`).delete(),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede asignarse crystals a sí mismo (semana aparte para no chocar con el caso ya calificado)',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '2.status': 'submitted', '2.crystals': 100 }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede ponerse status:"done" a sí mismo',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '3.status': 'done', '3.note': 'listo' }),
+        false
+    );
+
+    await check(
+        'Estudiante 2 (no es del equipo) NO puede escribir el avance de Equipo A',
+        student2.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '4.status': 'submitted', '4.note': 'intento ajeno' }),
+        false
+    );
+
+    await check(
+        'Estudiante NO puede crear/editar equipos de la expedición',
+        student1.doc(`artifacts/${NS}/teams/equipoFalso`).set({ name: 'Equipo Falso', memberUids: [STUDENT_1], professorId: PROF_A }),
+        false
+    );
+
+    await check(
+        'Estudiante NO puede publicar anuncios de la expedición',
+        student1.doc(`artifacts/${NS}/announcements/annFalso`).set({ text: 'falso', date: new Date().toISOString(), professorId: PROF_A }),
         false
     );
 

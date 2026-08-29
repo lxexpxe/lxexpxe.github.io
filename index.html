@@ -845,6 +845,7 @@
             const [pendingStudents, setPendingStudents] = React.useState([]);
             const [showPendingStudents, setShowPendingStudents] = React.useState(false);
             const [showAttendance, setShowAttendance] = React.useState(false);
+            const [showExpedition, setShowExpedition] = React.useState(false);
             const [qrTeacherVisible, setQrTeacherVisible] = React.useState(true);
             const [showQRTeacherWarning, setShowQRTeacherWarning] = React.useState(false);
             const [forceShowTeacherQR, setForceShowTeacherQR] = React.useState(false);
@@ -1924,6 +1925,10 @@
                 );
             }
 
+            if (showExpedition) {
+                return <ExpeditionPage currentUser={currentUser} role="professor" onBack={() => setShowExpedition(false)} />;
+            }
+
             if (showAttendance) {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2685,6 +2690,13 @@
                                     📋
                                 </button>
                                 <button
+                                    onClick={() => setShowExpedition(true)}
+                                    className="btn btn-secondary"
+                                    title="Expedición"
+                                >
+                                    🧭
+                                </button>
+                                <button
                                     onClick={() => setShowProfile(true)}
                                     className="btn btn-secondary"
                                     title="Perfil de usuario"
@@ -3203,6 +3215,7 @@
             const [pendingCodeInput, setPendingCodeInput] = React.useState('');
             const [fixingPendingCode, setFixingPendingCode] = React.useState(false);
             const [showQRScanner, setShowQRScanner] = React.useState(false);
+            const [showExpedition, setShowExpedition] = React.useState(false);
             const [forceShowQR, setForceShowQR] = React.useState(false);
             const [showQRTimeWarning, setShowQRTimeWarning] = React.useState(false);
             const scannerRef = React.useRef(null);
@@ -4141,6 +4154,10 @@
                 );
             }
 
+            if (showExpedition) {
+                return <ExpeditionPage currentUser={currentUser} role="student" onBack={() => setShowExpedition(false)} />;
+            }
+
             return (
                 <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
@@ -4200,6 +4217,13 @@
                                     title="Registrar asistencia"
                                 >
                                     📷
+                                </button>
+                                <button
+                                    onClick={() => setShowExpedition(true)}
+                                    className="btn btn-secondary"
+                                    title="Expedición"
+                                >
+                                    🧭
                                 </button>
                                 <button
                                     onClick={() => setShowProfile(true)}
@@ -4696,6 +4720,756 @@
                     <footer className="mt-8 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
                         Developed by<br />Leandro Flórez-Aristizábal, Ph.D
                     </footer>
+                </div>
+            );
+        }
+
+        // ============================================================
+        // EXPEDICIÓN — juego educativo de 12 semanas (proceso Doble Diamante)
+        // ============================================================
+
+        const EXPEDITION_MISSIONS = [
+            { wk: 1, phase: 1, code: 'D1-S1', title: 'Bitácora de Campo y Duelo de Entrevistas', objective: 'Explorar el campus como territorio inexplorado: observar y entrevistar para detectar problemas reales, no inventados.',
+              tasks: [
+                'Recorrer mínimo 3 sectores del campus y registrar 5 problemas observados con foto/video.',
+                'Diseñar un guion de entrevista semiestructurado de 6-8 preguntas abiertas.',
+                'Intercambiar el guion con otro equipo para detectar preguntas dirigidas.',
+                'Realizar mínimo 5 entrevistas usando preguntas abiertas, con consentimiento verbal explicado.'
+              ], deliverable: "Documento 'Bitácora de Campo' + guion de entrevista validado + evidencia visual (fotos/video)." },
+            { wk: 2, phase: 1, code: 'D1-S2', title: 'Codificación y Cierre de la Misión Descubrir', objective: 'Transformar las entrevistas crudas en patrones de sentido mediante codificación abierta.',
+              tasks: [
+                'Transcribir las 5 entrevistas, anonimizando a los participantes (E1, E2...).',
+                'Subrayar frases repetidas entre entrevistados y agruparlas en 3-5 códigos/temas.',
+                'Construir una matriz de codificación con la frecuencia de cada tema.',
+                'Redactar la Declaración Oficial de la Misión con el enfoque metodológico (cualitativo/cuantitativo/mixto).'
+              ], deliverable: 'Transcripciones anonimizadas + matriz de codificación + Declaración Oficial de la Misión.' },
+            { wk: 3, phase: 2, code: 'D2-S1', title: 'Selección del Problema y Árbol de Problemas', objective: 'Convergir en un solo problema, fundamentado en evidencia, y mapear sus causas y consecuencias.',
+              tasks: [
+                'Seleccionar el problema con mayor frecuencia/impacto según la matriz de codificación.',
+                'Responder las preguntas 5W+H (Qué, Quién, Dónde, Cuándo, Por qué, Cómo).',
+                'Construir el árbol de problemas: tronco, raíces (causas) y ramas (consecuencias).',
+                'Redactar el planteamiento del problema (contexto, síntomas, causas, consecuencias, situación deseada) sin mencionar soluciones.'
+              ], deliverable: 'Árbol de problemas + planteamiento del problema escrito.' },
+            { wk: 4, phase: 2, code: 'D2-S2', title: 'Revisión Sistemática de la Literatura', objective: 'Fundamentar el problema con evidencia académica siguiendo un protocolo de búsqueda replicable.',
+              tasks: [
+                'Definir 3-5 palabras clave y sus equivalentes en inglés.',
+                'Construir cadenas de búsqueda con operadores booleanos (AND/OR).',
+                'Definir criterios de inclusión/exclusión antes de buscar.',
+                'Buscar en al menos 2 bases de datos académicas y registrar resultados en una bitácora de búsqueda.',
+                'Construir una matriz de síntesis con mínimo 6 fuentes (autor/año, objetivo, metodología, hallazgo, relación con el problema).'
+              ], deliverable: 'Bitácora de búsqueda + matriz de síntesis de literatura.' },
+            { wk: 5, phase: 2, code: 'D2-S3', title: 'Pregunta, Objetivos e Hipótesis', objective: 'Convertir el problema fundamentado en una pregunta de investigación clara y objetivos verificables.',
+              tasks: [
+                'Formular la pregunta de investigación a partir del planteamiento del problema y la literatura.',
+                'Redactar el objetivo general (responde a la pregunta de forma amplia).',
+                'Redactar 3 objetivos específicos tipo SMART.',
+                'Plantear una hipótesis verificable que responda tentativamente a la pregunta.'
+              ], deliverable: 'Pregunta de investigación + objetivo general + objetivos específicos + hipótesis.' },
+            { wk: 6, phase: 2, code: 'D2-S4', title: 'Justificación y Reto HMW — Cierre del Diamante 1', objective: 'Argumentar por qué vale la pena el proyecto y abrir la puerta a la ideación con una pregunta HMW.',
+              tasks: [
+                'Redactar la justificación cubriendo originalidad, importancia, interés y viabilidad.',
+                "Formular al menos 3 preguntas '¿Cómo podríamos...?' (HMW) a partir del problema.",
+                'Seleccionar la pregunta HMW más prometedora, ni muy amplia ni una solución disfrazada.',
+                'Consolidar el Informe de Investigación Formal con todo lo producido en la Fase Definir.'
+              ], deliverable: 'Informe de Investigación Formal completo + pregunta HMW seleccionada.' },
+            { wk: 7, phase: 3, code: 'D3-S1', title: 'Ideación — Tormenta de Estrellas', objective: 'Generar el mayor número de ideas de solución posibles antes de converger en una.',
+              tasks: [
+                'Cada integrante genera individualmente 10 ideas de solución a la pregunta HMW.',
+                "Compartir en equipo sin criticar (regla 'sí, y además...') y agrupar ideas similares.",
+                "Realizar una ronda de Crazy 8's: 8 variaciones visuales rápidas de una posible solución.",
+                'Evaluar las ideas agrupadas en una matriz de Impacto vs. Factibilidad.'
+              ], deliverable: "Registro de ideación (fotos del brainstorming y Crazy 8's) + matriz de priorización con la idea elegida." },
+            { wk: 8, phase: 3, code: 'D3-S2', title: 'Prototipado Fundamentado', objective: 'Construir un prototipo navegable, respaldando decisiones clave de diseño con literatura puntual.',
+              tasks: [
+                'Construir bocetos o wireframes de las pantallas/interacciones principales.',
+                'Antes de decidir un patrón de interfaz clave, buscar 1-2 referencias de UX/usabilidad que lo respalden.',
+                'Construir un prototipo interactivo navegable (Figma u otra herramienta) de fidelidad media-alta.',
+                'Documentar cada decisión de diseño relevante con su referencia.'
+              ], deliverable: 'Prototipo navegable + documento de decisiones de diseño con referencias.' },
+            { wk: 9, phase: 3, code: 'D3-S3', title: 'Refinamiento — Cierre del Diamante 2 (parte 1)', objective: 'Pulir el prototipo y dejarlo listo para ser puesto a prueba con usuarios reales.',
+              tasks: [
+                'Revisar el prototipo completo en equipo y corregir inconsistencias.',
+                'Verificar que el prototipo resuelve directamente la pregunta HMW seleccionada.',
+                'Preparar una lista de tareas candidatas para las pruebas de usuario de la próxima semana.'
+              ], deliverable: 'Prototipo refinado + lista preliminar de tareas para pruebas de usuario.' },
+            { wk: 10, phase: 4, code: 'D4-S1', title: 'Plan y Ejecución de Pruebas de Usuario', objective: 'Poner el prototipo frente a usuarios reales y recoger evidencia sobre si resuelve el problema.',
+              tasks: [
+                'Diseñar el protocolo de pruebas: tareas concretas + qué se va a medir (tiempo, éxito/error, satisfacción).',
+                'Pilotear el protocolo con un compañero de otro equipo y ajustar instrucciones ambiguas.',
+                'Ejecutar las pruebas con mínimo 5 usuarios representativos, sin guiarlos durante la tarea.',
+                'Registrar observaciones cualitativas y datos cuantitativos de cada prueba.'
+              ], deliverable: 'Protocolo de pruebas + registro completo de las 5+ pruebas (datos y observaciones).' },
+            { wk: 11, phase: 4, code: 'D4-S2', title: 'Análisis y Contraste de la Hipótesis', objective: 'Cerrar el ciclo investigativo: interpretar los datos y responder si la hipótesis se sostuvo o no.',
+              tasks: [
+                'Organizar los datos cuantitativos en tablas o gráficos simples.',
+                'Agrupar las observaciones cualitativas en patrones recurrentes.',
+                '¿La evidencia apoya, refuta o matiza la hipótesis planteada? Responder explícitamente.',
+                'Proponer al menos 2 ajustes concretos que harían al prototipo en una siguiente iteración.'
+              ], deliverable: 'Informe de análisis con contraste explícito de la hipótesis + ajustes propuestos.' },
+            { wk: 12, phase: 4, code: 'D4-S3', title: 'Informe Final y Presentación — Fin de la Expedición', objective: 'Comunicar todo el proceso investigativo y de diseño a una audiencia no especializada.',
+              tasks: [
+                'Consolidar el informe final: problema, literatura, pregunta/objetivos/hipótesis, ideación, prototipo, pruebas, hallazgos.',
+                'Preparar una presentación de máximo 10 minutos para el jurado académico.',
+                'Incluir conclusiones, limitaciones del estudio y trabajo futuro.',
+                'Ensayar la presentación en equipo antes de la sesión final.'
+              ], deliverable: 'Informe final consolidado + presentación ante jurado académico.' }
+        ];
+
+        const EXPEDITION_PHASES = {
+            1: { name: 'Descubrir', color: '#4E8FD4' },
+            2: { name: 'Definir', color: '#33A88F' },
+            3: { name: 'Desarrollar', color: '#D9A441' },
+            4: { name: 'Entregar', color: '#E0674F' }
+        };
+
+        const EXPEDITION_MAX_PER_MISSION = 100;
+
+        function ExpeditionPage({ currentUser, role, onBack }) {
+            const db = firebase.firestore();
+            const toast = useToast();
+
+            const [loading, setLoading] = React.useState(true);
+            const [activeWeek, setActiveWeek] = React.useState(1);
+            const [announcements, setAnnouncements] = React.useState([]);
+
+            // --- estado de profesor ---
+            const [profCourses, setProfCourses] = React.useState([]);
+            const [profTeams, setProfTeams] = React.useState([]);
+            const [profProgressByTeam, setProfProgressByTeam] = React.useState({});
+            const [profTab, setProfTab] = React.useState('overview');
+            const [newTeamName, setNewTeamName] = React.useState('');
+            const [rosterCourseId, setRosterCourseId] = React.useState('');
+            const [rosterStudents, setRosterStudents] = React.useState([]);
+            const [knownStudents, setKnownStudents] = React.useState({});
+            const [emailToAdd, setEmailToAdd] = React.useState({});
+            const [reviewInputs, setReviewInputs] = React.useState({});
+            const [announcementText, setAnnouncementText] = React.useState('');
+
+            // --- estado de estudiante ---
+            const [myTeam, setMyTeam] = React.useState(null);
+            const [myProgress, setMyProgress] = React.useState(null);
+            const [noteInput, setNoteInput] = React.useState('');
+            const [submitting, setSubmitting] = React.useState(false);
+
+            // ===== Carga y listeners: PROFESOR =====
+            React.useEffect(() => {
+                if (role !== 'professor') return;
+
+                (async () => {
+                    try {
+                        const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses`).get();
+                        setProfCourses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    } catch (error) {
+                        console.error('Error cargando cursos:', error);
+                    }
+                })();
+
+                const unsubTeams = db.collection('artifacts/academic-platform/teams')
+                    .where('professorId', '==', currentUser.uid)
+                    .onSnapshot(snap => {
+                        setProfTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                        setLoading(false);
+                    }, error => {
+                        console.error('Error escuchando equipos:', error);
+                        setLoading(false);
+                    });
+
+                const unsubAnn = db.collection('artifacts/academic-platform/announcements')
+                    .where('professorId', '==', currentUser.uid)
+                    .onSnapshot(snap => {
+                        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+                    }, error => console.error('Error escuchando anuncios:', error));
+
+                return () => { unsubTeams(); unsubAnn(); };
+            }, [role]);
+
+            React.useEffect(() => {
+                if (role !== 'professor' || profTeams.length === 0) return;
+                const unsubs = profTeams.map(team =>
+                    db.doc(`artifacts/academic-platform/progress/${team.id}`).onSnapshot(snap => {
+                        setProfProgressByTeam(prev => ({ ...prev, [team.id]: snap.exists ? snap.data() : {} }));
+                    }, error => console.error('Error escuchando progreso:', error))
+                );
+                return () => unsubs.forEach(u => u());
+            }, [role, profTeams.map(t => t.id).join(',')]);
+
+            const loadRosterForCourse = async (courseId) => {
+                setRosterCourseId(courseId);
+                if (!courseId) { setRosterStudents([]); return; }
+                try {
+                    const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${courseId}/students`).get();
+                    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setRosterStudents(list);
+                    setKnownStudents(prev => {
+                        const next = { ...prev };
+                        list.forEach(s => { next[s.id] = { fullName: s.fullName, email: s.email }; });
+                        return next;
+                    });
+                } catch (error) {
+                    console.error('Error cargando roster:', error);
+                    toast.showToast('Error cargando el roster del curso', 'error');
+                }
+            };
+
+            const createTeam = async () => {
+                const name = newTeamName.trim();
+                if (!name) { toast.showToast('Ingresa un nombre de equipo', 'error'); return; }
+                try {
+                    await db.collection('artifacts/academic-platform/teams').add({
+                        name, memberUids: [], professorId: currentUser.uid, createdAt: new Date()
+                    });
+                    setNewTeamName('');
+                    toast.showToast('Equipo creado', 'success');
+                } catch (error) {
+                    console.error('Error creando equipo:', error);
+                    toast.showToast('Error creando equipo', 'error');
+                }
+            };
+
+            const addMemberUid = async (teamId, uid) => {
+                const team = profTeams.find(t => t.id === teamId);
+                if (team && (team.memberUids || []).includes(uid)) {
+                    toast.showToast('Ese estudiante ya está en el equipo', 'info');
+                    return;
+                }
+                try {
+                    await db.doc(`artifacts/academic-platform/teams/${teamId}`).update({
+                        memberUids: firebase.firestore.FieldValue.arrayUnion(uid)
+                    });
+                    toast.showToast('Integrante agregado', 'success');
+                } catch (error) {
+                    console.error('Error agregando integrante:', error);
+                    toast.showToast('Error agregando integrante', 'error');
+                }
+            };
+
+            const addMemberByEmail = async (teamId) => {
+                const email = (emailToAdd[teamId] || '').trim().toLowerCase();
+                if (!email) { toast.showToast('Ingresa un correo', 'error'); return; }
+                try {
+                    let found = null;
+                    for (const course of profCourses) {
+                        const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${course.id}/students`)
+                            .where('email', '==', email).get();
+                        if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
+                    }
+                    if (!found) {
+                        toast.showToast('No encontramos ese correo en tus cursos', 'error');
+                        return;
+                    }
+                    setKnownStudents(prev => ({ ...prev, [found.id]: { fullName: found.fullName, email: found.email } }));
+                    await addMemberUid(teamId, found.id);
+                    setEmailToAdd(prev => ({ ...prev, [teamId]: '' }));
+                } catch (error) {
+                    console.error('Error buscando el correo:', error);
+                    toast.showToast('Error buscando el correo', 'error');
+                }
+            };
+
+            const removeMember = async (teamId, uid) => {
+                try {
+                    await db.doc(`artifacts/academic-platform/teams/${teamId}`).update({
+                        memberUids: firebase.firestore.FieldValue.arrayRemove(uid)
+                    });
+                } catch (error) {
+                    console.error('Error quitando integrante:', error);
+                    toast.showToast('Error quitando integrante', 'error');
+                }
+            };
+
+            const deleteTeam = async (teamId) => {
+                if (!confirm('¿Borrar este equipo y su progreso? No se puede deshacer.')) return;
+                try {
+                    await db.doc(`artifacts/academic-platform/teams/${teamId}`).delete();
+                    await db.doc(`artifacts/academic-platform/progress/${teamId}`).delete();
+                    toast.showToast('Equipo eliminado', 'success');
+                } catch (error) {
+                    console.error('Error borrando equipo:', error);
+                    toast.showToast('Error borrando equipo', 'error');
+                }
+            };
+
+            const gradeSubmission = async (teamId, wk) => {
+                const key = `${teamId}-${wk}`;
+                let crystals = parseInt(reviewInputs[key], 10);
+                if (isNaN(crystals)) { toast.showToast('Ingresa un número de cristales válido', 'error'); return; }
+                crystals = Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, crystals));
+                try {
+                    await db.doc(`artifacts/academic-platform/progress/${teamId}`).update({
+                        [`${wk}.status`]: 'done',
+                        [`${wk}.crystals`]: crystals
+                    });
+                    toast.showToast('Entrega calificada', 'success');
+                } catch (error) {
+                    console.error('Error calificando entrega:', error);
+                    toast.showToast('Error calificando entrega', 'error');
+                }
+            };
+
+            const publishAnnouncement = async () => {
+                const text = announcementText.trim();
+                if (!text) { toast.showToast('Escribe un texto para el anuncio', 'error'); return; }
+                try {
+                    await db.collection('artifacts/academic-platform/announcements').add({
+                        text, date: new Date().toISOString(), professorId: currentUser.uid
+                    });
+                    setAnnouncementText('');
+                    toast.showToast('Anuncio publicado', 'success');
+                } catch (error) {
+                    console.error('Error publicando anuncio:', error);
+                    toast.showToast('Error publicando anuncio', 'error');
+                }
+            };
+
+            // ===== Carga y listeners: ESTUDIANTE =====
+            React.useEffect(() => {
+                if (role !== 'student') return;
+
+                const unsubTeam = db.collection('artifacts/academic-platform/teams')
+                    .where('memberUids', 'array-contains', currentUser.uid)
+                    .onSnapshot(snap => {
+                        if (snap.empty) {
+                            setMyTeam(null);
+                            setLoading(false);
+                            return;
+                        }
+                        setMyTeam({ id: snap.docs[0].id, ...snap.docs[0].data() });
+                        setLoading(false);
+                    }, error => {
+                        console.error('Error buscando mi equipo:', error);
+                        setLoading(false);
+                    });
+
+                const unsubAnn = db.collection('artifacts/academic-platform/announcements')
+                    .onSnapshot(snap => {
+                        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+                    }, error => console.error('Error escuchando anuncios:', error));
+
+                return () => { unsubTeam(); unsubAnn(); };
+            }, [role, currentUser.uid]);
+
+            React.useEffect(() => {
+                if (role !== 'student' || !myTeam) { setMyProgress(null); return; }
+                const unsub = db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).onSnapshot(snap => {
+                    setMyProgress(snap.exists ? snap.data() : {});
+                }, error => console.error('Error escuchando mi progreso:', error));
+                return () => unsub();
+            }, [role, myTeam?.id]);
+
+            React.useEffect(() => {
+                if (role !== 'student' || !myProgress) return;
+                const firstOpen = EXPEDITION_MISSIONS.find(m => (myProgress[String(m.wk)] ? myProgress[String(m.wk)].status : 'open') !== 'done');
+                setActiveWeek(firstOpen ? firstOpen.wk : 12);
+            }, [role, myTeam?.id, !!myProgress]);
+
+            React.useEffect(() => {
+                const wk = String(activeWeek);
+                setNoteInput((myProgress && myProgress[wk] && myProgress[wk].note) || '');
+            }, [activeWeek, myTeam?.id]);
+
+            const submitMission = async () => {
+                if (!myTeam) return;
+                setSubmitting(true);
+                try {
+                    const wk = String(activeWeek);
+                    const existing = (myProgress && myProgress[wk]) || {};
+                    await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
+                        [wk]: {
+                            status: 'submitted',
+                            note: noteInput.trim(),
+                            crystals: existing.crystals || 0,
+                            submittedAt: new Date().toISOString()
+                        }
+                    }, { merge: true });
+                    toast.showToast('Entrega enviada. Espera la revisión del profesor.', 'success');
+                } catch (error) {
+                    console.error('Error enviando la entrega:', error);
+                    toast.showToast('Error enviando la entrega', 'error');
+                } finally {
+                    setSubmitting(false);
+                }
+            };
+
+            // ===== Helpers compartidos =====
+            const teamCrystals = (progress) => {
+                if (!progress) return 0;
+                return Object.values(progress).reduce((sum, wk) => sum + (wk.crystals || 0), 0);
+            };
+            const phaseCrystals = (progress, phase) => {
+                if (!progress) return 0;
+                return EXPEDITION_MISSIONS.filter(m => m.phase === phase)
+                    .reduce((sum, m) => sum + ((progress[String(m.wk)] && progress[String(m.wk)].crystals) || 0), 0);
+            };
+            const phaseMax = (phase) => EXPEDITION_MISSIONS.filter(m => m.phase === phase).length * EXPEDITION_MAX_PER_MISSION;
+            const statusOf = (progress, wk) => (progress && progress[String(wk)] && progress[String(wk)].status) || 'open';
+            const statusLabel = { open: 'Abierta', submitted: 'Enviada', done: 'Revisada' };
+
+            if (loading) {
+                return <LoadingSpinner />;
+            }
+
+            const renderJourney = (progress, onSelect) => (
+                <div className="flex flex-wrap gap-2 mb-6">
+                    {EXPEDITION_MISSIONS.map(m => {
+                        const st = statusOf(progress, m.wk);
+                        const crystalsHere = (progress && progress[String(m.wk)] && progress[String(m.wk)].crystals) || 0;
+                        const pct = Math.round((crystalsHere / EXPEDITION_MAX_PER_MISSION) * 100);
+                        return (
+                            <button
+                                key={m.wk}
+                                onClick={() => onSelect(m.wk)}
+                                className="text-left p-3 rounded-lg border flex-1"
+                                style={{
+                                    minWidth: '130px',
+                                    borderColor: activeWeek === m.wk ? EXPEDITION_PHASES[m.phase].color : 'var(--border-color)',
+                                    borderWidth: activeWeek === m.wk ? '2px' : '1px',
+                                    borderLeftWidth: '4px',
+                                    borderLeftColor: EXPEDITION_PHASES[m.phase].color,
+                                    backgroundColor: 'var(--bg-secondary)'
+                                }}
+                            >
+                                <div className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>SEM {String(m.wk).padStart(2, '0')} · {m.code}</div>
+                                <div className="text-sm font-semibold my-1" style={{ color: 'var(--text-primary)' }}>{m.title}</div>
+                                <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                                    backgroundColor: st === 'done' ? '#dcfce7' : st === 'submitted' ? '#fef3c7' : '#e0e7ff',
+                                    color: st === 'done' ? '#166534' : st === 'submitted' ? '#92400e' : '#3730a3'
+                                }}>{statusLabel[st]}</span>
+                                <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
+                                    <div className="h-1 rounded-full" style={{ width: `${pct}%`, backgroundColor: EXPEDITION_PHASES[m.phase].color }}></div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+
+            const header = (
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🧭 Expedición Doble Diamante</h1>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Diseño e investigación en 12 semanas</p>
+                    </div>
+                    <button onClick={onBack} className="btn btn-secondary">← Volver</button>
+                </div>
+            );
+
+            // ================= VISTA PROFESOR =================
+            if (role === 'professor') {
+                const sortedTeams = [...profTeams].sort((a, b) => teamCrystals(profProgressByTeam[b.id]) - teamCrystals(profProgressByTeam[a.id]));
+                const pendingReviews = [];
+                profTeams.forEach(team => {
+                    const progress = profProgressByTeam[team.id] || {};
+                    Object.entries(progress).forEach(([wk, data]) => {
+                        if (data.status === 'submitted') {
+                            const mission = EXPEDITION_MISSIONS.find(m => m.wk === Number(wk));
+                            pendingReviews.push({ team, wk: Number(wk), mission, note: data.note });
+                        }
+                    });
+                });
+
+                return (
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                        <div className="max-w-6xl mx-auto">
+                            {header}
+
+                            <div className="flex gap-2 mb-6 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                                {[
+                                    { id: 'overview', label: 'Visión general' },
+                                    { id: 'review', label: `Revisar envíos (${pendingReviews.length})` },
+                                    { id: 'teams', label: 'Equipos' },
+                                    { id: 'announce', label: 'Anuncios' }
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setProfTab(tab.id)}
+                                        className="px-3 py-2 text-sm font-semibold"
+                                        style={{
+                                            color: profTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
+                                            borderBottom: profTab === tab.id ? '2px solid var(--accent-color)' : '2px solid transparent'
+                                        }}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {profTab === 'overview' && (
+                                <div className="card rounded-xl p-6">
+                                    <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Tablero de comando</h2>
+                                    {sortedTeams.length === 0 ? (
+                                        <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos. Ve a la pestaña "Equipos" para crear el primero.</p>
+                                    ) : (
+                                        sortedTeams.map((team, i) => (
+                                            <div key={team.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>#{i + 1}</span>
+                                                <span className="flex-1 mx-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
+                                                <span className="font-mono" style={{ color: 'var(--accent-color)' }}>{teamCrystals(profProgressByTeam[team.id])} 💎</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {profTab === 'review' && (
+                                <div className="card rounded-xl p-6">
+                                    <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Envíos pendientes</h2>
+                                    <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Asigna cristales (0-{EXPEDITION_MAX_PER_MISSION}) a cada entrega.</p>
+                                    {pendingReviews.length === 0 ? (
+                                        <p style={{ color: 'var(--text-secondary)' }}>No hay envíos pendientes por revisar.</p>
+                                    ) : (
+                                        pendingReviews.map(item => (
+                                            <div key={`${item.team.id}-${item.wk}`} className="border rounded-lg p-4 mb-3" style={{ borderColor: 'var(--border-color)' }}>
+                                                <div className="text-xs uppercase font-mono mb-1" style={{ color: 'var(--text-secondary)' }}>
+                                                    {item.team.name} · Semana {item.wk} · {item.mission ? item.mission.title : ''}
+                                                </div>
+                                                <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note || 'Sin nota adjunta.'}</p>
+                                                <div className="flex gap-2 items-center">
+                                                    <input
+                                                        type="number" min="0" max={EXPEDITION_MAX_PER_MISSION}
+                                                        placeholder={`0-${EXPEDITION_MAX_PER_MISSION}`}
+                                                        className="input-field py-2 px-3 rounded-lg w-32"
+                                                        value={reviewInputs[`${item.team.id}-${item.wk}`] || ''}
+                                                        onChange={(e) => setReviewInputs(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: e.target.value }))}
+                                                    />
+                                                    <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary text-sm">Registrar revisión</button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {profTab === 'teams' && (
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    <div className="card rounded-xl p-6">
+                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Crear equipo</h2>
+                                        <input
+                                            type="text" placeholder="Nombre del equipo"
+                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
+                                            value={newTeamName}
+                                            onChange={(e) => setNewTeamName(e.target.value)}
+                                        />
+                                        <button onClick={createTeam} className="btn btn-primary text-sm">+ Crear equipo</button>
+
+                                        <h3 className="text-sm font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>Roster de un curso</h3>
+                                        <select
+                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
+                                            value={rosterCourseId}
+                                            onChange={(e) => loadRosterForCourse(e.target.value)}
+                                        >
+                                            <option value="">Selecciona un curso...</option>
+                                            {profCourses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                        {rosterStudents.length > 0 && (
+                                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                                Usa el selector "+ Agregar del roster" junto a cada equipo para sumar estudiantes de este curso.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="card rounded-xl p-6">
+                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Equipos registrados ({profTeams.length})</h2>
+                                        {profTeams.length === 0 ? (
+                                            <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos.</p>
+                                        ) : (
+                                            profTeams.map(team => (
+                                                <div key={team.id} className="border rounded-lg p-4 mb-3" style={{ borderColor: 'var(--border-color)' }}>
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
+                                                        <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-600 hover:underline">Eliminar</button>
+                                                    </div>
+                                                    <div className="space-y-1 mb-3">
+                                                        {(team.memberUids || []).length === 0 ? (
+                                                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin integrantes todavía.</p>
+                                                        ) : (
+                                                            (team.memberUids || []).map(uid => (
+                                                                <div key={uid} className="flex justify-between items-center text-sm">
+                                                                    <span style={{ color: 'var(--text-primary)' }}>
+                                                                        {(knownStudents[uid] && (knownStudents[uid].fullName || knownStudents[uid].email)) || uid}
+                                                                    </span>
+                                                                    <button onClick={() => removeMember(team.id, uid)} className="text-xs text-red-500 hover:underline">Quitar</button>
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                    {rosterStudents.length > 0 && (
+                                                        <div className="mb-2">
+                                                            <select
+                                                                className="input-field w-full py-1.5 px-2 rounded text-sm"
+                                                                value=""
+                                                                onChange={(e) => { if (e.target.value) addMemberUid(team.id, e.target.value); }}
+                                                            >
+                                                                <option value="">+ Agregar del roster...</option>
+                                                                {rosterStudents.filter(s => !(team.memberUids || []).includes(s.id)).map(s => (
+                                                                    <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="email" placeholder="correo@institucion.edu.co"
+                                                            className="input-field flex-1 py-1.5 px-2 rounded text-sm"
+                                                            value={emailToAdd[team.id] || ''}
+                                                            onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
+                                                        />
+                                                        <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ Por correo</button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {profTab === 'announce' && (
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    <div className="card rounded-xl p-6">
+                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Nueva transmisión</h2>
+                                        <textarea
+                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
+                                            rows="3"
+                                            placeholder="Ej: Nueva señal detectada — recuerden anexar evidencia visual."
+                                            value={announcementText}
+                                            onChange={(e) => setAnnouncementText(e.target.value)}
+                                        ></textarea>
+                                        <button onClick={publishAnnouncement} className="btn btn-primary text-sm">Enviar transmisión</button>
+                                    </div>
+                                    <div className="card rounded-xl p-6">
+                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Historial</h2>
+                                        {announcements.length === 0 ? (
+                                            <p style={{ color: 'var(--text-secondary)' }}>Sin transmisiones todavía.</p>
+                                        ) : (
+                                            announcements.map(a => (
+                                                <div key={a.id} className="border-l-4 rounded p-3 mb-2 text-sm" style={{ borderColor: 'var(--accent-color)', backgroundColor: 'var(--bg-primary)' }}>
+                                                    <div className="text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>{new Date(a.date).toLocaleString('es-CO')}</div>
+                                                    <p style={{ color: 'var(--text-primary)' }}>{a.text}</p>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // ================= VISTA ESTUDIANTE =================
+            if (!myTeam) {
+                return (
+                    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                        <div className="max-w-3xl mx-auto">
+                            {header}
+                            <div className="card rounded-xl p-8 text-center">
+                                <p style={{ color: 'var(--text-secondary)' }}>Aún no perteneces a ningún equipo de la expedición. Pídele a tu profesor que te agregue.</p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            const mission = EXPEDITION_MISSIONS.find(m => m.wk === activeWeek);
+            const phaseMeta = EXPEDITION_PHASES[mission.phase];
+            const currentEntry = (myProgress && myProgress[String(activeWeek)]) || { status: 'open', note: '', crystals: 0 };
+            const crystalsTotal = teamCrystals(myProgress);
+            const totalMax = EXPEDITION_MISSIONS.length * EXPEDITION_MAX_PER_MISSION;
+
+            return (
+                <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                    <div className="max-w-6xl mx-auto">
+                        {header}
+                        <div className="mb-2">
+                            <span className="text-xs uppercase font-mono" style={{ color: 'var(--text-secondary)' }}>Tripulación</span>
+                            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{myTeam.name}</h2>
+                        </div>
+
+                        {renderJourney(myProgress, setActiveWeek)}
+
+                        <div className="grid md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2 card rounded-xl p-6">
+                                <div className="text-xs uppercase font-mono mb-1" style={{ color: phaseMeta.color }}>
+                                    Fase {mission.phase} · {phaseMeta.name} — Semana {mission.wk}
+                                </div>
+                                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{mission.title}</h3>
+                                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>{mission.objective}</p>
+                                <div className="space-y-2 mb-4">
+                                    {mission.tasks.map((t, i) => (
+                                        <div key={i} className="flex gap-2 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                            <span>•</span><span>{t}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                                    <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--warning-color, #f59e0b)' }}>Entregable</div>
+                                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mission.deliverable}</p>
+                                </div>
+
+                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío</label>
+                                <textarea
+                                    className="input-field w-full py-2 px-3 rounded-lg mb-3"
+                                    rows="4"
+                                    placeholder="Pega aquí el enlace al documento/prototipo o un resumen de lo entregado..."
+                                    value={noteInput}
+                                    onChange={(e) => setNoteInput(e.target.value)}
+                                ></textarea>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">
+                                        {currentEntry.status === 'open' ? 'Enviar a revisión' : 'Actualizar envío'}
+                                    </button>
+                                    {currentEntry.status !== 'open' && (
+                                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                            Estado: <strong style={{ color: 'var(--text-primary)' }}>
+                                                {currentEntry.status === 'submitted' ? 'En revisión' : `Revisada — ${currentEntry.crystals} cristales`}
+                                            </strong>
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="card rounded-xl p-6 mb-4 text-center">
+                                    <div className="text-3xl font-bold" style={{ color: 'var(--accent-color)' }}>{crystalsTotal} 💎</div>
+                                    <div className="text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>cristales de insight</div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                                        <div className="h-2 rounded-full" style={{ width: `${Math.min(100, Math.round((crystalsTotal / totalMax) * 100))}%`, backgroundColor: 'var(--accent-color)' }}></div>
+                                    </div>
+                                    <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>{crystalsTotal} / {totalMax} posibles</p>
+                                </div>
+
+                                <div className="card rounded-xl p-6 mb-4">
+                                    <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Progreso por fase</h3>
+                                    {[1, 2, 3, 4].map(ph => {
+                                        const c = phaseCrystals(myProgress, ph);
+                                        const mx = phaseMax(ph);
+                                        const pct = mx ? Math.round((c / mx) * 100) : 0;
+                                        return (
+                                            <div key={ph} className="mb-3">
+                                                <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
+                                                    <span>{EXPEDITION_PHASES[ph].name}</span><span>{c}/{mx}</span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                    <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, backgroundColor: EXPEDITION_PHASES[ph].color }}></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {announcements.length > 0 && (
+                                    <div className="card rounded-xl p-6">
+                                        <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Transmisiones</h3>
+                                        {announcements.slice(0, 5).map(a => (
+                                            <div key={a.id} className="border-l-4 rounded p-2 mb-2 text-xs" style={{ borderColor: 'var(--accent-color)', backgroundColor: 'var(--bg-primary)' }}>
+                                                <div style={{ color: 'var(--text-secondary)' }}>{new Date(a.date).toLocaleDateString('es-CO')}</div>
+                                                <p style={{ color: 'var(--text-primary)' }}>{a.text}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         }

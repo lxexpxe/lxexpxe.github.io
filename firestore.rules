@@ -19,6 +19,37 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/artifacts/academic-platform/professors/$(profId)/courses/$(courseId));
     }
 
+    // --- Juego "Expedición" (teams/progress/announcements) ---
+
+    function isTeamMember(teamId) {
+      return exists(/databases/$(database)/documents/artifacts/academic-platform/teams/$(teamId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/artifacts/academic-platform/teams/$(teamId)).data.memberUids;
+    }
+
+    // progress/{teamId} es UN documento por equipo con una clave por semana
+    // ('1' a '12'), no una subcolección — así que "solo status/note, nunca
+    // crystals ni status:'done'" hay que validarlo dentro de cada clave de
+    // semana que cambió. Rules no tiene loops ni forma de sacar un elemento
+    // de un Set sin conocer la clave de antemano, así que se revisan las 12
+    // semanas una por una a mano; cada llamada es gratis si esa semana en
+    // particular no cambió.
+    function oldProgressData() {
+      return resource != null ? resource.data : {};
+    }
+
+    function weekEditOk(wk) {
+      return !(wk in request.resource.data.diff(oldProgressData()).affectedKeys()) || (
+        request.resource.data.get(wk, {}).get('crystals', 0) == oldProgressData().get(wk, {}).get('crystals', 0) &&
+        request.resource.data.get(wk, {}).get('status', '') != 'done'
+      );
+    }
+
+    function studentProgressEditOk() {
+      return weekEditOk('1') && weekEditOk('2') && weekEditOk('3') && weekEditOk('4') &&
+        weekEditOk('5') && weekEditOk('6') && weekEditOk('7') && weekEditOk('8') &&
+        weekEditOk('9') && weekEditOk('10') && weekEditOk('11') && weekEditOk('12');
+    }
+
     // Regla aparte para collectionGroup('courses'): las reglas anidadas de
     // más abajo (dentro de /artifacts/academic-platform/...) solo cubren
     // lecturas por ruta directa/subcolección — una consulta collectionGroup
@@ -146,6 +177,36 @@ service cloud.firestore {
         allow create, update: if signedIn() && request.auth.uid == studentId;
         allow read: if signedIn() && (request.auth.uid == studentId || isProfessor());
         allow delete: if signedIn() && isProfessor();
+      }
+
+      match /teams/{teamId} {
+        // Lectura abierta: cualquier estudiante autenticado necesita ver
+        // todos los equipos para poder elegir el suyo. Solo un profesor
+        // crea/edita/borra equipos — los estudiantes no se auto-asignan.
+        allow read: if signedIn();
+        allow write: if signedIn() && isProfessor();
+      }
+
+      match /progress/{teamId} {
+        // Lectura abierta (equipos ven su propio avance, y el de otros para
+        // el tablero de posiciones). Escritura:
+        //  - Cualquier profesor puede escribir libremente — incluye asignar
+        //    crystals y marcar status:'done' al calificar.
+        //  - Un miembro del equipo puede enviar/actualizar su propio avance
+        //    (status, note, submittedAt), pero nunca puede tocar crystals ni
+        //    ponerse a sí mismo status:'done' — eso es la calificación.
+        allow read: if signedIn();
+        allow write: if signedIn() && (
+          isProfessor() ||
+          (isTeamMember(teamId) && studentProgressEditOk())
+        );
+      }
+
+      match /announcements/{annId} {
+        // Lectura abierta a cualquier autenticado; solo un profesor publica
+        // transmisiones de la expedición.
+        allow read: if signedIn();
+        allow write: if signedIn() && isProfessor();
       }
     }
   }
