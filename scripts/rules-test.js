@@ -55,8 +55,8 @@ async function main() {
         await db.doc(`artifacts/${NS}/professors/${PROF_A}/profile/data`).set({ email: 'profa@icesi.edu.co', fullName: 'Profesor A' });
         await db.doc(`artifacts/${NS}/professors/${PROF_B}/profile/data`).set({ email: 'profb@icesi.edu.co', fullName: 'Profesor B' });
         await db.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}`).set({ name: 'HCI', courseCode: '#HCI', professorId: PROF_A });
-        await db.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).set({ fullName: 'Estudiante 1', badgesEarned: [] });
-        await db.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_2}`).set({ fullName: 'Estudiante 2', badgesEarned: [] });
+        await db.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).set({ fullName: 'Estudiante 1', badgesEarned: [], studentId: STUDENT_1 });
+        await db.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_2}`).set({ fullName: 'Estudiante 2', badgesEarned: [], studentId: STUDENT_2 });
         await db.doc(`artifacts/${NS}/courses/${COURSE_A}`).set({ courseName: 'Catálogo: HCI', professorId: PROF_A });
         await db.doc(`artifacts/${NS}/temp-students/otroEstudiante`).set({ email: 'x@icesi.edu.co' });
         await db.doc(`artifacts/${NS}/courses/${COURSE_A}/attendance/2026-08-04`).set({
@@ -118,6 +118,12 @@ async function main() {
     await check(
         'Búsqueda de curso por código vía collectionGroup (necesaria porque professors/{uid} suele ser un doc fantasma)',
         student2.collectionGroup('courses').where('courseCode', '==', '#HCI').get(),
+        true
+    );
+
+    await check(
+        'Estudiante 1 encuentra sus cursos vía collectionGroup(students).where(studentId==uid) (fix del profesor fantasma)',
+        student1.collectionGroup('students').where('studentId', '==', STUDENT_1).get(),
         true
     );
 
@@ -221,6 +227,12 @@ async function main() {
     await check(
         'Estudiante 2 NO puede leer el registro de Estudiante 1',
         student2.doc(`artifacts/${NS}/professors/${PROF_A}/courses/${COURSE_A}/students/${STUDENT_1}`).get(),
+        false
+    );
+
+    await check(
+        'Estudiante 2 NO puede usar collectionGroup(students) para leer los cursos de Estudiante 1',
+        student2.collectionGroup('students').where('studentId', '==', STUDENT_1).get(),
         false
     );
 

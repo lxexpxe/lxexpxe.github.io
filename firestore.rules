@@ -61,6 +61,20 @@ service cloud.firestore {
       allow read: if signedIn();
     }
 
+    // Misma razón que la de arriba: un estudiante necesita encontrar TODOS
+    // sus cursos matriculados vía collectionGroup('students') filtrando por
+    // el campo studentId — sin depender de enumerar professors, que se salta
+    // los que son fantasma. IMPORTANTE: para que Firestore autorice una query
+    // de collectionGroup, la condición debe coincidir con el campo que usa el
+    // propio where() del cliente (resource.data.studentId), NO con el
+    // segmento del path ({studentId} del ID del documento) — Firestore no
+    // puede correlacionar ambos aunque en la práctica sean iguales, y
+    // rechaza la query entera con permission-denied si la regla no calza
+    // exactamente con el filtro de la consulta.
+    match /{path=**}/students/{studentId} {
+      allow read: if signedIn() && resource != null && resource.data.studentId == request.auth.uid;
+    }
+
     match /artifacts/academic-platform {
 
       match /professors/{profId} {

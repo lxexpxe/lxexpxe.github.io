@@ -1168,6 +1168,7 @@
                 try {
                     const studentInfo = {
                         ...studentData,
+                        studentId: studentData.id,
                         approvedAt: new Date(),
                         badgesEarned: [],
                         badgeStatus: {},
@@ -1215,6 +1216,7 @@
                 const results = await Promise.allSettled(pendingStudents.map(async (studentData) => {
                     const studentInfo = {
                         ...studentData,
+                        studentId: studentData.id,
                         approvedAt: new Date(),
                         badgesEarned: [],
                         badgeStatus: {},
@@ -3951,26 +3953,28 @@
                         return;
                     }
 
-                    // Buscar en todos los profesores para encontrar TODOS los cursos del estudiante
-                    const professorsSnapshot = await db.collection('artifacts/academic-platform/professors').get();
+                    // collectionGroup en vez de enumerar professors: ese patrón se
+                    // salta cualquier professors/{uid} "fantasma" (el caso normal,
+                    // ya que el perfil real vive en profile/data) y dejaba al
+                    // estudiante en "Cargando..." para siempre si su profesor no
+                    // tenía datos propios en el doc raíz.
+                    const myEnrollments = await db.collectionGroup('students')
+                        .where('studentId', '==', currentUser.uid)
+                        .get();
+
                     const studentCourses = [];
+                    for (const studentDoc of myEnrollments.docs) {
+                        const courseRef = studentDoc.ref.parent.parent;
+                        const profRef = courseRef.parent.parent;
+                        const courseSnap = await courseRef.get();
+                        if (!courseSnap.exists) continue;
 
-                    for (const professorDoc of professorsSnapshot.docs) {
-                        const coursesSnapshot = await db.collection(`artifacts/academic-platform/professors/${professorDoc.id}/courses`).get();
-
-                        for (const courseDoc of coursesSnapshot.docs) {
-                            const studentDoc = await db.doc(`artifacts/academic-platform/professors/${professorDoc.id}/courses/${courseDoc.id}/students/${currentUser.uid}`).get();
-
-                            if (studentDoc.exists) {
-                                const courseData = courseDoc.data();
-                                studentCourses.push({
-                                    id: courseDoc.id,
-                                    professorId: professorDoc.id,
-                                    studentData: studentDoc.data(),
-                                    ...courseData
-                                });
-                            }
-                        }
+                        studentCourses.push({
+                            id: courseRef.id,
+                            professorId: profRef.id,
+                            studentData: studentDoc.data(),
+                            ...courseSnap.data()
+                        });
                     }
 
                     if (studentCourses.length > 0) {
