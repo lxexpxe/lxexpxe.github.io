@@ -4864,6 +4864,8 @@
             const [profProgressByTeam, setProfProgressByTeam] = React.useState({});
             const [profTab, setProfTab] = React.useState('overview');
             const [newTeamName, setNewTeamName] = React.useState('');
+            const [editingTeamId, setEditingTeamId] = React.useState(null);
+            const [editTeamName, setEditTeamName] = React.useState('');
             const [rosterStudents, setRosterStudents] = React.useState([]);
             const [knownStudents, setKnownStudents] = React.useState({});
             const [emailToAdd, setEmailToAdd] = React.useState({});
@@ -4874,6 +4876,7 @@
             const [myTeam, setMyTeam] = React.useState(null);
             const [myProgress, setMyProgress] = React.useState(null);
             const [noteInput, setNoteInput] = React.useState('');
+            const [linkInputs, setLinkInputs] = React.useState(['']);
             const [submitting, setSubmitting] = React.useState(false);
 
             // ===== Carga y listeners: PROFESOR =====
@@ -4953,6 +4956,14 @@
                     toast.showToast('Ese estudiante ya está en el equipo', 'info');
                     return;
                 }
+                // Un estudiante solo puede pertenecer a un equipo de la Expedición
+                // a la vez — se revisa aquí también porque "+ Por correo" no pasa
+                // por el filtro del selector "+ Agregar del roster".
+                const otherTeam = profTeams.find(t => t.id !== teamId && (t.memberUids || []).includes(uid));
+                if (otherTeam) {
+                    toast.showToast(`Ese estudiante ya está en el equipo "${otherTeam.name}"`, 'error');
+                    return;
+                }
                 try {
                     await db.doc(`artifacts/academic-platform/teams/${teamId}`).update({
                         memberUids: firebase.firestore.FieldValue.arrayUnion(uid)
@@ -5006,6 +5017,19 @@
                 } catch (error) {
                     console.error('Error borrando equipo:', error);
                     toast.showToast('Error borrando equipo', 'error');
+                }
+            };
+
+            const renameTeam = async (teamId, name) => {
+                const trimmed = name.trim();
+                if (!trimmed) { toast.showToast('Ingresa un nombre de equipo', 'error'); return; }
+                try {
+                    await db.doc(`artifacts/academic-platform/teams/${teamId}`).update({ name: trimmed });
+                    setEditingTeamId(null);
+                    toast.showToast('Nombre actualizado', 'success');
+                } catch (error) {
+                    console.error('Error renombrando equipo:', error);
+                    toast.showToast('Error renombrando equipo', 'error');
                 }
             };
 
@@ -5091,7 +5115,17 @@
             React.useEffect(() => {
                 const wk = String(activeWeek);
                 setNoteInput((myProgress && myProgress[wk] && myProgress[wk].note) || '');
+                const existingLinks = (myProgress && myProgress[wk] && myProgress[wk].links) || [];
+                setLinkInputs(existingLinks.length > 0 ? existingLinks : ['']);
             }, [activeWeek, myTeam?.id]);
+
+            const updateLinkInput = (index, value) => {
+                setLinkInputs(prev => prev.map((l, i) => i === index ? value : l));
+            };
+            const addLinkInput = () => setLinkInputs(prev => [...prev, '']);
+            const removeLinkInput = (index) => {
+                setLinkInputs(prev => prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index));
+            };
 
             const submitMission = async () => {
                 if (!myTeam) return;
@@ -5099,10 +5133,12 @@
                 try {
                     const wk = String(activeWeek);
                     const existing = (myProgress && myProgress[wk]) || {};
+                    const links = linkInputs.map(l => l.trim()).filter(Boolean);
                     await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
                         [wk]: {
                             status: 'submitted',
                             note: noteInput.trim(),
+                            links,
                             crystals: existing.crystals || 0,
                             submittedAt: new Date().toISOString()
                         }
@@ -5188,7 +5224,7 @@
                     Object.entries(progress).forEach(([wk, data]) => {
                         if (data.status === 'submitted') {
                             const mission = EXPEDITION_MISSIONS.find(m => m.wk === Number(wk));
-                            pendingReviews.push({ team, wk: Number(wk), mission, note: data.note });
+                            pendingReviews.push({ team, wk: Number(wk), mission, note: data.note, links: data.links || [] });
                         }
                     });
                 });
@@ -5248,7 +5284,18 @@
                                                 <div className="text-xs uppercase font-mono mb-1" style={{ color: 'var(--text-secondary)' }}>
                                                     {item.team.name} · Semana {item.wk} · {item.mission ? item.mission.title : ''}
                                                 </div>
-                                                <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note || 'Sin nota adjunta.'}</p>
+                                                {item.links.length > 0 ? (
+                                                    <ul className="mb-2 list-disc list-inside">
+                                                        {item.links.map((link, i) => (
+                                                            <li key={i} className="text-sm">
+                                                                <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{link}</a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Sin enlaces adjuntos.</p>
+                                                )}
+                                                <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note || 'Sin comentario adjunto.'}</p>
                                                 <div className="flex gap-2 items-center">
                                                     <input
                                                         type="number" min="0" max={EXPEDITION_MAX_PER_MISSION}
@@ -5266,16 +5313,18 @@
                             )}
 
                             {profTab === 'teams' && (
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="card rounded-xl p-6">
+                                <div>
+                                    <div className="card rounded-xl p-6 mb-6">
                                         <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Crear equipo</h2>
-                                        <input
-                                            type="text" placeholder="Nombre del equipo"
-                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
-                                            value={newTeamName}
-                                            onChange={(e) => setNewTeamName(e.target.value)}
-                                        />
-                                        <button onClick={createTeam} className="btn btn-primary text-sm">+ Crear equipo</button>
+                                        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
+                                            <input
+                                                type="text" placeholder="Nombre del equipo"
+                                                className="input-field py-2 px-3 rounded-lg flex-1 w-full md:w-auto"
+                                                value={newTeamName}
+                                                onChange={(e) => setNewTeamName(e.target.value)}
+                                            />
+                                            <button onClick={createTeam} className="btn btn-primary text-sm whitespace-nowrap">+ Crear equipo</button>
+                                        </div>
 
                                         <h3 className="text-sm font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>Roster de {courseName}</h3>
                                         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -5285,58 +5334,84 @@
                                         </p>
                                     </div>
 
-                                    <div className="card rounded-xl p-6">
-                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Equipos registrados ({profTeams.length})</h2>
-                                        {profTeams.length === 0 ? (
-                                            <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos.</p>
-                                        ) : (
-                                            profTeams.map(team => (
-                                                <div key={team.id} className="border rounded-lg p-4 mb-3" style={{ borderColor: 'var(--border-color)' }}>
-                                                    <div className="flex justify-between items-center mb-2">
-                                                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
-                                                        <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-600 hover:underline">Eliminar</button>
-                                                    </div>
-                                                    <div className="space-y-1 mb-3">
-                                                        {(team.memberUids || []).length === 0 ? (
-                                                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin integrantes todavía.</p>
+                                    <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Equipos registrados ({profTeams.length})</h2>
+                                    {profTeams.length === 0 ? (
+                                        <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos.</p>
+                                    ) : (
+                                        <div className="grid md:grid-cols-3 gap-6">
+                                            {profTeams.map(team => {
+                                                // Un estudiante solo puede pertenecer a un equipo de la Expedición:
+                                                // se excluyen del selector los que ya están en CUALQUIER equipo de
+                                                // este curso, no solo en el equipo actual.
+                                                const assignedElsewhere = new Set(profTeams.flatMap(t => t.memberUids || []));
+                                                const availableForThisTeam = rosterStudents
+                                                    .filter(s => !assignedElsewhere.has(s.id))
+                                                    .sort((a, b) => (a.fullName || a.email || '').localeCompare(b.fullName || b.email || ''));
+                                                return (
+                                                    <div key={team.id} className="card rounded-xl p-6">
+                                                        {editingTeamId === team.id ? (
+                                                            <div className="flex gap-2 items-center mb-2">
+                                                                <input
+                                                                    type="text" autoFocus
+                                                                    className="input-field flex-1 py-1 px-2 rounded text-sm"
+                                                                    value={editTeamName}
+                                                                    onChange={(e) => setEditTeamName(e.target.value)}
+                                                                    onKeyDown={(e) => { if (e.key === 'Enter') renameTeam(team.id, editTeamName); if (e.key === 'Escape') setEditingTeamId(null); }}
+                                                                />
+                                                                <button onClick={() => renameTeam(team.id, editTeamName)} className="text-xs text-green-600 hover:underline whitespace-nowrap">Guardar</button>
+                                                                <button onClick={() => setEditingTeamId(null)} className="text-xs hover:underline whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Cancelar</button>
+                                                            </div>
                                                         ) : (
-                                                            (team.memberUids || []).map(uid => (
-                                                                <div key={uid} className="flex justify-between items-center text-sm">
-                                                                    <span style={{ color: 'var(--text-primary)' }}>
-                                                                        {(knownStudents[uid] && (knownStudents[uid].fullName || knownStudents[uid].email)) || uid}
-                                                                    </span>
-                                                                    <button onClick={() => removeMember(team.id, uid)} className="text-xs text-red-500 hover:underline">Quitar</button>
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
+                                                                <div className="flex gap-3">
+                                                                    <button onClick={() => { setEditingTeamId(team.id); setEditTeamName(team.name); }} className="text-xs hover:underline" style={{ color: 'var(--text-secondary)' }}>Editar</button>
+                                                                    <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-600 hover:underline">Eliminar</button>
                                                                 </div>
-                                                            ))
+                                                            </div>
                                                         )}
-                                                    </div>
-                                                    {rosterStudents.length > 0 && (
-                                                        <div className="mb-2">
-                                                            <select
-                                                                className="input-field w-full py-1.5 px-2 rounded text-sm"
-                                                                value=""
-                                                                onChange={(e) => { if (e.target.value) addMemberUid(team.id, e.target.value); }}
-                                                            >
-                                                                <option value="">+ Agregar del roster...</option>
-                                                                {rosterStudents.filter(s => !(team.memberUids || []).includes(s.id)).map(s => (
-                                                                    <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
-                                                                ))}
-                                                            </select>
+                                                        <div className="space-y-1 mb-3">
+                                                            {(team.memberUids || []).length === 0 ? (
+                                                                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin integrantes todavía.</p>
+                                                            ) : (
+                                                                (team.memberUids || []).map(uid => (
+                                                                    <div key={uid} className="flex justify-between items-center text-sm">
+                                                                        <span style={{ color: 'var(--text-primary)' }}>
+                                                                            {(knownStudents[uid] && (knownStudents[uid].fullName || knownStudents[uid].email)) || uid}
+                                                                        </span>
+                                                                        <button onClick={() => removeMember(team.id, uid)} className="text-xs text-red-500 hover:underline">Quitar</button>
+                                                                    </div>
+                                                                ))
+                                                            )}
                                                         </div>
-                                                    )}
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="email" placeholder="correo@institucion.edu.co"
-                                                            className="input-field flex-1 py-1.5 px-2 rounded text-sm"
-                                                            value={emailToAdd[team.id] || ''}
-                                                            onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
-                                                        />
-                                                        <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ Por correo</button>
+                                                        {availableForThisTeam.length > 0 && (
+                                                            <div className="mb-2">
+                                                                <select
+                                                                    className="input-field w-full py-1.5 px-2 rounded text-sm"
+                                                                    value=""
+                                                                    onChange={(e) => { if (e.target.value) addMemberUid(team.id, e.target.value); }}
+                                                                >
+                                                                    <option value="">+ Agregar del roster...</option>
+                                                                    {availableForThisTeam.map(s => (
+                                                                        <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="email" placeholder="correo@institucion.edu.co"
+                                                                className="input-field flex-1 py-1.5 px-2 rounded text-sm"
+                                                                value={emailToAdd[team.id] || ''}
+                                                                onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
+                                                            />
+                                                            <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ Por correo</button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -5423,11 +5498,35 @@
                                     <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mission.deliverable}</p>
                                 </div>
 
-                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío</label>
+                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
+                                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Agrega uno o más enlaces según el tipo de evidencia (Figma, Google Drive, Behance, etc.).</p>
+                                <div className="space-y-2 mb-3">
+                                    {linkInputs.map((link, i) => (
+                                        <div key={i} className="flex gap-2">
+                                            <input
+                                                type="url"
+                                                placeholder="https://..."
+                                                className="input-field flex-1 py-2 px-3 rounded-lg"
+                                                value={link}
+                                                onChange={(e) => updateLinkInput(i, e.target.value)}
+                                            />
+                                            <button
+                                                onClick={() => removeLinkInput(i)}
+                                                className="text-xs text-red-500 hover:underline px-2"
+                                                title="Quitar enlace"
+                                            >
+                                                Quitar
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={addLinkInput} className="btn btn-secondary text-xs px-3 mb-4">+ Agregar otro enlace</button>
+
+                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío (opcional)</label>
                                 <textarea
                                     className="input-field w-full py-2 px-3 rounded-lg mb-3"
                                     rows="4"
-                                    placeholder="Pega aquí el enlace al documento/prototipo o un resumen de lo entregado..."
+                                    placeholder="Comentario o resumen de lo entregado..."
                                     value={noteInput}
                                     onChange={(e) => setNoteInput(e.target.value)}
                                 ></textarea>
