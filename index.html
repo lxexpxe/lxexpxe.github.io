@@ -5208,7 +5208,7 @@
                                         d={`M ${a.x},${a.y} C ${midX},${a.y} ${midX},${b.y} ${b.x},${b.y}`}
                                         fill="none"
                                         stroke={unlockedB ? 'var(--accent-color)' : 'var(--border-color)'}
-                                        strokeWidth="3"
+                                        strokeWidth="6"
                                         strokeDasharray="9 9"
                                         strokeLinecap="round"
                                         opacity={unlockedB ? 0.7 : 0.5}
@@ -5221,9 +5221,9 @@
                                 const unlocked = isMissionUnlocked(progress, m.wk);
                                 const isActive = activeWeek === m.wk;
                                 let fill = '#f97316', stroke = '#c2410c'; // desbloqueada y abierta: misión actual
-                                if (!unlocked) { fill = 'var(--bg-primary)'; stroke = 'var(--border-color)'; }
+                                if (!unlocked) { fill = 'rgba(255,255,255,0.55)'; stroke = 'rgba(255,255,255,0.85)'; }
                                 else if (st === 'done') { fill = '#22c55e'; stroke = '#16a34a'; }
-                                else if (st === 'submitted') { fill = EXPEDITION_PHASES[m.phase].color; stroke = EXPEDITION_PHASES[m.phase].color; }
+                                else if (st === 'submitted') { fill = '#3b82f6'; stroke = '#1d4ed8'; }
                                 return (
                                     <g
                                         key={m.wk}
@@ -5233,7 +5233,7 @@
                                         {isActive && (
                                             <circle cx={pos.x} cy={pos.y} r={nodeR + 8} fill="none" stroke={EXPEDITION_PHASES[m.phase].color} strokeWidth="3" />
                                         )}
-                                        <circle cx={pos.x} cy={pos.y} r={nodeR} fill={fill} stroke={stroke} strokeWidth="3" opacity={unlocked ? 1 : 0.5} />
+                                        <circle cx={pos.x} cy={pos.y} r={nodeR} fill={fill} stroke={stroke} strokeWidth="3" />
                                         <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" fontSize={unlocked ? '26' : '22'} fontWeight="bold" fill={unlocked ? '#fff' : 'var(--text-secondary)'}>
                                             {unlocked ? m.wk : '🔒'}
                                         </text>
