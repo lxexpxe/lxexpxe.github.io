@@ -5037,8 +5037,8 @@
             const gradeSubmission = async (teamId, wk) => {
                 const key = `${teamId}-${wk}`;
                 let crystals = parseInt(reviewInputs[key], 10);
-                if (isNaN(crystals)) { toast.showToast('Ingresa un número de cristales válido', 'error'); return; }
-                crystals = Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, crystals));
+                if (isNaN(crystals)) { toast.showToast('Selecciona una cantidad de cristales', 'error'); return; }
+                crystals = Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, Math.round(crystals / 10) * 10));
                 const feedback = (reviewFeedback[key] || '').trim();
                 try {
                     await db.doc(`artifacts/academic-platform/progress/${teamId}`).update({
@@ -5278,7 +5278,7 @@
                             {profTab === 'review' && (
                                 <div className="card rounded-xl p-6">
                                     <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Envíos pendientes</h2>
-                                    <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Asigna cristales (0-{EXPEDITION_MAX_PER_MISSION}) a cada entrega.</p>
+                                    <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Asigna cristales (de 10 en 10, hasta {EXPEDITION_MAX_PER_MISSION}) a cada entrega.</p>
                                     {pendingReviews.length === 0 ? (
                                         <p style={{ color: 'var(--text-secondary)' }}>No hay envíos pendientes por revisar.</p>
                                     ) : (
@@ -5309,19 +5309,16 @@
                                                 ></textarea>
                                                 <div className="flex gap-2 items-center">
                                                     <div className="flex items-center gap-1">
-                                                        <input
-                                                            type="number" min="0" max={EXPEDITION_MAX_PER_MISSION}
-                                                            placeholder={`0-${EXPEDITION_MAX_PER_MISSION}`}
+                                                        <select
                                                             className="input-field py-2 px-3 rounded-lg w-28"
                                                             value={reviewInputs[`${item.team.id}-${item.wk}`] || ''}
-                                                            onChange={(e) => {
-                                                                let v = e.target.value;
-                                                                if (v !== '' && !isNaN(v)) {
-                                                                    v = String(Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, parseInt(v, 10))));
-                                                                }
-                                                                setReviewInputs(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: v }));
-                                                            }}
-                                                        />
+                                                            onChange={(e) => setReviewInputs(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: e.target.value }))}
+                                                        >
+                                                            <option value="">Elegir...</option>
+                                                            {Array.from({ length: (EXPEDITION_MAX_PER_MISSION / 10) + 1 }, (_, i) => i * 10).map(v => (
+                                                                <option key={v} value={v}>{v}</option>
+                                                            ))}
+                                                        </select>
                                                         <span className="text-xl" title="cristales">💎</span>
                                                     </div>
                                                     <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary text-sm">Registrar revisión</button>
@@ -5518,54 +5515,83 @@
                                     <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mission.deliverable}</p>
                                 </div>
 
-                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
-                                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Agrega uno o más enlaces según el tipo de evidencia (Figma, Google Drive, Behance, etc.).</p>
-                                <div className="space-y-2 mb-3">
-                                    {linkInputs.map((link, i) => (
-                                        <div key={i} className="flex gap-2">
-                                            <input
-                                                type="url"
-                                                placeholder="https://..."
-                                                className="input-field flex-1 py-2 px-3 rounded-lg"
-                                                value={link}
-                                                onChange={(e) => updateLinkInput(i, e.target.value)}
-                                            />
-                                            <button
-                                                onClick={() => removeLinkInput(i)}
-                                                className="text-xs text-red-500 hover:underline px-2"
-                                                title="Quitar enlace"
-                                            >
-                                                Quitar
-                                            </button>
+                                {currentEntry.status === 'done' ? (
+                                    <div>
+                                        <div className="mb-3">
+                                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                Estado: <strong style={{ color: 'var(--text-primary)' }}>Revisada — {currentEntry.crystals} 💎</strong>
+                                            </span>
+                                            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Esta entrega ya fue calificada y no se puede modificar.</p>
                                         </div>
-                                    ))}
-                                </div>
-                                <button onClick={addLinkInput} className="btn btn-secondary text-xs px-3 mb-4">+ Agregar otro enlace</button>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
+                                        {(currentEntry.links || []).length > 0 ? (
+                                            <ul className="mb-3 list-disc list-inside">
+                                                {currentEntry.links.map((link, i) => (
+                                                    <li key={i} className="text-sm">
+                                                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{link}</a>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Sin enlaces adjuntos.</p>
+                                        )}
+                                        {currentEntry.note && (
+                                            <>
+                                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío</label>
+                                                <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{currentEntry.note}</p>
+                                            </>
+                                        )}
+                                        {currentEntry.feedback && (
+                                            <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                                <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--accent-color)' }}>Feedback del profesor</div>
+                                                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{currentEntry.feedback}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
+                                        <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Agrega uno o más enlaces según el tipo de evidencia (Figma, Google Drive, Behance, etc.).</p>
+                                        <div className="space-y-2 mb-3">
+                                            {linkInputs.map((link, i) => (
+                                                <div key={i} className="flex gap-2">
+                                                    <input
+                                                        type="url"
+                                                        placeholder="https://..."
+                                                        className="input-field flex-1 py-2 px-3 rounded-lg"
+                                                        value={link}
+                                                        onChange={(e) => updateLinkInput(i, e.target.value)}
+                                                    />
+                                                    <button
+                                                        onClick={() => removeLinkInput(i)}
+                                                        className="text-xs text-red-500 hover:underline px-2"
+                                                        title="Quitar enlace"
+                                                    >
+                                                        Quitar
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button onClick={addLinkInput} className="btn btn-secondary text-xs px-3 mb-4">+ Agregar otro enlace</button>
 
-                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío (opcional)</label>
-                                <textarea
-                                    className="input-field w-full py-2 px-3 rounded-lg mb-3"
-                                    rows="4"
-                                    placeholder="Comentario o resumen de lo entregado..."
-                                    value={noteInput}
-                                    onChange={(e) => setNoteInput(e.target.value)}
-                                ></textarea>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">
-                                        {currentEntry.status === 'open' ? 'Enviar a revisión' : 'Actualizar envío'}
-                                    </button>
-                                    {currentEntry.status !== 'open' && (
-                                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                            Estado: <strong style={{ color: 'var(--text-primary)' }}>
-                                                {currentEntry.status === 'submitted' ? 'En revisión' : <span>Revisada — {currentEntry.crystals} 💎</span>}
-                                            </strong>
-                                        </span>
-                                    )}
-                                </div>
-                                {currentEntry.status === 'done' && currentEntry.feedback && (
-                                    <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
-                                        <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--accent-color)' }}>Feedback del profesor</div>
-                                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{currentEntry.feedback}</p>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío (opcional)</label>
+                                        <textarea
+                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
+                                            rows="4"
+                                            placeholder="Comentario o resumen de lo entregado..."
+                                            value={noteInput}
+                                            onChange={(e) => setNoteInput(e.target.value)}
+                                        ></textarea>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">
+                                                {currentEntry.status === 'open' ? 'Enviar a revisión' : 'Actualizar envío'}
+                                            </button>
+                                            {currentEntry.status !== 'open' && (
+                                                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                    Estado: <strong style={{ color: 'var(--text-primary)' }}>En revisión</strong>
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

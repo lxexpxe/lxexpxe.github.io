@@ -211,6 +211,12 @@ async function main() {
     );
 
     await check(
+        'Profesor A califica otra semana con un múltiplo de 10 (90)',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '7.status': 'done', '7.crystals': 90 }),
+        true
+    );
+
+    await check(
         'Cualquier profesor publica un anuncio de la expedición',
         profA.doc(`artifacts/${NS}/announcements/annA`).set({ text: 'Nueva señal detectada', date: new Date().toISOString(), professorId: PROF_A }),
         true
@@ -329,6 +335,24 @@ async function main() {
     await check(
         'Profesor A NO puede asignar cristales negativos',
         profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '6.status': 'done', '6.crystals': -10 }),
+        false
+    );
+
+    await check(
+        'Profesor A NO puede asignar cristales que no sean múltiplo de 10',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '8.status': 'done', '8.crystals': 85 }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede modificar su nota en una semana YA calificada (semana 1, calificada arriba)',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.note': 'intento de editar después de calificado' }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede agregar enlaces en una semana YA calificada',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.links': ['https://intento-tardio.com'] }),
         false
     );
 

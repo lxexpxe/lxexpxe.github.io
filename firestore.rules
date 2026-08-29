@@ -28,27 +28,30 @@ service cloud.firestore {
 
     // progress/{teamId} es UN documento por equipo con una clave por semana
     // ('1' a '12'), no una subcolección — así que "solo status/note/links,
-    // nunca crystals/feedback ni status:'done'" (si quien escribe no es
-    // profesor) y "cristales siempre entre 0 y 100" (sin importar quién
-    // escriba) hay que validarlo dentro de cada clave de semana que cambió.
-    // Rules no tiene loops ni forma de sacar un elemento de un Set sin
-    // conocer la clave de antemano, así que se revisan las 12 semanas una
-    // por una a mano, pero `changedKeys` y los datos viejos del documento se
-    // calculan UNA sola vez con `let` y se pasan como parámetros — llamar a
-    // .diff() o reconstruir "resource.data viejo" repetidamente dentro de
-    // cada una de las 12 llamadas resultó ser tan costoso que superaba el
-    // límite de Firestore de 1000 evaluaciones por escritura y la regla
-    // entera se denegaba con "Unable to evaluate the expression" incluso
-    // para escrituras legítimas del profesor o del estudiante.
+    // nunca crystals/feedback ni status:'done', y nunca si la semana YA
+    // estaba calificada" (si quien escribe no es profesor) y "cristales
+    // siempre entre 0 y 100 en múltiplos de 10" (sin importar quién escriba)
+    // hay que validarlo dentro de cada clave de semana que cambió. Rules no
+    // tiene loops ni forma de sacar un elemento de un Set sin conocer la
+    // clave de antemano, así que se revisan las 12 semanas una por una a
+    // mano, pero `changedKeys` y los datos viejos del documento se calculan
+    // UNA sola vez con `let` y se pasan como parámetros — llamar a .diff() o
+    // reconstruir "resource.data viejo" repetidamente dentro de cada una de
+    // las 12 llamadas resultó ser tan costoso que superaba el límite de
+    // Firestore de 1000 evaluaciones por escritura y la regla entera se
+    // denegaba con "Unable to evaluate the expression" incluso para
+    // escrituras legítimas del profesor o del estudiante.
     function weekOk(wk, changedKeys, oldData, isProf) {
       return !(wk in changedKeys) || (
         (isProf || (
+          oldData.get(wk, {}).get('status', '') != 'done' &&
           request.resource.data.get(wk, {}).get('crystals', 0) == oldData.get(wk, {}).get('crystals', 0) &&
           request.resource.data.get(wk, {}).get('status', '') != 'done' &&
           request.resource.data.get(wk, {}).get('feedback', '') == oldData.get(wk, {}).get('feedback', '')
         )) &&
         request.resource.data.get(wk, {}).get('crystals', 0) >= 0 &&
-        request.resource.data.get(wk, {}).get('crystals', 0) <= 100
+        request.resource.data.get(wk, {}).get('crystals', 0) <= 100 &&
+        request.resource.data.get(wk, {}).get('crystals', 0) % 10 == 0
       );
     }
 
