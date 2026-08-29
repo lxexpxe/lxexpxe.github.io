@@ -1702,7 +1702,8 @@
                         credits: selectedCourse.credits || '',
                         introduction: selectedCourse.introduction || '',
                         iagAgreements: selectedCourse.iagAgreements || '',
-                        availableBadges: selectedCourse.availableBadges || []
+                        availableBadges: selectedCourse.availableBadges || [],
+                        expeditionEnabled: selectedCourse.expeditionEnabled || false
                     });
                 } else {
                     const week = selectedCourse.weeklyContent?.find(w => w.week === weekNumber) || {
@@ -1736,7 +1737,8 @@
                             credits: weekContent.credits,
                             introduction: weekContent.introduction,
                             iagAgreements: weekContent.iagAgreements,
-                            availableBadges: weekContent.availableBadges || []
+                            availableBadges: weekContent.availableBadges || [],
+                            expeditionEnabled: !!weekContent.expeditionEnabled
                         });
                     } else {
                         // Guardar contenido de semana
@@ -1926,7 +1928,7 @@
             }
 
             if (showExpedition) {
-                return <ExpeditionPage currentUser={currentUser} role="professor" onBack={() => setShowExpedition(false)} />;
+                return <ExpeditionPage currentUser={currentUser} role="professor" courseId={selectedCourse.id} courseName={selectedCourse.name} onBack={() => setShowExpedition(false)} />;
             }
 
             if (showAttendance) {
@@ -2433,6 +2435,23 @@
                                                 </button>
                                             </div>
                                         </div>
+
+                                        <div className="border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!weekContent.expeditionEnabled}
+                                                    onChange={(e) => setWeekContent({ ...weekContent, expeditionEnabled: e.target.checked })}
+                                                    className="w-5 h-5"
+                                                />
+                                                <div>
+                                                    <span className="font-semibold">🧭 Habilitar Expedición para este curso</span>
+                                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                                        Cada curso tiene su propia Expedición: los equipos y estudiantes de un curso nunca se mezclan con los de otro.
+                                                    </p>
+                                                </div>
+                                            </label>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
@@ -2689,13 +2708,15 @@
                                 >
                                     📋
                                 </button>
-                                <button
-                                    onClick={() => setShowExpedition(true)}
-                                    className="btn btn-secondary"
-                                    title="Expedición"
-                                >
-                                    🧭
-                                </button>
+                                {selectedCourse?.expeditionEnabled && (
+                                    <button
+                                        onClick={() => setShowExpedition(true)}
+                                        className="btn btn-secondary"
+                                        title="Expedición"
+                                    >
+                                        🧭
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setShowProfile(true)}
                                     className="btn btn-secondary"
@@ -4155,7 +4176,7 @@
             }
 
             if (showExpedition) {
-                return <ExpeditionPage currentUser={currentUser} role="student" onBack={() => setShowExpedition(false)} />;
+                return <ExpeditionPage currentUser={currentUser} role="student" courseId={selectedCourse.id} courseName={selectedCourse.name} onBack={() => setShowExpedition(false)} />;
             }
 
             return (
@@ -4218,13 +4239,15 @@
                                 >
                                     📷
                                 </button>
-                                <button
-                                    onClick={() => setShowExpedition(true)}
-                                    className="btn btn-secondary"
-                                    title="Expedición"
-                                >
-                                    🧭
-                                </button>
+                                {selectedCourse?.expeditionEnabled && (
+                                    <button
+                                        onClick={() => setShowExpedition(true)}
+                                        className="btn btn-secondary"
+                                        title="Expedición"
+                                    >
+                                        🧭
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setShowProfile(true)}
                                     className="btn btn-secondary"
@@ -4824,7 +4847,7 @@
 
         const EXPEDITION_MAX_PER_MISSION = 100;
 
-        function ExpeditionPage({ currentUser, role, onBack }) {
+        function ExpeditionPage({ currentUser, role, courseId, courseName, onBack }) {
             const db = firebase.firestore();
             const toast = useToast();
 
@@ -4833,12 +4856,10 @@
             const [announcements, setAnnouncements] = React.useState([]);
 
             // --- estado de profesor ---
-            const [profCourses, setProfCourses] = React.useState([]);
             const [profTeams, setProfTeams] = React.useState([]);
             const [profProgressByTeam, setProfProgressByTeam] = React.useState({});
             const [profTab, setProfTab] = React.useState('overview');
             const [newTeamName, setNewTeamName] = React.useState('');
-            const [rosterCourseId, setRosterCourseId] = React.useState('');
             const [rosterStudents, setRosterStudents] = React.useState([]);
             const [knownStudents, setKnownStudents] = React.useState({});
             const [emailToAdd, setEmailToAdd] = React.useState({});
@@ -4852,20 +4873,17 @@
             const [submitting, setSubmitting] = React.useState(false);
 
             // ===== Carga y listeners: PROFESOR =====
+            // Todo se filtra también por courseId (no solo professorId): cada
+            // curso tiene su propia Expedición, con sus propios equipos —
+            // nunca se mezclan estudiantes de un curso con los de otro.
             React.useEffect(() => {
                 if (role !== 'professor') return;
 
-                (async () => {
-                    try {
-                        const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses`).get();
-                        setProfCourses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    } catch (error) {
-                        console.error('Error cargando cursos:', error);
-                    }
-                })();
+                loadRosterForThisCourse();
 
                 const unsubTeams = db.collection('artifacts/academic-platform/teams')
                     .where('professorId', '==', currentUser.uid)
+                    .where('courseId', '==', courseId)
                     .onSnapshot(snap => {
                         setProfTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                         setLoading(false);
@@ -4876,12 +4894,13 @@
 
                 const unsubAnn = db.collection('artifacts/academic-platform/announcements')
                     .where('professorId', '==', currentUser.uid)
+                    .where('courseId', '==', courseId)
                     .onSnapshot(snap => {
                         setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
                     }, error => console.error('Error escuchando anuncios:', error));
 
                 return () => { unsubTeams(); unsubAnn(); };
-            }, [role]);
+            }, [role, courseId]);
 
             React.useEffect(() => {
                 if (role !== 'professor' || profTeams.length === 0) return;
@@ -4893,9 +4912,7 @@
                 return () => unsubs.forEach(u => u());
             }, [role, profTeams.map(t => t.id).join(',')]);
 
-            const loadRosterForCourse = async (courseId) => {
-                setRosterCourseId(courseId);
-                if (!courseId) { setRosterStudents([]); return; }
+            const loadRosterForThisCourse = async () => {
                 try {
                     const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${courseId}/students`).get();
                     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -4916,7 +4933,7 @@
                 if (!name) { toast.showToast('Ingresa un nombre de equipo', 'error'); return; }
                 try {
                     await db.collection('artifacts/academic-platform/teams').add({
-                        name, memberUids: [], professorId: currentUser.uid, createdAt: new Date()
+                        name, memberUids: [], professorId: currentUser.uid, courseId, createdAt: new Date()
                     });
                     setNewTeamName('');
                     toast.showToast('Equipo creado', 'success');
@@ -4947,16 +4964,15 @@
                 const email = (emailToAdd[teamId] || '').trim().toLowerCase();
                 if (!email) { toast.showToast('Ingresa un correo', 'error'); return; }
                 try {
-                    let found = null;
-                    for (const course of profCourses) {
-                        const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${course.id}/students`)
-                            .where('email', '==', email).get();
-                        if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
-                    }
-                    if (!found) {
-                        toast.showToast('No encontramos ese correo en tus cursos', 'error');
+                    // Solo se busca en el roster de ESTE curso — un estudiante de
+                    // otro curso del profesor no debe poder colarse en esta Expedición.
+                    const snap = await db.collection(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${courseId}/students`)
+                        .where('email', '==', email).get();
+                    if (snap.empty) {
+                        toast.showToast('No encontramos ese correo en el roster de este curso', 'error');
                         return;
                     }
+                    const found = { id: snap.docs[0].id, ...snap.docs[0].data() };
                     setKnownStudents(prev => ({ ...prev, [found.id]: { fullName: found.fullName, email: found.email } }));
                     await addMemberUid(teamId, found.id);
                     setEmailToAdd(prev => ({ ...prev, [teamId]: '' }));
@@ -5011,7 +5027,7 @@
                 if (!text) { toast.showToast('Escribe un texto para el anuncio', 'error'); return; }
                 try {
                     await db.collection('artifacts/academic-platform/announcements').add({
-                        text, date: new Date().toISOString(), professorId: currentUser.uid
+                        text, date: new Date().toISOString(), professorId: currentUser.uid, courseId
                     });
                     setAnnouncementText('');
                     toast.showToast('Anuncio publicado', 'success');
@@ -5022,11 +5038,16 @@
             };
 
             // ===== Carga y listeners: ESTUDIANTE =====
+            // Filtrado también por courseId: un estudiante puede estar en varios
+            // cursos con Expedición habilitada a la vez, cada uno con su propio
+            // equipo — sin esto podría mezclarse (o traer al azar) el equipo de
+            // un curso distinto al que tiene seleccionado.
             React.useEffect(() => {
                 if (role !== 'student') return;
 
                 const unsubTeam = db.collection('artifacts/academic-platform/teams')
                     .where('memberUids', 'array-contains', currentUser.uid)
+                    .where('courseId', '==', courseId)
                     .onSnapshot(snap => {
                         if (snap.empty) {
                             setMyTeam(null);
@@ -5041,12 +5062,13 @@
                     });
 
                 const unsubAnn = db.collection('artifacts/academic-platform/announcements')
+                    .where('courseId', '==', courseId)
                     .onSnapshot(snap => {
                         setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || '').localeCompare(a.date || '')));
                     }, error => console.error('Error escuchando anuncios:', error));
 
                 return () => { unsubTeam(); unsubAnn(); };
-            }, [role, currentUser.uid]);
+            }, [role, currentUser.uid, courseId]);
 
             React.useEffect(() => {
                 if (role !== 'student' || !myTeam) { setMyProgress(null); return; }
@@ -5147,7 +5169,7 @@
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🧭 Expedición Doble Diamante</h1>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Diseño e investigación en 12 semanas</p>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{courseName} · Diseño e investigación en 12 semanas</p>
                     </div>
                     <button onClick={onBack} className="btn btn-secondary">← Volver</button>
                 </div>
@@ -5251,20 +5273,12 @@
                                         />
                                         <button onClick={createTeam} className="btn btn-primary text-sm">+ Crear equipo</button>
 
-                                        <h3 className="text-sm font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>Roster de un curso</h3>
-                                        <select
-                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
-                                            value={rosterCourseId}
-                                            onChange={(e) => loadRosterForCourse(e.target.value)}
-                                        >
-                                            <option value="">Selecciona un curso...</option>
-                                            {profCourses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                        {rosterStudents.length > 0 && (
-                                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                                Usa el selector "+ Agregar del roster" junto a cada equipo para sumar estudiantes de este curso.
-                                            </p>
-                                        )}
+                                        <h3 className="text-sm font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>Roster de {courseName}</h3>
+                                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                            {rosterStudents.length > 0
+                                                ? `Usa el selector "+ Agregar del roster" junto a cada equipo para sumar estudiantes de ${courseName} (${rosterStudents.length} en el roster).`
+                                                : 'Este curso todavía no tiene estudiantes aprobados en el roster.'}
+                                        </p>
                                     </div>
 
                                     <div className="card rounded-xl p-6">
