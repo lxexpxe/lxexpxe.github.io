@@ -4851,6 +4851,15 @@
 
         const EXPEDITION_MAX_PER_MISSION = 100;
 
+        // Coordenadas fijas del "mapa de camino" (estilo Clash of Clans) que
+        // ve el estudiante, dentro de un viewBox de 1200x460 — el mismo
+        // espacio que antes ocupaban las 12 tarjetas en flex-wrap.
+        const EXPEDITION_MAP_POSITIONS = {
+            1: { x: 90, y: 95 }, 2: { x: 290, y: 65 }, 3: { x: 490, y: 135 }, 4: { x: 700, y: 75 },
+            5: { x: 900, y: 45 }, 6: { x: 1100, y: 95 }, 7: { x: 760, y: 225 }, 8: { x: 560, y: 275 },
+            9: { x: 230, y: 320 }, 10: { x: 490, y: 400 }, 11: { x: 800, y: 380 }, 12: { x: 1080, y: 400 }
+        };
+
         function ExpeditionPage({ currentUser, role, courseId, courseName, onBack }) {
             const db = firebase.firestore();
             const toast = useToast();
@@ -5167,46 +5176,73 @@
             };
             const phaseMax = (phase) => EXPEDITION_MISSIONS.filter(m => m.phase === phase).length * EXPEDITION_MAX_PER_MISSION;
             const statusOf = (progress, wk) => (progress && progress[String(wk)] && progress[String(wk)].status) || 'open';
-            const statusLabel = { open: 'Abierta', submitted: 'Enviada', done: 'Revisada' };
+
+            // La misión 1 siempre está desbloqueada; cualquier otra se
+            // desbloquea en cuanto la anterior deja de estar 'open' (o sea,
+            // en cuanto el equipo la envía a revisión — no hace falta
+            // esperar a que el profesor la califique).
+            const isMissionUnlocked = (progress, wk) => wk === 1 || statusOf(progress, wk - 1) !== 'open';
 
             if (loading) {
                 return <LoadingSpinner />;
             }
 
-            const renderJourney = (progress, onSelect) => (
-                <div className="flex flex-wrap gap-2 mb-6">
-                    {EXPEDITION_MISSIONS.map(m => {
-                        const st = statusOf(progress, m.wk);
-                        const crystalsHere = (progress && progress[String(m.wk)] && progress[String(m.wk)].crystals) || 0;
-                        const pct = Math.round((crystalsHere / EXPEDITION_MAX_PER_MISSION) * 100);
-                        return (
-                            <button
-                                key={m.wk}
-                                onClick={() => onSelect(m.wk)}
-                                className="text-left p-3 rounded-lg border flex-1"
-                                style={{
-                                    minWidth: '130px',
-                                    borderColor: activeWeek === m.wk ? EXPEDITION_PHASES[m.phase].color : 'var(--border-color)',
-                                    borderWidth: activeWeek === m.wk ? '2px' : '1px',
-                                    borderLeftWidth: '4px',
-                                    borderLeftColor: EXPEDITION_PHASES[m.phase].color,
-                                    backgroundColor: 'var(--bg-secondary)'
-                                }}
-                            >
-                                <div className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>SEM {String(m.wk).padStart(2, '0')} · {m.code}</div>
-                                <div className="text-sm font-semibold my-1" style={{ color: 'var(--text-primary)' }}>{m.title}</div>
-                                <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                                    backgroundColor: st === 'done' ? '#dcfce7' : st === 'submitted' ? '#fef3c7' : '#e0e7ff',
-                                    color: st === 'done' ? '#166534' : st === 'submitted' ? '#92400e' : '#3730a3'
-                                }}>{statusLabel[st]}</span>
-                                <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
-                                    <div className="h-1 rounded-full" style={{ width: `${pct}%`, backgroundColor: EXPEDITION_PHASES[m.phase].color }}></div>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            );
+            // Mapa de camino tipo "Clash of Clans": nodos numerados unidos por
+            // un camino punteado, en el mismo espacio que antes ocupaban las
+            // 12 tarjetas. Solo muestra el número (o un candado si está
+            // bloqueada); el detalle completo se ve abajo al seleccionarla.
+            const renderJourney = (progress, onSelect) => {
+                const nodeR = 34;
+                return (
+                    <div className="mb-6">
+                        <svg viewBox="0 0 1200 460" style={{ width: '100%', height: 'auto', display: 'block' }}>
+                            {EXPEDITION_MISSIONS.slice(0, -1).map(m => {
+                                const a = EXPEDITION_MAP_POSITIONS[m.wk];
+                                const b = EXPEDITION_MAP_POSITIONS[m.wk + 1];
+                                const midX = (a.x + b.x) / 2;
+                                const unlockedB = isMissionUnlocked(progress, m.wk + 1);
+                                return (
+                                    <path
+                                        key={m.wk}
+                                        d={`M ${a.x},${a.y} C ${midX},${a.y} ${midX},${b.y} ${b.x},${b.y}`}
+                                        fill="none"
+                                        stroke={unlockedB ? 'var(--accent-color)' : 'var(--border-color)'}
+                                        strokeWidth="3"
+                                        strokeDasharray="9 9"
+                                        strokeLinecap="round"
+                                        opacity={unlockedB ? 0.7 : 0.5}
+                                    />
+                                );
+                            })}
+                            {EXPEDITION_MISSIONS.map(m => {
+                                const pos = EXPEDITION_MAP_POSITIONS[m.wk];
+                                const st = statusOf(progress, m.wk);
+                                const unlocked = isMissionUnlocked(progress, m.wk);
+                                const isActive = activeWeek === m.wk;
+                                let fill = '#f97316', stroke = '#c2410c'; // desbloqueada y abierta: misión actual
+                                if (!unlocked) { fill = 'var(--bg-primary)'; stroke = 'var(--border-color)'; }
+                                else if (st === 'done') { fill = '#22c55e'; stroke = '#16a34a'; }
+                                else if (st === 'submitted') { fill = EXPEDITION_PHASES[m.phase].color; stroke = EXPEDITION_PHASES[m.phase].color; }
+                                return (
+                                    <g
+                                        key={m.wk}
+                                        onClick={() => unlocked && onSelect(m.wk)}
+                                        style={{ cursor: unlocked ? 'pointer' : 'not-allowed' }}
+                                    >
+                                        {isActive && (
+                                            <circle cx={pos.x} cy={pos.y} r={nodeR + 8} fill="none" stroke={EXPEDITION_PHASES[m.phase].color} strokeWidth="3" />
+                                        )}
+                                        <circle cx={pos.x} cy={pos.y} r={nodeR} fill={fill} stroke={stroke} strokeWidth="3" opacity={unlocked ? 1 : 0.5} />
+                                        <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" fontSize={unlocked ? '26' : '22'} fontWeight="bold" fill={unlocked ? '#fff' : 'var(--text-secondary)'}>
+                                            {unlocked ? m.wk : '🔒'}
+                                        </text>
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                    </div>
+                );
+            };
 
             const header = (
                 <div className="flex justify-between items-center mb-6">
