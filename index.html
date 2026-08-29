@@ -4870,6 +4870,7 @@
             const [knownStudents, setKnownStudents] = React.useState({});
             const [emailToAdd, setEmailToAdd] = React.useState({});
             const [reviewInputs, setReviewInputs] = React.useState({});
+            const [reviewFeedback, setReviewFeedback] = React.useState({});
             const [announcementText, setAnnouncementText] = React.useState('');
 
             // --- estado de estudiante ---
@@ -5038,10 +5039,12 @@
                 let crystals = parseInt(reviewInputs[key], 10);
                 if (isNaN(crystals)) { toast.showToast('Ingresa un número de cristales válido', 'error'); return; }
                 crystals = Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, crystals));
+                const feedback = (reviewFeedback[key] || '').trim();
                 try {
                     await db.doc(`artifacts/academic-platform/progress/${teamId}`).update({
                         [`${wk}.status`]: 'done',
-                        [`${wk}.crystals`]: crystals
+                        [`${wk}.crystals`]: crystals,
+                        [`${wk}.feedback`]: feedback
                     });
                     toast.showToast('Entrega calificada', 'success');
                 } catch (error) {
@@ -5296,14 +5299,31 @@
                                                     <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Sin enlaces adjuntos.</p>
                                                 )}
                                                 <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note || 'Sin comentario adjunto.'}</p>
+                                                <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Feedback para el equipo (opcional)</label>
+                                                <textarea
+                                                    className="input-field w-full py-2 px-3 rounded-lg mb-3 text-sm"
+                                                    rows="2"
+                                                    placeholder="Explica por qué asignas esta cantidad de cristales..."
+                                                    value={reviewFeedback[`${item.team.id}-${item.wk}`] || ''}
+                                                    onChange={(e) => setReviewFeedback(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: e.target.value }))}
+                                                ></textarea>
                                                 <div className="flex gap-2 items-center">
-                                                    <input
-                                                        type="number" min="0" max={EXPEDITION_MAX_PER_MISSION}
-                                                        placeholder={`0-${EXPEDITION_MAX_PER_MISSION}`}
-                                                        className="input-field py-2 px-3 rounded-lg w-32"
-                                                        value={reviewInputs[`${item.team.id}-${item.wk}`] || ''}
-                                                        onChange={(e) => setReviewInputs(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: e.target.value }))}
-                                                    />
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number" min="0" max={EXPEDITION_MAX_PER_MISSION}
+                                                            placeholder={`0-${EXPEDITION_MAX_PER_MISSION}`}
+                                                            className="input-field py-2 px-3 rounded-lg w-28"
+                                                            value={reviewInputs[`${item.team.id}-${item.wk}`] || ''}
+                                                            onChange={(e) => {
+                                                                let v = e.target.value;
+                                                                if (v !== '' && !isNaN(v)) {
+                                                                    v = String(Math.max(0, Math.min(EXPEDITION_MAX_PER_MISSION, parseInt(v, 10))));
+                                                                }
+                                                                setReviewInputs(prev => ({ ...prev, [`${item.team.id}-${item.wk}`]: v }));
+                                                            }}
+                                                        />
+                                                        <span className="text-xl" title="cristales">💎</span>
+                                                    </div>
                                                     <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary text-sm">Registrar revisión</button>
                                                 </div>
                                             </div>
@@ -5537,11 +5557,17 @@
                                     {currentEntry.status !== 'open' && (
                                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                             Estado: <strong style={{ color: 'var(--text-primary)' }}>
-                                                {currentEntry.status === 'submitted' ? 'En revisión' : `Revisada — ${currentEntry.crystals} cristales`}
+                                                {currentEntry.status === 'submitted' ? 'En revisión' : <span>Revisada — {currentEntry.crystals} 💎</span>}
                                             </strong>
                                         </span>
                                     )}
                                 </div>
+                                {currentEntry.status === 'done' && currentEntry.feedback && (
+                                    <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                        <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--accent-color)' }}>Feedback del profesor</div>
+                                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{currentEntry.feedback}</p>
+                                    </div>
+                                )}
                             </div>
 
                             <div>

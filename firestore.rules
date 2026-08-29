@@ -27,27 +27,39 @@ service cloud.firestore {
     }
 
     // progress/{teamId} es UN documento por equipo con una clave por semana
-    // ('1' a '12'), no una subcolección — así que "solo status/note, nunca
-    // crystals ni status:'done'" hay que validarlo dentro de cada clave de
-    // semana que cambió. Rules no tiene loops ni forma de sacar un elemento
-    // de un Set sin conocer la clave de antemano, así que se revisan las 12
-    // semanas una por una a mano; cada llamada es gratis si esa semana en
-    // particular no cambió.
-    function oldProgressData() {
-      return resource != null ? resource.data : {};
-    }
-
-    function weekEditOk(wk) {
-      return !(wk in request.resource.data.diff(oldProgressData()).affectedKeys()) || (
-        request.resource.data.get(wk, {}).get('crystals', 0) == oldProgressData().get(wk, {}).get('crystals', 0) &&
-        request.resource.data.get(wk, {}).get('status', '') != 'done'
+    // ('1' a '12'), no una subcolección — así que "solo status/note/links,
+    // nunca crystals/feedback ni status:'done'" (si quien escribe no es
+    // profesor) y "cristales siempre entre 0 y 100" (sin importar quién
+    // escriba) hay que validarlo dentro de cada clave de semana que cambió.
+    // Rules no tiene loops ni forma de sacar un elemento de un Set sin
+    // conocer la clave de antemano, así que se revisan las 12 semanas una
+    // por una a mano, pero `changedKeys` y los datos viejos del documento se
+    // calculan UNA sola vez con `let` y se pasan como parámetros — llamar a
+    // .diff() o reconstruir "resource.data viejo" repetidamente dentro de
+    // cada una de las 12 llamadas resultó ser tan costoso que superaba el
+    // límite de Firestore de 1000 evaluaciones por escritura y la regla
+    // entera se denegaba con "Unable to evaluate the expression" incluso
+    // para escrituras legítimas del profesor o del estudiante.
+    function weekOk(wk, changedKeys, oldData, isProf) {
+      return !(wk in changedKeys) || (
+        (isProf || (
+          request.resource.data.get(wk, {}).get('crystals', 0) == oldData.get(wk, {}).get('crystals', 0) &&
+          request.resource.data.get(wk, {}).get('status', '') != 'done' &&
+          request.resource.data.get(wk, {}).get('feedback', '') == oldData.get(wk, {}).get('feedback', '')
+        )) &&
+        request.resource.data.get(wk, {}).get('crystals', 0) >= 0 &&
+        request.resource.data.get(wk, {}).get('crystals', 0) <= 100
       );
     }
 
-    function studentProgressEditOk() {
-      return weekEditOk('1') && weekEditOk('2') && weekEditOk('3') && weekEditOk('4') &&
-        weekEditOk('5') && weekEditOk('6') && weekEditOk('7') && weekEditOk('8') &&
-        weekEditOk('9') && weekEditOk('10') && weekEditOk('11') && weekEditOk('12');
+    function progressWriteOk(teamId) {
+      let oldData = resource != null ? resource.data : {};
+      let changedKeys = request.resource.data.diff(oldData).affectedKeys();
+      let isProf = isProfessor();
+      return (isProf || isTeamMember(teamId)) &&
+        weekOk('1', changedKeys, oldData, isProf) && weekOk('2', changedKeys, oldData, isProf) && weekOk('3', changedKeys, oldData, isProf) && weekOk('4', changedKeys, oldData, isProf) &&
+        weekOk('5', changedKeys, oldData, isProf) && weekOk('6', changedKeys, oldData, isProf) && weekOk('7', changedKeys, oldData, isProf) && weekOk('8', changedKeys, oldData, isProf) &&
+        weekOk('9', changedKeys, oldData, isProf) && weekOk('10', changedKeys, oldData, isProf) && weekOk('11', changedKeys, oldData, isProf) && weekOk('12', changedKeys, oldData, isProf);
     }
 
     // Regla aparte para collectionGroup('courses'): las reglas anidadas de
@@ -205,15 +217,14 @@ service cloud.firestore {
         // Lectura abierta (equipos ven su propio avance, y el de otros para
         // el tablero de posiciones). Escritura:
         //  - Cualquier profesor puede escribir libremente — incluye asignar
-        //    crystals y marcar status:'done' al calificar.
+        //    crystals, feedback y marcar status:'done' al calificar — pero
+        //    nunca por encima de 100 cristales por misión (progressWriteOk).
         //  - Un miembro del equipo puede enviar/actualizar su propio avance
-        //    (status, note, submittedAt), pero nunca puede tocar crystals ni
-        //    ponerse a sí mismo status:'done' — eso es la calificación.
+        //    (status, note, links, submittedAt), pero nunca puede tocar
+        //    crystals ni feedback ni ponerse a sí mismo status:'done' — eso
+        //    es la calificación.
         allow read: if signedIn();
-        allow write: if signedIn() && (
-          isProfessor() ||
-          (isTeamMember(teamId) && studentProgressEditOk())
-        );
+        allow write: if signedIn() && progressWriteOk(teamId);
       }
 
       match /announcements/{annId} {

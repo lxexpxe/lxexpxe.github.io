@@ -205,8 +205,8 @@ async function main() {
     );
 
     await check(
-        'Profesor A califica el avance del equipo: crystals y status:"done"',
-        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.status': 'done', '1.crystals': 80 }),
+        'Profesor A califica el avance del equipo: crystals, feedback y status:"done"',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '1.status': 'done', '1.crystals': 80, '1.feedback': 'Buen trabajo, falta profundizar en la literatura.' }),
         true
     );
 
@@ -311,6 +311,24 @@ async function main() {
     await check(
         'Estudiante 1 NO puede asignarse crystals a sí mismo (semana aparte para no chocar con el caso ya calificado)',
         student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '2.status': 'submitted', '2.crystals': 100 }),
+        false
+    );
+
+    await check(
+        'Estudiante 1 NO puede escribirse feedback a sí mismo',
+        student1.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '2.status': 'submitted', '2.feedback': 'Excelente, 100 cristales' }),
+        false
+    );
+
+    await check(
+        'Profesor A NO puede asignar más de 100 cristales a una misión (semana aparte, límite real en la regla, no solo en el navegador)',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '5.status': 'done', '5.crystals': 200 }),
+        false
+    );
+
+    await check(
+        'Profesor A NO puede asignar cristales negativos',
+        profA.doc(`artifacts/${NS}/progress/${TEAM_A}`).update({ '6.status': 'done', '6.crystals': -10 }),
         false
     );
 
