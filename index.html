@@ -4228,7 +4228,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
                                 <button
                                     onClick={() => setShowJoinCourse(true)}
                                     className="btn btn-secondary"
@@ -4264,7 +4264,8 @@
                                     className="btn btn-secondary"
                                     title="Cerrar sesión"
                                 >
-                                    Cerrar Sesión
+                                    <span className="hidden sm:inline">Cerrar Sesión</span>
+                                    <LogOut className="sm:hidden" />
                                 </button>
                                 <ThemeToggle />
                             </div>
@@ -5290,7 +5291,10 @@
                         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🧭 Expedición Doble Diamante</h1>
                         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{courseName} · Diseño e investigación en 12 semanas</p>
                     </div>
-                    <button onClick={onBack} className="btn btn-secondary">← Volver</button>
+                    <button onClick={onBack} className="btn btn-secondary">
+                        <span className="hidden sm:inline">← Volver</span>
+                        <span className="sm:hidden">←</span>
+                    </button>
                 </div>
             );
 
