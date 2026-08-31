@@ -4264,8 +4264,7 @@
                                     className="btn btn-secondary"
                                     title="Cerrar sesión"
                                 >
-                                    <span className="hidden sm:inline">Cerrar Sesión</span>
-                                    <LogOut className="sm:hidden" />
+                                    Cerrar Sesión
                                 </button>
                                 <ThemeToggle />
                             </div>
@@ -4869,6 +4868,18 @@
             const [activeWeek, setActiveWeek] = React.useState(1);
             const [announcements, setAnnouncements] = React.useState([]);
 
+            // El viewBox del mapa de misiones no se puede escalar solo con
+            // CSS (es un atributo SVG, no una propiedad de estilo), así que
+            // se detecta el ancho de pantalla en JS para usar un viewBox más
+            // alto con nodos/líneas más grandes en móvil.
+            const [isMobile, setIsMobile] = React.useState(() => window.matchMedia('(max-width: 639px)').matches);
+            React.useEffect(() => {
+                const mq = window.matchMedia('(max-width: 639px)');
+                const handler = (e) => setIsMobile(e.matches);
+                mq.addEventListener('change', handler);
+                return () => mq.removeEventListener('change', handler);
+            }, []);
+
             // --- estado de profesor ---
             const [profTeams, setProfTeams] = React.useState([]);
             const [profProgressByTeam, setProfProgressByTeam] = React.useState({});
@@ -5193,10 +5204,21 @@
             // 12 tarjetas. Solo muestra el número (o un candado si está
             // bloqueada); el detalle completo se ve abajo al seleccionarla.
             const renderJourney = (progress, onSelect) => {
-                const nodeR = 34;
+                // En móvil el mapa se ve el doble de alto, con nodos y líneas
+                // el doble de grandes/gruesas — el orden y la forma del
+                // recorrido son los mismos, solo escalados. El viewBox es un
+                // atributo SVG (no CSS), así que hay que recalcular todo en
+                // JS según isMobile en vez de resolverlo con media queries.
+                const scale = isMobile ? 2 : 1;
+                const mapH = 460 * scale;
+                const nodeR = 34 * scale;
+                const pos = (wk) => {
+                    const p = EXPEDITION_MAP_POSITIONS[wk];
+                    return { x: p.x, y: p.y * scale };
+                };
                 return (
                     <div className="mb-6 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-color)' }}>
-                        <svg viewBox="0 0 1200 460" style={{ width: '100%', height: 'auto', display: 'block' }}>
+                        <svg viewBox={`0 0 1200 ${mapH}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
                             <style>{`
                                 .expedition-node-unlocked { transition: transform 0.15s ease, filter 0.15s ease; transform-box: fill-box; transform-origin: center; cursor: pointer; }
                                 .expedition-node-unlocked:hover { transform: scale(1.1); filter: brightness(1.12) drop-shadow(0 4px 6px rgba(0,0,0,0.25)); }
@@ -5215,20 +5237,20 @@
                                     <stop offset="100%" stopColor="#c2410c" />
                                 </radialGradient>
                             </defs>
-                            <image href="assets/expedition-map-bg.png" x="0" y="0" width="1200" height="460" preserveAspectRatio="xMidYMid slice" />
+                            <image href="assets/expedition-map-bg.png" x="0" y="0" width="1200" height={mapH} preserveAspectRatio="xMidYMid slice" />
                             {EXPEDITION_MISSIONS.slice(0, -1).map((m, i) => {
-                                const a = EXPEDITION_MAP_POSITIONS[m.wk];
-                                const b = EXPEDITION_MAP_POSITIONS[m.wk + 1];
+                                const a = pos(m.wk);
+                                const b = pos(m.wk + 1);
                                 const midX = (a.x + b.x) / 2;
                                 const unlockedB = isMissionUnlocked(progress, m.wk + 1);
                                 let c1, c2;
                                 if (m.wk === 5 || m.wk === 8) {
                                     // Entra al nodo siguiente por ARRIBA.
                                     c1 = { x: midX, y: a.y };
-                                    c2 = { x: b.x, y: b.y - 60 };
+                                    c2 = { x: b.x, y: b.y - 60 * scale };
                                 } else if (m.wk === 6 || m.wk === 9) {
                                     // Sale del nodo actual por ABAJO.
-                                    c1 = { x: a.x, y: a.y + 60 };
+                                    c1 = { x: a.x, y: a.y + 60 * scale };
                                     c2 = { x: midX, y: b.y };
                                 } else {
                                     // Ola vertical decorativa alternada: sin esto,
@@ -5238,8 +5260,8 @@
                                     // pareja en vez de solo curvarse donde la
                                     // diferencia de altura entre nodos ya es grande.
                                     const wave = (i % 2 === 0) ? -45 : 45;
-                                    c1 = { x: a.x + (b.x - a.x) * 0.33, y: a.y + wave };
-                                    c2 = { x: a.x + (b.x - a.x) * 0.66, y: b.y + wave };
+                                    c1 = { x: a.x + (b.x - a.x) * 0.33, y: a.y + wave * scale };
+                                    c2 = { x: a.x + (b.x - a.x) * 0.66, y: b.y + wave * scale };
                                 }
                                 return (
                                     <path
@@ -5247,7 +5269,7 @@
                                         d={`M ${a.x},${a.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`}
                                         fill="none"
                                         stroke="#3f3f46"
-                                        strokeWidth="6"
+                                        strokeWidth={6 * scale}
                                         strokeDasharray="9 9"
                                         strokeLinecap="round"
                                         opacity={unlockedB ? 0.85 : 0.35}
@@ -5255,7 +5277,7 @@
                                 );
                             })}
                             {EXPEDITION_MISSIONS.map(m => {
-                                const pos = EXPEDITION_MAP_POSITIONS[m.wk];
+                                const p = pos(m.wk);
                                 const st = statusOf(progress, m.wk);
                                 const unlocked = isMissionUnlocked(progress, m.wk);
                                 const isActive = activeWeek === m.wk;
@@ -5271,10 +5293,10 @@
                                         style={{ cursor: unlocked ? 'pointer' : 'not-allowed' }}
                                     >
                                         {isActive && (
-                                            <circle cx={pos.x} cy={pos.y} r={nodeR + 8} fill="none" stroke={EXPEDITION_PHASES[m.phase].color} strokeWidth="3" />
+                                            <circle cx={p.x} cy={p.y} r={nodeR + 8 * scale} fill="none" stroke={EXPEDITION_PHASES[m.phase].color} strokeWidth={3 * scale} />
                                         )}
-                                        <circle cx={pos.x} cy={pos.y} r={nodeR} fill={fill} stroke={stroke} strokeWidth="3" />
-                                        <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" fontSize={unlocked ? '26' : '22'} fontWeight="bold" fill={unlocked ? '#fff' : 'var(--text-secondary)'}>
+                                        <circle cx={p.x} cy={p.y} r={nodeR} fill={fill} stroke={stroke} strokeWidth={3 * scale} />
+                                        <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fontSize={(unlocked ? 26 : 22) * scale} fontWeight="bold" fill={unlocked ? '#fff' : 'var(--text-secondary)'}>
                                             {unlocked ? m.wk : '🔒'}
                                         </text>
                                     </g>
