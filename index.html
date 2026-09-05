@@ -854,6 +854,8 @@
             const [newSemesterPeriod, setNewSemesterPeriod] = React.useState('');
             const [newSemesterLoading, setNewSemesterLoading] = React.useState(false);
             const [creatingTodayRecord, setCreatingTodayRecord] = React.useState(false);
+            // 'on-time' | 'late' | 'checkout' — qué QR se está mostrando ahora mismo.
+            const [qrMode, setQrMode] = React.useState('on-time');
             const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
@@ -1053,7 +1055,8 @@
 
                         if (isCorrectTime || forceShowTeacherQR) {
                             setQrTeacherVisible(true);
-                            generateTodayQR();
+                            setQrMode('on-time');
+                            generateTodayQR('on-time');
                         } else {
                             setQrTeacherVisible(false);
                             setShowQRTeacherWarning(true);
@@ -1248,13 +1251,15 @@
                 loadStudents();
             };
 
-            const generateTodayQR = () => {
+            const generateTodayQR = (mode = 'on-time') => {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const qrData = JSON.stringify({
                     courseId: selectedCourse.id,
                     date: today,
-                    professorId: currentUser.uid
+                    professorId: currentUser.uid,
+                    phase: mode === 'checkout' ? 'checkout' : 'checkin',
+                    late: mode === 'late'
                 });
 
                 setTimeout(() => {
@@ -1269,6 +1274,88 @@
                         });
                     }
                 }, 100);
+            };
+
+            // Alterna el QR entre "a tiempo" y "llegada tarde". Si el QR de
+            // salida estaba activo, este botón lo regresa a modo de llegada
+            // (a tiempo) — es el "reset" natural desde ese modo.
+            const toggleQrLateMode = () => {
+                const next = qrMode === 'on-time' ? 'late' : 'on-time';
+                setQrMode(next);
+                generateTodayQR(next);
+            };
+
+            // Alterna el QR entre modo de llegada (a tiempo/tarde, lo que sea
+            // que estuviera activo antes) y modo de salida.
+            const toggleQrCheckoutMode = () => {
+                const next = qrMode === 'checkout' ? 'on-time' : 'checkout';
+                setQrMode(next);
+                generateTodayQR(next);
+            };
+
+            // Estado de asistencia de un estudiante en una fecha, a partir de
+            // TODOS sus registros ese día (puede haber uno de llegada y otro
+            // de salida, son eventos separados que se van agregando al mismo
+            // arreglo — nunca se muta un registro existente, así respeta la
+            // regla de Firestore que solo permite anexar al final).
+            //   'absent'     -> no hay ningún registro ese día (guión)
+            //   'incomplete' -> hay llegada (QR nuevo) pero no salida (rojo)
+            //   'ontime'     -> llegada a tiempo + completo, o registro
+            //                   manual/histórico anterior a esta función,
+            //                   que siempre se consideró completo (verde)
+            //   'late'       -> llegada tarde + completo (naranja)
+            const getAttendanceStatus = (records, studentId) => {
+                const mine = (records || []).filter(r => r.studentId === studentId);
+                if (mine.length === 0) return 'absent';
+
+                const checkin = mine.find(r => r.type !== 'checkout');
+                if (!checkin) return 'absent';
+
+                if (checkin.type !== 'checkin') {
+                    // Marcado manual por el profesor, o registro de antes de
+                    // que existiera el concepto de salida: siempre completo.
+                    return checkin.late ? 'late' : 'ontime';
+                }
+
+                const hasCheckout = mine.some(r => r.type === 'checkout');
+                if (!hasCheckout) return 'incomplete';
+                return checkin.late ? 'late' : 'ontime';
+            };
+
+            // Clic sobre una celda del Historial: si está incompleta, el
+            // profesor confirma manualmente que sí hubo salida (se agrega un
+            // registro de salida, igual que si el estudiante hubiera
+            // escaneado el QR); si ya está completa, alterna a tiempo/tarde.
+            // El listener onSnapshot de arriba (líneas ~1095-1113) refleja el
+            // cambio solo, no hace falta actualizar attendanceData a mano.
+            const advanceAttendanceStatus = async (studentId, date) => {
+                if (!selectedCourse) return;
+
+                try {
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
+                    const attendanceDoc = await attendanceRef.get();
+                    if (!attendanceDoc.exists) return;
+
+                    const existingData = attendanceDoc.data();
+                    const students = existingData.students || [];
+                    const status = getAttendanceStatus(students, studentId);
+
+                    if (status === 'incomplete') {
+                        await attendanceRef.update({
+                            students: [...students, { studentId, timestamp: new Date(), type: 'checkout', source: 'manual' }]
+                        });
+                    } else if (status === 'ontime' || status === 'late') {
+                        const updatedStudents = students.map(record =>
+                            (record.studentId === studentId && record.type !== 'checkout')
+                                ? { ...record, late: !record.late }
+                                : record
+                        );
+                        await attendanceRef.update({ students: updatedStudents });
+                    }
+                } catch (error) {
+                    console.error('Error actualizando estado de asistencia:', error);
+                    toast.showToast('Error actualizando el estado de asistencia', 'error');
+                }
             };
 
             const chunkArray = (arr, size) => {
@@ -1943,6 +2030,20 @@
                     return nameA.localeCompare(nameB, 'es');
                 });
 
+                // "Asistencia de Hoy" agrupa por estudiante en vez de mostrar
+                // un renglón por evento — con check-in + check-out puede
+                // haber dos registros para el mismo estudiante el mismo día.
+                const todayRecords = attendanceData[today] || [];
+                const todayStudentIds = [...new Set(todayRecords.map(r => r.studentId))];
+                const todayRows = todayStudentIds.map(studentId => {
+                    const checkin = todayRecords.find(r => r.studentId === studentId && r.type !== 'checkout') || todayRecords.find(r => r.studentId === studentId);
+                    return { studentId, checkin, status: getAttendanceStatus(todayRecords, studentId) };
+                }).sort((a, b) => {
+                    const ta = a.checkin?.timestamp?.toDate ? a.checkin.timestamp.toDate() : a.checkin?.timestamp;
+                    const tb = b.checkin?.timestamp?.toDate ? b.checkin.timestamp.toDate() : b.checkin?.timestamp;
+                    return new Date(ta) - new Date(tb);
+                });
+
                 const formatDateMmmDD = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
                     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -1984,10 +2085,40 @@
 
                                         {qrTeacherVisible ? (
                                             <>
-                                                <div className="bg-white p-8 rounded-lg inline-block shadow-lg" style={{ border: '4px solid #f0f0f0' }}>
+                                                <div
+                                                    className="bg-white p-8 rounded-lg inline-block shadow-lg"
+                                                    style={{
+                                                        border: qrMode === 'checkout'
+                                                            ? '4px solid #3b82f6'
+                                                            : qrMode === 'late'
+                                                                ? '4px solid #fb923c'
+                                                                : '4px solid #f0f0f0'
+                                                    }}
+                                                >
                                                     <div ref={qrCodeRef}></div>
                                                 </div>
                                                 <p className="text-sm text-gray-600 mt-2">Escanea desde cualquier distancia</p>
+                                                <div className={`mt-2 mb-2 text-sm font-semibold px-3 py-1 rounded-full ${qrMode === 'checkout' ? 'bg-blue-100 text-blue-800' : qrMode === 'late' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {qrMode === 'checkout' ? '🚪 Modo: QR de salida' : qrMode === 'late' ? '🟠 Modo: Llegada tarde' : '🟢 Modo: A tiempo'}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={toggleQrLateMode}
+                                                        className="btn text-sm"
+                                                        style={qrMode === 'late' ? {} : { backgroundColor: '#fb923c', color: 'white' }}
+                                                        title="Los estudiantes que escaneen este QR de aquí en adelante quedarán marcados con llegada tarde"
+                                                    >
+                                                        {qrMode === 'late' ? '↩️ Volver a a tiempo' : '🕐 QR de llegada tarde'}
+                                                    </button>
+                                                    <button
+                                                        onClick={toggleQrCheckoutMode}
+                                                        className="btn text-sm"
+                                                        style={qrMode === 'checkout' ? {} : { backgroundColor: '#3b82f6', color: 'white' }}
+                                                        title="QR para que los estudiantes registren su salida y completen la asistencia del día"
+                                                    >
+                                                        {qrMode === 'checkout' ? '↩️ Volver a QR de llegada' : '🚪 Generar QR de salida'}
+                                                    </button>
+                                                </div>
                                             </>
                                         ) : (
                                             <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 w-full max-w-sm text-center">
@@ -2000,7 +2131,8 @@
                                                     onClick={() => {
                                                         setForceShowTeacherQR(true);
                                                         setQrTeacherVisible(true);
-                                                        setTimeout(() => generateTodayQR(), 100);
+                                                        setQrMode('on-time');
+                                                        setTimeout(() => generateTodayQR('on-time'), 100);
                                                     }}
                                                     className="btn btn-primary text-sm"
                                                 >
@@ -2025,14 +2157,16 @@
                                             )}
                                         </div>
                                         <div className="bg-gray-50 rounded-lg p-4 flex-1 min-h-0 overflow-y-auto">
-                                            {attendanceData[today] && attendanceData[today].length > 0 ? (
+                                            {todayRows.length > 0 ? (
                                                 <ul className="space-y-2">
-                                                    {attendanceData[today].map((record, idx) => (
-                                                        <li key={idx} className="flex items-center gap-2 text-sm">
-                                                            <span className="text-green-600">✓</span>
-                                                            <span>{record.studentName}</span>
+                                                    {todayRows.map(({ studentId, checkin, status }) => (
+                                                        <li key={studentId} className="flex items-center gap-2 text-sm">
+                                                            <span title={status === 'incomplete' ? 'Falta escanear el QR de salida' : ''}>
+                                                                {status === 'late' ? '🟠' : status === 'ontime' ? '🟢' : '🔴'}
+                                                            </span>
+                                                            <span>{checkin?.studentName || 'Estudiante'}</span>
                                                             <span className="text-xs text-gray-500">
-                                                                ({new Date(record.timestamp?.toDate ? record.timestamp.toDate() : record.timestamp).toLocaleTimeString()})
+                                                                ({checkin?.timestamp ? new Date(checkin.timestamp?.toDate ? checkin.timestamp.toDate() : checkin.timestamp).toLocaleTimeString() : '—'})
                                                             </span>
                                                         </li>
                                                     ))}
@@ -2046,7 +2180,12 @@
                             </div>
 
                             <div className="card rounded-xl p-6">
-                                <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-semibold">Historial de Asistencia</h3>
+                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                        🟢 A tiempo · 🟠 Tarde · 🔴 Sin salida registrada · - Ausente — clic para cambiar
+                                    </p>
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead>
@@ -2076,12 +2215,10 @@
                                                     <tr key={student.id} className="border-b hover:bg-gray-50">
                                                         <td className="p-3">{student.fullName}</td>
                                                         {dates.slice(-10).map(date => {
-                                                            const attended = attendanceData[date]?.some(record => record.studentId === student.id);
+                                                            const status = getAttendanceStatus(attendanceData[date], student.id);
                                                             return (
                                                                 <td key={date} className="text-center p-3">
-                                                                    {attended ? (
-                                                                        <span className="text-green-600">✓</span>
-                                                                    ) : (
+                                                                    {status === 'absent' ? (
                                                                         <button
                                                                             type="button"
                                                                             className="text-gray-400 hover:text-green-600 font-semibold"
@@ -2089,6 +2226,21 @@
                                                                             onClick={() => markManualAttendance(student, date)}
                                                                         >
                                                                             -
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="font-semibold"
+                                                                            title={
+                                                                                status === 'incomplete'
+                                                                                    ? 'Sin salida registrada — clic para marcar como completa'
+                                                                                    : status === 'late'
+                                                                                        ? 'Marcar como a tiempo'
+                                                                                        : 'Marcar como llegada tarde'
+                                                                            }
+                                                                            onClick={() => advanceAttendanceStatus(student.id, date)}
+                                                                        >
+                                                                            {status === 'incomplete' ? '🔴' : status === 'late' ? '🟠' : '🟢'}
                                                                         </button>
                                                                     )}
                                                                 </td>
@@ -3622,6 +3774,15 @@
                                     cameraConfig,
                                     scanConfig,
                                     async (decodedText) => {
+                                        // Mientras stop() (llamado más abajo) termina de detener la
+                                        // cámara, siguen llegando frames y este callback puede volver
+                                        // a dispararse para el mismo QR ya resuelto — a veces con una
+                                        // lectura parcial/corrupta (motion blur, glare) que ya no
+                                        // corresponde al QR real. Si ya se registró la asistencia en
+                                        // este intento de escaneo, se ignora cualquier decodificación
+                                        // adicional en vez de mostrar "QR inválido" sobre un escaneo
+                                        // que en realidad sí tuvo éxito.
+                                        if (scanHandledRef.current) return;
                                         try {
                                             const qrData = JSON.parse(decodedText);
 
@@ -3632,7 +3793,13 @@
                                                 // capacidades de un track que este stop() ya detuvo,
                                                 // y eso no debe mostrarse como "Error de cámara".
                                                 scanHandledRef.current = true;
-                                                await registerAttendance(qrData);
+                                                // phase ausente (QR generado antes de este cambio) se
+                                                // trata como 'checkin', el comportamiento de siempre.
+                                                if (qrData.phase === 'checkout') {
+                                                    await registerCheckout(qrData);
+                                                } else {
+                                                    await registerAttendance(qrData);
+                                                }
                                                 html5QrCode.stop().catch(() => {}).finally(() => {
                                                     setShowQRScanner(false);
                                                 });
@@ -3770,15 +3937,21 @@
                     const studentData = {
                         studentId: currentUser.uid,
                         studentName: userData?.fullName || currentUser.email,
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        late: !!qrData.late,
+                        type: 'checkin'
                     };
 
                     if (attendanceDoc.exists) {
                         const existingData = attendanceDoc.data();
                         const students = existingData.students || [];
 
-                        if (students.some(s => s.studentId === currentUser.uid)) {
-                            toast.showToast('Ya registraste tu asistencia hoy', 'info');
+                        // "type !== 'checkout'" incluye tanto llegadas nuevas
+                        // (type: 'checkin') como registros manuales/antiguos
+                        // sin ese campo — cualquiera de esos ya cuenta como
+                        // llegada registrada.
+                        if (students.some(s => s.studentId === currentUser.uid && s.type !== 'checkout')) {
+                            toast.showToast('Ya registraste tu llegada hoy', 'info');
                             return;
                         }
 
@@ -3794,10 +3967,54 @@
                         });
                     }
 
-                    toast.showToast('¡Asistencia registrada exitosamente!', 'success');
+                    toast.showToast(qrData.late ? '¡Llegada registrada (tarde)! Falta escanear el QR de salida.' : '¡Llegada registrada a tiempo! Falta escanear el QR de salida.', 'success');
                 } catch (error) {
                     console.error('Error registrando asistencia:', error);
                     toast.showToast('Error registrando asistencia', 'error');
+                }
+            };
+
+            const registerCheckout = async (qrData) => {
+                try {
+                    const professorCoursesRef = db.collection(`artifacts/academic-platform/professors/${qrData.professorId}/courses/${qrData.courseId}/students`);
+                    const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
+
+                    if (!studentDoc.exists) {
+                        toast.showToast('No estás matriculado en este curso', 'error');
+                        return;
+                    }
+
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${qrData.courseId}/attendance/${qrData.date}`);
+                    const attendanceDoc = await attendanceRef.get();
+
+                    if (!attendanceDoc.exists) {
+                        toast.showToast('Aún no has registrado tu llegada. Escanea primero el QR de entrada.', 'error');
+                        return;
+                    }
+
+                    const existingData = attendanceDoc.data();
+                    const students = existingData.students || [];
+
+                    const hasCheckedIn = students.some(s => s.studentId === currentUser.uid && s.type !== 'checkout');
+                    if (!hasCheckedIn) {
+                        toast.showToast('Aún no has registrado tu llegada. Escanea primero el QR de entrada.', 'error');
+                        return;
+                    }
+
+                    const alreadyCheckedOut = students.some(s => s.studentId === currentUser.uid && s.type === 'checkout');
+                    if (alreadyCheckedOut) {
+                        toast.showToast('Ya registraste tu salida', 'info');
+                        return;
+                    }
+
+                    await attendanceRef.update({
+                        students: [...students, { studentId: currentUser.uid, timestamp: new Date(), type: 'checkout' }]
+                    });
+
+                    toast.showToast('¡Salida registrada! Tu asistencia quedó completa.', 'success');
+                } catch (error) {
+                    console.error('Error registrando salida:', error);
+                    toast.showToast('Error registrando salida', 'error');
                 }
             };
 
@@ -5467,7 +5684,7 @@
                                                     .filter(s => !assignedElsewhere.has(s.id))
                                                     .sort((a, b) => (a.fullName || a.email || '').localeCompare(b.fullName || b.email || ''));
                                                 return (
-                                                    <div key={team.id} className="card rounded-xl p-6">
+                                                    <div key={team.id} className="card rounded-xl p-6 flex flex-col h-full">
                                                         {editingTeamId === team.id ? (
                                                             <div className="flex gap-2 items-center mb-2">
                                                                 <input
@@ -5503,28 +5720,30 @@
                                                                 ))
                                                             )}
                                                         </div>
-                                                        {availableForThisTeam.length > 0 && (
-                                                            <div className="mb-2">
-                                                                <select
-                                                                    className="input-field w-full py-1.5 px-2 rounded text-sm"
-                                                                    value=""
-                                                                    onChange={(e) => { if (e.target.value) addMemberUid(team.id, e.target.value); }}
-                                                                >
-                                                                    <option value="">+ Agregar del roster...</option>
-                                                                    {availableForThisTeam.map(s => (
-                                                                        <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
-                                                                    ))}
-                                                                </select>
+                                                        <div className="mt-auto">
+                                                            {availableForThisTeam.length > 0 && (
+                                                                <div className="mb-2">
+                                                                    <select
+                                                                        className="input-field w-full py-1.5 px-2 rounded text-sm"
+                                                                        value=""
+                                                                        onChange={(e) => { if (e.target.value) addMemberUid(team.id, e.target.value); }}
+                                                                    >
+                                                                        <option value="">+ Agregar del roster...</option>
+                                                                        {availableForThisTeam.map(s => (
+                                                                            <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    type="email" placeholder="correo@institucion.edu.co"
+                                                                    className="input-field flex-1 py-1.5 px-2 rounded text-sm"
+                                                                    value={emailToAdd[team.id] || ''}
+                                                                    onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
+                                                                />
+                                                                <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ 📩</button>
                                                             </div>
-                                                        )}
-                                                        <div className="flex gap-2">
-                                                            <input
-                                                                type="email" placeholder="correo@institucion.edu.co"
-                                                                className="input-field flex-1 py-1.5 px-2 rounded text-sm"
-                                                                value={emailToAdd[team.id] || ''}
-                                                                onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
-                                                            />
-                                                            <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ Por correo</button>
                                                         </div>
                                                     </div>
                                                 );
