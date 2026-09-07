@@ -1,0 +1,14 @@
+{
+  "name": "academic-platform-build",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Compila index.html (JSX + Tailwind CDN, para editar y probar en local) a la versión optimizada que se publica en gh-pages: JSX precompilado a JS plano y CSS de Tailwind generado estáticamente, sin cargar Babel ni el CDN de Tailwind en el navegador del usuario final. No cambia cómo se edita el sitio — index.html en main sigue siendo el único archivo fuente.",
+  "scripts": {
+    "build": "node compile.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-react": "^7.27.1",
+    "tailwindcss": "^3.4.13"
+  }
+}

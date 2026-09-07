@@ -1,0 +1,45 @@
+name: Compilar y publicar
+
+# index.html en main sigue siendo el único archivo fuente que se edita (JSX
+# inline + Tailwind vía CDN, para poder abrirlo tal cual y probarlo sin
+# build). Este workflow lo compila (build/compile.js: JSX -> JS plano,
+# Tailwind -> CSS estático) y publica el resultado en la rama gh-pages, que
+# es la que sirve el sitio real — sin que nadie tenga que compilar a mano.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'build/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: build/package-lock.json
+
+      - name: Instalar dependencias del build
+        working-directory: build
+        run: npm ci
+
+      - name: Compilar (JSX -> JS, Tailwind -> CSS)
+        working-directory: build
+        run: npm run build
+
+      - name: Publicar en gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

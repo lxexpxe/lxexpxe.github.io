@@ -23,3 +23,7 @@ Thumbs.db
 firestore-debug.log
 ui-debug.log
 .firebase/
+
+# Salida del pipeline de build (build/compile.js) — se genera en cada
+# despliegue vía GitHub Actions, publicada en la rama gh-pages, nunca en main.
+/dist/
