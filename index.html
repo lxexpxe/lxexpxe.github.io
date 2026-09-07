@@ -1388,6 +1388,17 @@
             // escaneado el QR); si ya está completa, alterna a tiempo/tarde.
             // El listener onSnapshot de arriba (líneas ~1095-1113) refleja el
             // cambio solo, no hace falta actualizar attendanceData a mano.
+            // Un registro es "de QR" si su check-in tiene type: 'checkin'
+            // (lo pone registerAttendance) — un registro manual/histórico
+            // nunca tiene ese campo. La distinción importa: a un registro de
+            // QR se le puede cambiar el estado pero NUNCA quitarle la
+            // asistencia (eso solo aplica a los manuales, ver
+            // unmarkAttendance más abajo).
+            const isQrVerifiedRecord = (records, studentId) => {
+                const checkin = (records || []).find(r => r.studentId === studentId && r.type !== 'checkout');
+                return !!checkin && checkin.type === 'checkin';
+            };
+
             const advanceAttendanceStatus = async (studentId, date) => {
                 if (!selectedCourse) return;
 
@@ -1404,18 +1415,34 @@
                     const students = existingData.students || [];
                     const status = getAttendanceStatus(students, studentId);
 
-                    let writePromise;
-                    if (status === 'incomplete') {
-                        writePromise = attendanceRef.update({
-                            students: [...students, { studentId, timestamp: new Date(), type: 'checkout', source: 'manual' }]
-                        });
+                    let updatedStudents;
+                    if (isQrVerifiedRecord(students, studentId)) {
+                        // Registro por QR: cicla verde -> naranja -> rojo -> verde,
+                        // nunca vuelve a ausente. Se recalcula el resultado exacto
+                        // en cada paso (en vez de solo alternar el flag `late`)
+                        // para que el ciclo sea el mismo sin importar de qué
+                        // estado se venga.
+                        const cycle = ['ontime', 'late', 'incomplete'];
+                        const nextStatus = cycle[(cycle.indexOf(status) + 1) % cycle.length];
+                        const withoutCheckout = students.filter(r => !(r.studentId === studentId && r.type === 'checkout'));
+
+                        if (nextStatus === 'incomplete') {
+                            updatedStudents = withoutCheckout;
+                        } else {
+                            const withUpdatedLate = withoutCheckout.map(r =>
+                                (r.studentId === studentId && r.type !== 'checkout')
+                                    ? { ...r, late: nextStatus === 'late' }
+                                    : r
+                            );
+                            updatedStudents = [...withUpdatedLate, { studentId, timestamp: new Date(), type: 'checkout', source: 'manual' }];
+                        }
                     } else if (status === 'ontime' || status === 'late') {
-                        const updatedStudents = students.map(record =>
+                        // Registro manual/histórico: solo alterna a tiempo/tarde.
+                        updatedStudents = students.map(record =>
                             (record.studentId === studentId && record.type !== 'checkout')
                                 ? { ...record, late: !record.late }
                                 : record
                         );
-                        writePromise = attendanceRef.update({ students: updatedStudents });
                     } else {
                         return;
                     }
@@ -1423,7 +1450,7 @@
                     // No se muta attendanceData localmente antes de este await:
                     // el cambio en pantalla solo debe aparecer una vez que el
                     // listener onSnapshot refleje que Firestore lo confirmó.
-                    await runWithConnectivityWarning(writePromise, () => {
+                    await runWithConnectivityWarning(attendanceRef.update({ students: updatedStudents }), () => {
                         warned = true;
                         toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
                     });
@@ -1438,6 +1465,49 @@
                 } finally {
                     setPendingAttendanceCells(prev => { const next = new Set(prev); next.delete(cellKey); return next; });
                     if (warned) toast.showToast('Cambio confirmado', 'success');
+                }
+            };
+
+            // Quita una asistencia marcada MANUALMENTE por error (nunca una
+            // verificada por QR — se vuelve a validar por si acaso, aunque la
+            // UI solo debería ofrecer este botón para registros manuales).
+            // El estudiante vuelve a quedar como ausente ("-") ese día.
+            const unmarkAttendance = async (studentId, date) => {
+                if (!selectedCourse) return;
+                if (!confirm('¿Quitar esta asistencia marcada manualmente? El estudiante quedará como ausente ese día.')) return;
+
+                const cellKey = `${studentId}_${date}`;
+                setPendingAttendanceCells(prev => new Set(prev).add(cellKey));
+
+                try {
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
+                    const attendanceDoc = await attendanceRef.get();
+                    if (!attendanceDoc.exists) return;
+
+                    const existingData = attendanceDoc.data();
+                    const students = existingData.students || [];
+
+                    if (isQrVerifiedRecord(students, studentId)) {
+                        toast.showToast('No se puede quitar una asistencia verificada por QR', 'error');
+                        return;
+                    }
+
+                    const updatedStudents = students.filter(record => record.studentId !== studentId);
+
+                    await runWithConnectivityWarning(attendanceRef.update({ students: updatedStudents }), () => {
+                        toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
+                    });
+                    toast.showToast('Asistencia manual removida', 'success');
+                } catch (error) {
+                    console.error('Error quitando asistencia manual:', error);
+                    toast.showToast(
+                        error.code === 'permission-denied'
+                            ? 'No se pudo guardar el cambio — puede que tu sesión haya expirado, vuelve a iniciar sesión'
+                            : 'Error quitando la asistencia',
+                        'error'
+                    );
+                } finally {
+                    setPendingAttendanceCells(prev => { const next = new Set(prev); next.delete(cellKey); return next; });
                 }
             };
 
@@ -2280,7 +2350,7 @@
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-semibold">Historial de Asistencia</h3>
                                     <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                        🟢 A tiempo · 🟠 Tarde · 🔴 Sin salida registrada · - Ausente — clic para cambiar
+                                        🟢 A tiempo · 🟠 Tarde · 🔴 Sin salida registrada · - Ausente — clic para cambiar · fila resaltada: 3-4 inasistencias/incompletas en naranja, 5+ en rojo
                                     </p>
                                 </div>
                                 <div className="overflow-x-auto">
@@ -2308,12 +2378,29 @@
                                                     attendanceData[date]?.some(record => record.studentId === student.id)
                                                 ).length;
 
+                                                // Ausencias reales + días con llegada pero sin salida
+                                                // validada, contadas sobre TODO el historial (no solo
+                                                // las últimas 10 fechas visibles) — igual que "Total".
+                                                // Esto NO cambia qué cuenta como "asistencia completa"
+                                                // en cada celda ni en el Total: un 🔴 sigue siendo
+                                                // asistencia, solo también suma para este resaltado.
+                                                const problemCount = dates.filter(date => {
+                                                    const s = getAttendanceStatus(attendanceData[date], student.id);
+                                                    return s === 'absent' || s === 'incomplete';
+                                                }).length;
+                                                const rowBg = problemCount >= 5
+                                                    ? 'rgba(239, 68, 68, 0.15)'
+                                                    : problemCount >= 3
+                                                        ? 'rgba(251, 146, 60, 0.15)'
+                                                        : undefined;
+
                                                 return (
-                                                    <tr key={student.id} className="border-b hover:bg-gray-50">
+                                                    <tr key={student.id} className="border-b hover:bg-gray-50" style={rowBg ? { backgroundColor: rowBg } : {}}>
                                                         <td className="p-3">{student.fullName}</td>
                                                         {dates.slice(-10).map(date => {
                                                             const status = getAttendanceStatus(attendanceData[date], student.id);
                                                             const isPending = pendingAttendanceCells.has(`${student.id}_${date}`);
+                                                            const isManual = status !== 'absent' && !isQrVerifiedRecord(attendanceData[date], student.id);
                                                             return (
                                                                 <td key={date} className="text-center p-3">
                                                                     {isPending ? (
@@ -2328,20 +2415,33 @@
                                                                             -
                                                                         </button>
                                                                     ) : (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="font-semibold"
-                                                                            title={
-                                                                                status === 'incomplete'
-                                                                                    ? 'Sin salida registrada — clic para marcar como completa'
-                                                                                    : status === 'late'
-                                                                                        ? 'Marcar como a tiempo'
-                                                                                        : 'Marcar como llegada tarde'
-                                                                            }
-                                                                            onClick={() => advanceAttendanceStatus(student.id, date)}
-                                                                        >
-                                                                            {status === 'incomplete' ? '🔴' : status === 'late' ? '🟠' : '🟢'}
-                                                                        </button>
+                                                                        <div className="flex flex-col items-center gap-0.5">
+                                                                            <button
+                                                                                type="button"
+                                                                                className="font-semibold"
+                                                                                title={
+                                                                                    status === 'incomplete'
+                                                                                        ? 'Sin salida registrada — clic para cambiar'
+                                                                                        : status === 'late'
+                                                                                            ? 'Marcar como a tiempo'
+                                                                                            : 'Marcar como llegada tarde'
+                                                                                }
+                                                                                onClick={() => advanceAttendanceStatus(student.id, date)}
+                                                                            >
+                                                                                {status === 'incomplete' ? '🔴' : status === 'late' ? '🟠' : '🟢'}
+                                                                            </button>
+                                                                            {isManual && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="text-gray-400 hover:text-red-600"
+                                                                                    style={{ fontSize: '0.6rem', lineHeight: 1 }}
+                                                                                    title="Quitar esta asistencia marcada manualmente"
+                                                                                    onClick={() => unmarkAttendance(student.id, date)}
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </td>
                                                             );
