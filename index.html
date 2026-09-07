@@ -4,6 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Evita que el navegador sirva una copia vieja de esta página sin
+         revisar primero si hay una nueva — un estudiante con una versión
+         cacheada de antes de un despliegue puede terminar corriendo JS
+         desactualizado (visto en producción: un registro de asistencia sin
+         los campos type/late que ya no existían en versiones nuevas). -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Plataforma Académica</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -297,6 +305,53 @@
                 <p className="ml-3" style={{ color: 'var(--text-secondary)' }}>Cargando...</p>
             </div>
         );
+
+        // Aviso global de "sin conexión". navigator.onLine es una señal
+        // heurística (detecta la interfaz de red caída, no garantiza que
+        // haya internet real detrás de un router) — se complementa con el
+        // aviso de "esto está tardando" en las acciones concretas (ver
+        // runWithConnectivityWarning), que sí detecta cuando una escritura a
+        // Firestore se queda colgada sin resolver.
+        function OfflineBanner() {
+            const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+            React.useEffect(() => {
+                const goOnline = () => setIsOnline(true);
+                const goOffline = () => setIsOnline(false);
+                window.addEventListener('online', goOnline);
+                window.addEventListener('offline', goOffline);
+                return () => {
+                    window.removeEventListener('online', goOnline);
+                    window.removeEventListener('offline', goOffline);
+                };
+            }, []);
+
+            if (isOnline) return null;
+
+            return (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2000,
+                    backgroundColor: '#dc2626', color: 'white', textAlign: 'center',
+                    padding: '0.6rem 1rem', fontWeight: 600, fontSize: '0.875rem'
+                }}>
+                    ⚠️ Sin conexión a internet — nada de lo que hagas ahora se va a guardar hasta que se reconecte
+                </div>
+            );
+        }
+
+        // Corre `promise` (una escritura a Firestore) y avisa aparte si tarda
+        // más de `timeoutMs` sin resolver, sin cancelarla — Firestore no
+        // permite cancelar una escritura en curso, y si la conexión vuelve
+        // más tarde se completa sola. Esto solo hace visible que algo se
+        // quedó pendiente, en vez de dejar la UI en silencio total (que es lo
+        // que pasa hoy: sin red, la promesa de escritura no resuelve NI
+        // falla, se queda colgada — comprobado empíricamente contra el
+        // emulador con la conexión cortada de verdad).
+        const runWithConnectivityWarning = (promise, onSlow, timeoutMs = 8000) => {
+            let settled = false;
+            const timer = setTimeout(() => { if (!settled) onSlow(); }, timeoutMs);
+            return promise.finally(() => { settled = true; clearTimeout(timer); });
+        };
 
         function AuthPage() {
             const toast = useToast();
@@ -850,6 +905,11 @@
             const [showQRTeacherWarning, setShowQRTeacherWarning] = React.useState(false);
             const [forceShowTeacherQR, setForceShowTeacherQR] = React.useState(false);
             const [attendanceData, setAttendanceData] = React.useState({});
+            // Claves "studentId_date" con una acción de asistencia en curso
+            // (marcar manual, o cambiar de estado) — mientras una celda está
+            // acá, se muestra un spinner en vez del ícono, para que nunca se
+            // vea un cambio en pantalla antes de que Firestore lo confirme.
+            const [pendingAttendanceCells, setPendingAttendanceCells] = React.useState(new Set());
             const [showNewSemesterConfirm, setShowNewSemesterConfirm] = React.useState(false);
             const [newSemesterPeriod, setNewSemesterPeriod] = React.useState('');
             const [newSemesterLoading, setNewSemesterLoading] = React.useState(false);
@@ -1331,6 +1391,10 @@
             const advanceAttendanceStatus = async (studentId, date) => {
                 if (!selectedCourse) return;
 
+                const cellKey = `${studentId}_${date}`;
+                setPendingAttendanceCells(prev => new Set(prev).add(cellKey));
+                let warned = false;
+
                 try {
                     const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
                     const attendanceDoc = await attendanceRef.get();
@@ -1340,8 +1404,9 @@
                     const students = existingData.students || [];
                     const status = getAttendanceStatus(students, studentId);
 
+                    let writePromise;
                     if (status === 'incomplete') {
-                        await attendanceRef.update({
+                        writePromise = attendanceRef.update({
                             students: [...students, { studentId, timestamp: new Date(), type: 'checkout', source: 'manual' }]
                         });
                     } else if (status === 'ontime' || status === 'late') {
@@ -1350,11 +1415,29 @@
                                 ? { ...record, late: !record.late }
                                 : record
                         );
-                        await attendanceRef.update({ students: updatedStudents });
+                        writePromise = attendanceRef.update({ students: updatedStudents });
+                    } else {
+                        return;
                     }
+
+                    // No se muta attendanceData localmente antes de este await:
+                    // el cambio en pantalla solo debe aparecer una vez que el
+                    // listener onSnapshot refleje que Firestore lo confirmó.
+                    await runWithConnectivityWarning(writePromise, () => {
+                        warned = true;
+                        toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
+                    });
                 } catch (error) {
                     console.error('Error actualizando estado de asistencia:', error);
-                    toast.showToast('Error actualizando el estado de asistencia', 'error');
+                    toast.showToast(
+                        error.code === 'permission-denied'
+                            ? 'No se pudo guardar el cambio — puede que tu sesión haya expirado, vuelve a iniciar sesión'
+                            : 'Error actualizando el estado de asistencia',
+                        'error'
+                    );
+                } finally {
+                    setPendingAttendanceCells(prev => { const next = new Set(prev); next.delete(cellKey); return next; });
+                    if (warned) toast.showToast('Cambio confirmado', 'success');
                 }
             };
 
@@ -1445,6 +1528,10 @@
             const markManualAttendance = async (student, date) => {
                 if (!selectedCourse) return;
 
+                const cellKey = `${student.id}_${date}`;
+                setPendingAttendanceCells(prev => new Set(prev).add(cellKey));
+                let warned = false;
+
                 try {
                     const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
                     const attendanceDoc = await attendanceRef.get();
@@ -1456,6 +1543,7 @@
                         source: 'manual'
                     };
 
+                    let writePromise;
                     if (attendanceDoc.exists) {
                         const existingData = attendanceDoc.data();
                         const studentsForDate = existingData.students || [];
@@ -1466,11 +1554,11 @@
                             return;
                         }
 
-                        await attendanceRef.update({
+                        writePromise = attendanceRef.update({
                             students: [...studentsForDate, attendanceRecord]
                         });
                     } else {
-                        await attendanceRef.set({
+                        writePromise = attendanceRef.set({
                             date,
                             courseId: selectedCourse.id,
                             professorId: currentUser.uid,
@@ -1478,18 +1566,27 @@
                         });
                     }
 
-                    setAttendanceData(prev => {
-                        const current = prev[date] || [];
-                        return {
-                            ...prev,
-                            [date]: [...current, attendanceRecord]
-                        };
+                    // No se actualiza attendanceData a mano aquí — antes esto
+                    // se mostraba en pantalla apenas terminaba el await, sin
+                    // esperar a que el listener onSnapshot confirmara que de
+                    // verdad llegó a Firestore. Ahora la única fuente de la
+                    // marca en pantalla es ese listener.
+                    await runWithConnectivityWarning(writePromise, () => {
+                        warned = true;
+                        toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
                     });
 
                     toast.showToast(`Asistencia manual registrada para ${student.fullName || student.email}`, 'success');
                 } catch (error) {
                     console.error('Error registrando asistencia manual:', error);
-                    toast.showToast('Error registrando asistencia manual', 'error');
+                    toast.showToast(
+                        error.code === 'permission-denied'
+                            ? 'No se pudo guardar el cambio — puede que tu sesión haya expirado, vuelve a iniciar sesión'
+                            : 'Error registrando asistencia manual',
+                        'error'
+                    );
+                } finally {
+                    setPendingAttendanceCells(prev => { const next = new Set(prev); next.delete(cellKey); return next; });
                 }
             };
 
@@ -2216,9 +2313,12 @@
                                                         <td className="p-3">{student.fullName}</td>
                                                         {dates.slice(-10).map(date => {
                                                             const status = getAttendanceStatus(attendanceData[date], student.id);
+                                                            const isPending = pendingAttendanceCells.has(`${student.id}_${date}`);
                                                             return (
                                                                 <td key={date} className="text-center p-3">
-                                                                    {status === 'absent' ? (
+                                                                    {isPending ? (
+                                                                        <div className="spinner" style={{ margin: '0 auto', width: '14px', height: '14px', borderWidth: '2px' }} title="Guardando..."></div>
+                                                                    ) : status === 'absent' ? (
                                                                         <button
                                                                             type="button"
                                                                             className="text-gray-400 hover:text-green-600 font-semibold"
@@ -3390,6 +3490,10 @@
             const [pendingCodeInput, setPendingCodeInput] = React.useState('');
             const [fixingPendingCode, setFixingPendingCode] = React.useState(false);
             const [showQRScanner, setShowQRScanner] = React.useState(false);
+            // Confirmación grande mostrada ENCIMA de la cámara tras un
+            // escaneo (además del toast de esquina, que es fácil de perderse
+            // mientras el estudiante mira el visor de la cámara).
+            const [qrScanFeedback, setQrScanFeedback] = React.useState(null);
             const [showExpedition, setShowExpedition] = React.useState(false);
             const [forceShowQR, setForceShowQR] = React.useState(false);
             const [showQRTimeWarning, setShowQRTimeWarning] = React.useState(false);
@@ -3745,6 +3849,12 @@
                             aspectRatio: 1
                         };
 
+                        // El hint de enfoque continuo se agrega a TODOS los
+                        // intentos (antes solo estaba en el primero) — en
+                        // celulares con varias lentes traseras, si el primer
+                        // intento falla y cae a un fallback, sin este hint el
+                        // navegador puede quedarse en enfoque fijo/lento,
+                        // justo el caso de "no enfoca bien de cerca" reportado.
                         const cameraConstraintsFallback = [
                             {
                                 facingMode: "environment",
@@ -3755,10 +3865,11 @@
                             {
                                 facingMode: { ideal: "environment" },
                                 width: { ideal: 1280 },
-                                height: { ideal: 720 }
+                                height: { ideal: 720 },
+                                advanced: [{ focusMode: "continuous" }]
                             },
-                            { facingMode: "environment" },
-                            { facingMode: { ideal: "user" } }
+                            { facingMode: "environment", advanced: [{ focusMode: "continuous" }] },
+                            { facingMode: { ideal: "user" }, advanced: [{ focusMode: "continuous" }] }
                         ];
 
                         let startError = null;
@@ -3795,14 +3906,21 @@
                                                 scanHandledRef.current = true;
                                                 // phase ausente (QR generado antes de este cambio) se
                                                 // trata como 'checkin', el comportamiento de siempre.
-                                                if (qrData.phase === 'checkout') {
-                                                    await registerCheckout(qrData);
-                                                } else {
-                                                    await registerAttendance(qrData);
-                                                }
-                                                html5QrCode.stop().catch(() => {}).finally(() => {
-                                                    setShowQRScanner(false);
-                                                });
+                                                const result = qrData.phase === 'checkout'
+                                                    ? await registerCheckout(qrData)
+                                                    : await registerAttendance(qrData);
+                                                toast.showToast(result.message, result.type);
+                                                // Confirmación grande sobre la cámara, no solo el toast
+                                                // de esquina: se queda visible ~1.8s (el tiempo que se
+                                                // demora en cerrarse el modal) para que sea imposible de
+                                                // perder mientras el estudiante mira el visor.
+                                                setQrScanFeedback(result);
+                                                setTimeout(() => {
+                                                    html5QrCode.stop().catch(() => {}).finally(() => {
+                                                        setShowQRScanner(false);
+                                                        setQrScanFeedback(null);
+                                                    });
+                                                }, 1800);
                                             } else {
                                                 toast.showToast('QR inválido', 'error');
                                             }
@@ -3920,6 +4038,11 @@
                 }
             };
 
+            // Devuelve { type, message } en vez de mostrar el toast
+            // directamente, para que quien llama (el callback de escaneo)
+            // pueda también mostrar una confirmación grande sobre la cámara
+            // — un toast de esquina de 3s es fácil de perderse mientras el
+            // estudiante tiene los ojos puestos en el visor de la cámara.
             const registerAttendance = async (qrData) => {
                 try {
                     // Verificar que el estudiante esté matriculado en el curso
@@ -3927,8 +4050,7 @@
                     const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
 
                     if (!studentDoc.exists) {
-                        toast.showToast('No estás matriculado en este curso', 'error');
-                        return;
+                        return { type: 'error', message: 'No estás matriculado en este curso' };
                     }
 
                     const attendanceRef = db.doc(`artifacts/academic-platform/courses/${qrData.courseId}/attendance/${qrData.date}`);
@@ -3951,26 +4073,37 @@
                         // sin ese campo — cualquiera de esos ya cuenta como
                         // llegada registrada.
                         if (students.some(s => s.studentId === currentUser.uid && s.type !== 'checkout')) {
-                            toast.showToast('Ya registraste tu llegada hoy', 'info');
-                            return;
+                            return { type: 'info', message: 'Ya registraste tu llegada hoy' };
                         }
 
-                        await attendanceRef.update({
-                            students: [...students, studentData]
-                        });
+                        await runWithConnectivityWarning(
+                            attendanceRef.update({ students: [...students, studentData] }),
+                            () => toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet', 'info')
+                        );
                     } else {
-                        await attendanceRef.set({
-                            date: qrData.date,
-                            courseId: qrData.courseId,
-                            professorId: qrData.professorId,
-                            students: [studentData]
-                        });
+                        await runWithConnectivityWarning(
+                            attendanceRef.set({
+                                date: qrData.date,
+                                courseId: qrData.courseId,
+                                professorId: qrData.professorId,
+                                students: [studentData]
+                            }),
+                            () => toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet', 'info')
+                        );
                     }
 
-                    toast.showToast(qrData.late ? '¡Llegada registrada (tarde)! Falta escanear el QR de salida.' : '¡Llegada registrada a tiempo! Falta escanear el QR de salida.', 'success');
+                    return {
+                        type: 'success',
+                        message: qrData.late ? '¡Llegada registrada (tarde)! Falta escanear el QR de salida.' : '¡Llegada registrada a tiempo! Falta escanear el QR de salida.'
+                    };
                 } catch (error) {
                     console.error('Error registrando asistencia:', error);
-                    toast.showToast('Error registrando asistencia', 'error');
+                    return {
+                        type: 'error',
+                        message: error.code === 'permission-denied'
+                            ? 'No se pudo registrar — tu sesión pudo haber expirado, vuelve a iniciar sesión'
+                            : 'Error registrando asistencia'
+                    };
                 }
             };
 
@@ -3980,16 +4113,14 @@
                     const studentDoc = await professorCoursesRef.doc(currentUser.uid).get();
 
                     if (!studentDoc.exists) {
-                        toast.showToast('No estás matriculado en este curso', 'error');
-                        return;
+                        return { type: 'error', message: 'No estás matriculado en este curso' };
                     }
 
                     const attendanceRef = db.doc(`artifacts/academic-platform/courses/${qrData.courseId}/attendance/${qrData.date}`);
                     const attendanceDoc = await attendanceRef.get();
 
                     if (!attendanceDoc.exists) {
-                        toast.showToast('Aún no has registrado tu llegada. Escanea primero el QR de entrada.', 'error');
-                        return;
+                        return { type: 'error', message: 'Aún no has registrado tu llegada. Escanea primero el QR de entrada.' };
                     }
 
                     const existingData = attendanceDoc.data();
@@ -3997,24 +4128,30 @@
 
                     const hasCheckedIn = students.some(s => s.studentId === currentUser.uid && s.type !== 'checkout');
                     if (!hasCheckedIn) {
-                        toast.showToast('Aún no has registrado tu llegada. Escanea primero el QR de entrada.', 'error');
-                        return;
+                        return { type: 'error', message: 'Aún no has registrado tu llegada. Escanea primero el QR de entrada.' };
                     }
 
                     const alreadyCheckedOut = students.some(s => s.studentId === currentUser.uid && s.type === 'checkout');
                     if (alreadyCheckedOut) {
-                        toast.showToast('Ya registraste tu salida', 'info');
-                        return;
+                        return { type: 'info', message: 'Ya registraste tu salida' };
                     }
 
-                    await attendanceRef.update({
-                        students: [...students, { studentId: currentUser.uid, timestamp: new Date(), type: 'checkout' }]
-                    });
+                    await runWithConnectivityWarning(
+                        attendanceRef.update({
+                            students: [...students, { studentId: currentUser.uid, timestamp: new Date(), type: 'checkout' }]
+                        }),
+                        () => toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet', 'info')
+                    );
 
-                    toast.showToast('¡Salida registrada! Tu asistencia quedó completa.', 'success');
+                    return { type: 'success', message: '¡Salida registrada! Tu asistencia quedó completa.' };
                 } catch (error) {
                     console.error('Error registrando salida:', error);
-                    toast.showToast('Error registrando salida', 'error');
+                    return {
+                        type: 'error',
+                        message: error.code === 'permission-denied'
+                            ? 'No se pudo registrar — tu sesión pudo haber expirado, vuelve a iniciar sesión'
+                            : 'Error registrando salida'
+                    };
                 }
             };
 
@@ -4552,15 +4689,33 @@
                                     <h3 className="text-lg font-bold">Escanear QR de Asistencia</h3>
                                     <button onClick={stopQRScanner} className="text-2xl">×</button>
                                 </div>
-                                <div
-                                    id="qr-reader"
-                                    className="w-full"
-                                    style={{ touchAction: 'none' }}
-                                    onTouchStart={handleQRPinchStart}
-                                    onTouchMove={handleQRPinchMove}
-                                    onTouchEnd={handleQRPinchEnd}
-                                    onTouchCancel={handleQRPinchEnd}
-                                ></div>
+                                <div style={{ position: 'relative' }}>
+                                    <div
+                                        id="qr-reader"
+                                        className="w-full"
+                                        style={{ touchAction: 'none' }}
+                                        onTouchStart={handleQRPinchStart}
+                                        onTouchMove={handleQRPinchMove}
+                                        onTouchEnd={handleQRPinchEnd}
+                                        onTouchCancel={handleQRPinchEnd}
+                                    ></div>
+                                    {qrScanFeedback && (
+                                        <div
+                                            className="rounded-xl"
+                                            style={{
+                                                position: 'absolute', inset: 0,
+                                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                                gap: '0.75rem', textAlign: 'center', padding: '1rem',
+                                                backgroundColor: qrScanFeedback.type === 'success' ? 'rgba(22, 163, 74, 0.92)' : qrScanFeedback.type === 'error' ? 'rgba(220, 38, 38, 0.92)' : 'rgba(59, 130, 246, 0.92)'
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '3.5rem', lineHeight: 1 }}>
+                                                {qrScanFeedback.type === 'success' ? '✅' : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'}
+                                            </div>
+                                            <p className="text-white font-semibold text-base">{qrScanFeedback.message}</p>
+                                        </div>
+                                    )}
+                                </div>
                                 {qrZoomSupported && (
                                     <div className="mt-4">
                                         <div className="flex items-center justify-between mb-2">
@@ -6017,6 +6172,7 @@
 
             return (
                 <>
+                    <OfflineBanner />
                     {currentUser ? (
                         userData?.userType === 'professor' ? (
                             <AdminDashboard currentUser={currentUser} />
