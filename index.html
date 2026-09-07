@@ -14,8 +14,8 @@
     <meta http-equiv="Expires" content="0">
     <title>Plataforma Académica</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -910,6 +910,15 @@
             // acá, se muestra un spinner en vez del ícono, para que nunca se
             // vea un cambio en pantalla antes de que Firestore lo confirme.
             const [pendingAttendanceCells, setPendingAttendanceCells] = React.useState(new Set());
+            // Marcaciones manuales en cola por fecha, agrupadas para
+            // escribirse en una sola operación (ver flushManualBatch más
+            // abajo) — Firestore solo puede aplicar una escritura a la vez
+            // sobre un mismo documento, así que varias marcaciones seguidas
+            // al mismo día se sirven en fila, cada una más lenta que la
+            // anterior (comprobado: 20 escrituras separadas al mismo
+            // documento tardan progresivamente más, hasta varios segundos en
+            // producción con latencia de red real). Agruparlas evita esa fila.
+            const pendingManualBatchesRef = React.useRef({});
             const [showNewSemesterConfirm, setShowNewSemesterConfirm] = React.useState(false);
             const [newSemesterPeriod, setNewSemesterPeriod] = React.useState('');
             const [newSemesterLoading, setNewSemesterLoading] = React.useState(false);
@@ -1619,22 +1628,53 @@
                 }
             };
 
+            // Junta en UNA sola escritura todas las marcaciones manuales que
+            // se hayan encolado para esta fecha (ver markManualAttendance) —
+            // arrayUnion con varios elementos a la vez sigue siendo atómico,
+            // así que da igual si se agruparon 1 o 20.
+            const flushManualBatch = async (date) => {
+                const batch = pendingManualBatchesRef.current[date];
+                if (!batch) return;
+                delete pendingManualBatchesRef.current[date];
+                clearTimeout(batch.debounceTimer);
+                clearTimeout(batch.maxWaitTimer);
+
+                const records = Array.from(batch.records.values());
+                const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
+
+                try {
+                    const writePromise = attendanceRef.set({
+                        date,
+                        courseId: selectedCourse.id,
+                        professorId: currentUser.uid,
+                        students: firebase.firestore.FieldValue.arrayUnion(...records)
+                    }, { merge: true });
+
+                    await runWithConnectivityWarning(writePromise, () => {
+                        toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
+                    });
+
+                    batch.entries.forEach(({ resolve }) => resolve());
+                } catch (error) {
+                    batch.entries.forEach(({ reject }) => reject(error));
+                }
+            };
+
             const markManualAttendance = async (student, date) => {
                 if (!selectedCourse) return;
 
                 const cellKey = `${student.id}_${date}`;
                 setPendingAttendanceCells(prev => new Set(prev).add(cellKey));
-                let warned = false;
 
                 try {
-                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
-
                     // Chequeo informativo, no la fuente de verdad de la
-                    // escritura: si hay varias marcaciones en curso a la vez
-                    // (varios "-" clicados con conexión lenta) esta lectura
-                    // puede estar un poco desactualizada, pero eso como mucho
-                    // deja pasar sin avisar un caso raro de doble clic sobre
-                    // el mismo estudiante — no afecta a los demás.
+                    // escritura: si hay varias marcaciones encolándose casi al
+                    // mismo tiempo para este mismo día, esta lectura puede
+                    // estar un poco desactualizada, pero eso como mucho deja
+                    // pasar sin avisar un caso raro de doble clic sobre el
+                    // mismo estudiante — no afecta a los demás (el Map de más
+                    // abajo igual dedupea por studentId dentro del lote).
+                    const attendanceRef = db.doc(`artifacts/academic-platform/courses/${selectedCourse.id}/attendance/${date}`);
                     const attendanceDoc = await attendanceRef.get();
                     if (attendanceDoc.exists) {
                         const alreadyMarked = (attendanceDoc.data().students || []).some(record => record.studentId === student.id);
@@ -1651,29 +1691,29 @@
                         source: 'manual'
                     };
 
-                    // arrayUnion es una transformación atómica del lado del
-                    // servidor: a diferencia de leer el arreglo y reescribirlo
-                    // completo (lo que hacía antes), varias de estas escrituras
-                    // en vuelo al mismo tiempo (varios estudiantes marcados
-                    // seguido, con conexión lenta) NO se pisan entre sí —
-                    // comprobado contra el emulador con dos escrituras
-                    // concurrentes reales. set(..., {merge:true}) hace que
-                    // funcione igual sin importar si el doc del día ya existía.
-                    const writePromise = attendanceRef.set({
-                        date,
-                        courseId: selectedCourse.id,
-                        professorId: currentUser.uid,
-                        students: firebase.firestore.FieldValue.arrayUnion(attendanceRecord)
-                    }, { merge: true });
+                    // Se encola en vez de escribir de una: Firestore solo
+                    // puede aplicar una escritura a la vez sobre un mismo
+                    // documento — comprobado que 20 escrituras separadas al
+                    // mismo día se sirven en fila, cada una más lenta que la
+                    // anterior (hasta varios segundos con latencia de red
+                    // real). Agrupar en una sola escritura las marcaciones que
+                    // lleguen dentro de ~800ms (con un tope de 1.5s para no
+                    // esperar de más si el profesor sigue marcando seguido)
+                    // evita esa fila en vez de solo acelerarla.
+                    await new Promise((resolve, reject) => {
+                        let batch = pendingManualBatchesRef.current[date];
+                        if (!batch) {
+                            batch = { records: new Map(), entries: [], debounceTimer: null, maxWaitTimer: null };
+                            pendingManualBatchesRef.current[date] = batch;
+                        }
+                        batch.records.set(student.id, attendanceRecord);
+                        batch.entries.push({ resolve, reject });
 
-                    // No se actualiza attendanceData a mano aquí — antes esto
-                    // se mostraba en pantalla apenas terminaba el await, sin
-                    // esperar a que el listener onSnapshot confirmara que de
-                    // verdad llegó a Firestore. Ahora la única fuente de la
-                    // marca en pantalla es ese listener.
-                    await runWithConnectivityWarning(writePromise, () => {
-                        warned = true;
-                        toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet. El cambio no se ha confirmado todavía.', 'info');
+                        clearTimeout(batch.debounceTimer);
+                        batch.debounceTimer = setTimeout(() => flushManualBatch(date), 800);
+                        if (!batch.maxWaitTimer) {
+                            batch.maxWaitTimer = setTimeout(() => flushManualBatch(date), 1500);
+                        }
                     });
 
                     toast.showToast(`Asistencia manual registrada para ${student.fullName || student.email}`, 'success');
@@ -4452,20 +4492,28 @@
                         .where('studentId', '==', currentUser.uid)
                         .get();
 
-                    const studentCourses = [];
-                    for (const studentDoc of myEnrollments.docs) {
-                        const courseRef = studentDoc.ref.parent.parent;
-                        const profRef = courseRef.parent.parent;
-                        const courseSnap = await courseRef.get();
-                        if (!courseSnap.exists) continue;
+                    // Un estudiante rara vez tiene más de un puñado de cursos,
+                    // pero no hay razón para traerlos uno por uno: se piden
+                    // todos los docs de curso en paralelo en vez de esperar
+                    // cada round-trip por turno.
+                    const courseSnaps = await Promise.all(
+                        myEnrollments.docs.map(studentDoc => studentDoc.ref.parent.parent.get())
+                    );
 
-                        studentCourses.push({
-                            id: courseRef.id,
-                            professorId: profRef.id,
-                            studentData: studentDoc.data(),
-                            ...courseSnap.data()
-                        });
-                    }
+                    const studentCourses = myEnrollments.docs
+                        .map((studentDoc, i) => {
+                            const courseSnap = courseSnaps[i];
+                            if (!courseSnap.exists) return null;
+                            const courseRef = studentDoc.ref.parent.parent;
+                            const profRef = courseRef.parent.parent;
+                            return {
+                                id: courseRef.id,
+                                professorId: profRef.id,
+                                studentData: studentDoc.data(),
+                                ...courseSnap.data()
+                            };
+                        })
+                        .filter(Boolean);
 
                     if (studentCourses.length > 0) {
                         setCourses(studentCourses);
