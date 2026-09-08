@@ -27,3 +27,7 @@ ui-debug.log
 # Salida del pipeline de build (build/compile.js) — se genera en cada
 # despliegue vía GitHub Actions, publicada en la rama gh-pages, nunca en main.
 /dist/
+
+# Archivo de referencia de diseño (reference-game.html) usado como guía al
+# construir la Expedición — nunca fue parte del sitio, solo vive local.
+/reference/
