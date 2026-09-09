@@ -223,14 +223,24 @@
             box-shadow: 0 8px 25px rgba(77, 150, 255, 0.4);
         }
 
+        /* La cámara real casi nunca entrega un stream 1:1 (aspectRatio:1 en
+           scanConfig es solo un pedido "ideal" para html5-qrcode; el navegador
+           puede devolver 4:3, 16:9, etc.). Con height:auto el <video> tomaba
+           su propia proporción real, más baja que el cuadro cuadrado que
+           asume el overlay de las esquinas — dejaba una franja blanca (el
+           fondo de #qr-reader) debajo del video real. Forzar aspect-ratio en
+           el contenedor + height:100% en el video (en vez de auto) hace que
+           el video SIEMPRE cubra el cuadro completo, recortando lo que sobre,
+           sin importar la proporción nativa de la cámara del dispositivo. */
         #qr-reader {
             border-radius: 0.75rem;
             overflow: hidden;
+            aspect-ratio: 1 / 1;
         }
 
         #qr-reader video {
             width: 100% !important;
-            height: auto !important;
+            height: 100% !important;
             object-fit: cover;
         }
     </style>
@@ -1345,7 +1355,20 @@ function AdminDashboard({
           // para que el ciclo sea el mismo sin importar de qué
           // estado se venga.
           const cycle = ['ontime', 'late', 'incomplete'];
-          const nextStatus = cycle[(cycle.indexOf(status) + 1) % cycle.length];
+          let nextStatus;
+          if (status === 'incomplete') {
+            // Confirmar salida manualmente (clic sobre una
+            // celda roja): se respeta el "tarde" real que
+            // ya traía el check-in por QR, en vez de
+            // reiniciar siempre a "a tiempo" — si no, una
+            // llegada tarde sin salida quedaba en verde al
+            // confirmarla, perdiendo en silencio su
+            // estado real hasta el próximo clic manual.
+            const checkin = students.find(r => r.studentId === studentId && r.type !== 'checkout');
+            nextStatus = checkin && checkin.late ? 'late' : 'ontime';
+          } else {
+            nextStatus = cycle[(cycle.indexOf(status) + 1) % cycle.length];
+          }
           const withoutCheckout = students.filter(r => !(r.studentId === studentId && r.type === 'checkout'));
           if (nextStatus === 'incomplete') {
             updatedStudents = withoutCheckout;
@@ -3964,6 +3987,7 @@ function CoursePage({
       }), () => toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet', 'info'));
       return {
         type: 'success',
+        late: !!qrData.late,
         message: qrData.late ? '¡Llegada registrada (tarde)! Falta escanear el QR de salida.' : '¡Llegada registrada a tiempo! Falta escanear el QR de salida.'
       };
     } catch (error) {
@@ -4535,14 +4559,17 @@ function CoursePage({
       gap: '0.75rem',
       textAlign: 'center',
       padding: '1rem',
-      backgroundColor: qrScanFeedback.type === 'success' ? 'rgba(22, 163, 74, 0.92)' : qrScanFeedback.type === 'error' ? 'rgba(220, 38, 38, 0.92)' : 'rgba(59, 130, 246, 0.92)'
+      // Un check-in "success" con late:true se muestra en naranja
+      // (no verde) — antes cualquier escaneo exitoso se veía igual
+      // sin importar si quedó marcado a tiempo o tarde.
+      backgroundColor: qrScanFeedback.type === 'success' ? qrScanFeedback.late ? 'rgba(234, 88, 12, 0.92)' : 'rgba(22, 163, 74, 0.92)' : qrScanFeedback.type === 'error' ? 'rgba(220, 38, 38, 0.92)' : 'rgba(59, 130, 246, 0.92)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: '3.5rem',
       lineHeight: 1
     }
-  }, qrScanFeedback.type === 'success' ? '✅' : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'), /*#__PURE__*/React.createElement("p", {
+  }, qrScanFeedback.type === 'success' ? qrScanFeedback.late ? '⚠️' : '✅' : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'), /*#__PURE__*/React.createElement("p", {
     className: "text-white font-semibold text-base"
   }, qrScanFeedback.message))), qrZoomSupported && /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
