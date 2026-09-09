@@ -4019,27 +4019,26 @@
                             aspectRatio: 1
                         };
 
-                        // El hint de enfoque continuo se agrega a TODOS los
-                        // intentos (antes solo estaba en el primero) — en
-                        // celulares con varias lentes traseras, si el primer
-                        // intento falla y cae a un fallback, sin este hint el
-                        // navegador puede quedarse en enfoque fijo/lento,
-                        // justo el caso de "no enfoca bien de cerca" reportado.
+                        // html5-qrcode 2.3.8 valida en createVideoConstraints()
+                        // que este primer parámetro, si es un objeto, tenga
+                        // EXACTAMENTE 1 key ('facingMode' o 'deviceId') — con
+                        // cualquier otra combinación (width/height/advanced
+                        // junto a facingMode, como tenía este código antes)
+                        // lanza "'cameraIdOrConfig' object should have
+                        // exactly 1 key" ANTES de siquiera pedir permiso de
+                        // cámara. Confirmado reproduciendo esto contra el
+                        // sitio real: los 4 intentos de antes fallaban así,
+                        // dejando SIEMPRE "Error de cámara" sin importar el
+                        // dispositivo — Android y iPhone por igual, porque es
+                        // un rechazo de la librería en JS, no algo del
+                        // hardware. El enfoque continuo (y cualquier otra
+                        // constraint extra) se aplica más abajo con
+                        // applyVideoConstraints() una vez la cámara ya
+                        // arrancó — el mismo mecanismo que ya se usaba ahí
+                        // para el zoom.
                         const cameraConstraintsFallback = [
-                            {
-                                facingMode: "environment",
-                                width: { ideal: 1920 },
-                                height: { ideal: 1080 },
-                                advanced: [{ focusMode: "continuous" }]
-                            },
-                            {
-                                facingMode: { ideal: "environment" },
-                                width: { ideal: 1280 },
-                                height: { ideal: 720 },
-                                advanced: [{ focusMode: "continuous" }]
-                            },
-                            { facingMode: "environment", advanced: [{ focusMode: "continuous" }] },
-                            { facingMode: { ideal: "user" }, advanced: [{ focusMode: "continuous" }] }
+                            { facingMode: "environment" },
+                            { facingMode: "user" }
                         ];
 
                         let startError = null;
@@ -4124,6 +4123,22 @@
                         setQrZoomMax(20);
                         setQrZoomStep(0.5);
                         setQrZoomValue(1);
+
+                        // Enfoque continuo, aplicado ya con la cámara corriendo
+                        // (no se puede pedir en el getUserMedia inicial, ver el
+                        // comentario junto a cameraConstraintsFallback más
+                        // arriba) — en celulares con varias lentes traseras,
+                        // sin esto el navegador puede quedarse en enfoque
+                        // fijo/lento al escanear de cerca. No bloquea nada si
+                        // el dispositivo no lo soporta.
+                        if (!scanHandledRef.current && activeScanner && typeof activeScanner.applyVideoConstraints === 'function') {
+                            try {
+                                await activeScanner.applyVideoConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                                appendQRLog('Enfoque continuo aplicado.');
+                            } catch (focusError) {
+                                appendQRLog(`Enfoque continuo no soportado: ${formatQRError(focusError)}`);
+                            }
+                        }
 
                         if (!scanHandledRef.current && activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
                             const capabilities = activeScanner.getRunningTrackCapabilities();
