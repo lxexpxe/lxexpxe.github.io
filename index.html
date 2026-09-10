@@ -428,7 +428,17 @@
                 e.preventDefault();
                 setLoading(true);
 
-                if (!validateEmail(email)) {
+                // El correo se normaliza a minúsculas (y sin espacios) antes de
+                // usarlo para lo que sea: login, creación de cuenta, y lo que
+                // se guarda en Firestore — así "Juan@Icesi.edu.co" y
+                // "juan@icesi.edu.co" son siempre la misma cuenta, y además
+                // el regex de dominios válidos de abajo solo matchea en
+                // minúsculas (un correo con el dominio en mayúsculas fallaba
+                // la validación aunque fuera un correo institucional real).
+                const normalizedEmail = email.trim().toLowerCase();
+                setEmail(normalizedEmail);
+
+                if (!validateEmail(normalizedEmail)) {
                     toast.showToast('Usa tu correo institucional (@icesi.edu.co, @u.icesi.edu.co, @estudiante.uniajc.edu.co o @profesores.uniajc.edu.co)', 'error');
                     setLoading(false);
                     return;
@@ -436,7 +446,7 @@
 
                 try {
                     if (isLogin) {
-                        const result = await auth.signInWithEmailAndPassword(email, password);
+                        const result = await auth.signInWithEmailAndPassword(normalizedEmail, password);
                         toast.showToast('¡Bienvenido de vuelta!', 'success');
                     } else {
                         const code = generateCode();
@@ -451,7 +461,7 @@
                         }
 
                         const pendingData = {
-                            email,
+                            email: normalizedEmail,
                             password,
                             fullName,
                             userType: userRole
@@ -463,7 +473,7 @@
 
                         setPendingUserData(pendingData);
 
-                        await sendVerificationEmail(email, code, fullName);
+                        await sendVerificationEmail(normalizedEmail, code, fullName);
                         setShowCodeVerification(true);
                     }
                 } catch (err) {
@@ -492,7 +502,10 @@
                 e.preventDefault();
                 setLoading(true);
 
-                if (!validateEmail(email)) {
+                const normalizedEmail = email.trim().toLowerCase();
+                setEmail(normalizedEmail);
+
+                if (!validateEmail(normalizedEmail)) {
                     toast.showToast('Ingresa tu correo institucional', 'error');
                     setLoading(false);
                     return;
@@ -502,7 +515,7 @@
                     const code = generateCode();
                     setGeneratedCode(code);
 
-                    await sendVerificationEmail(email, code, email.split('@')[0]);
+                    await sendVerificationEmail(normalizedEmail, code, normalizedEmail.split('@')[0]);
                     setShowCodeVerification(true);
                     toast.showToast('Código enviado para restablecer contraseña', 'success');
                 } catch (error) {
@@ -524,7 +537,9 @@
                 }
 
                 try {
-                    await auth.sendPasswordResetEmail(email);
+                    // email ya quedó normalizado a minúsculas por
+                    // handlePasswordReset antes de llegar a este paso.
+                    await auth.sendPasswordResetEmail(email.trim().toLowerCase());
                     toast.showToast('Se envió un enlace de restablecimiento a tu correo', 'success');
                     setShowPasswordReset(false);
                     setShowCodeVerification(false);
