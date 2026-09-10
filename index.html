@@ -1142,7 +1142,17 @@
                         }
                     }
                 }
-            }, [selectedCourse, showAttendance, forceShowTeacherQR]);
+                // selectedCourse?.id (no el objeto completo): este efecto
+                // reinicia el QR a "a tiempo" cada vez que corre — usar
+                // selectedCourse como dependencia lo disparaba de nuevo ante
+                // CUALQUIER actualización del curso (guardar contenido de
+                // semana, cambiar badges, etc.) mientras la pantalla de
+                // asistencia seguía abierta, borrando en silencio el modo
+                // "tarde"/"salida" que el profesor hubiera activado a mano
+                // un momento antes — el profesor no tocó nada y el QR volvía
+                // solo a "a tiempo", dejando a los que sí llegaban tarde
+                // marcados como si hubieran llegado a tiempo.
+            }, [selectedCourse?.id, showAttendance, forceShowTeacherQR]);
 
             // Listener en tiempo real (en vez de recargar manualmente después de
             // cada aprobar/rechazar): con varias aprobaciones seguidas, cada
