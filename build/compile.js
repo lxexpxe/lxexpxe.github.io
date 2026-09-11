@@ -77,6 +77,18 @@ function build() {
         console.log('Copiado assets/ a dist/assets/.');
     }
 
+    // manifest.json y sw.js habilitan instalar la app como PWA — index.html
+    // los referencia con rutas relativas (<link rel="manifest">,
+    // navigator.serviceWorker.register('sw.js')), así que sin copiarlos
+    // quedarían rotos (404) en el sitio publicado.
+    for (const file of ['manifest.json', 'sw.js']) {
+        const src = path.join(ROOT, file);
+        if (fs.existsSync(src)) {
+            fs.copyFileSync(src, path.join(DIST_DIR, file));
+            console.log(`Copiado ${file} a dist/${file}.`);
+        }
+    }
+
     // Le dice a GitHub Pages que no procese esto con Jekyll (que por defecto
     // ignora/renombra archivos y carpetas que empiezan con "_", entre otras
     // cosas) — se sirve tal cual, como ya pasa hoy publicando desde main.

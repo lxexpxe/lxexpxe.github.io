@@ -11,6 +11,9 @@ on:
     paths:
       - 'index.html'
       - 'build/**'
+      - 'manifest.json'
+      - 'sw.js'
+      - 'assets/**'
   workflow_dispatch:
 
 permissions:

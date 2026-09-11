@@ -13,6 +13,13 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Plataforma Académica</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4D96FF">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/app-icon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Plataforma Académica">
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -250,6 +257,19 @@
 <body>
     <div id="root"></div>
 
+    <script>
+        // Requisito técnico para que Chrome/Android considere la app
+        // instalable (dispara beforeinstallprompt) — ver sw.js, no cachea
+        // nada a propósito.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.error('No se pudo registrar el service worker:', err);
+                });
+            });
+        }
+    </script>
+
     <script type="text/babel">
         const ToastContext = React.createContext();
 
@@ -345,6 +365,69 @@
                     padding: '0.6rem 1rem', fontWeight: 600, fontSize: '0.875rem'
                 }}>
                     ⚠️ Sin conexión a internet — nada de lo que hagas ahora se va a guardar hasta que se reconecte
+                </div>
+            );
+        }
+
+        // Botón para instalar la app como PWA. Chrome/Android disparan
+        // beforeinstallprompt — se captura ese evento (evitando el
+        // mini-banner nativo del navegador, con preventDefault) para
+        // mostrar nuestro propio botón, que no depende de que alguien note
+        // el ícono en la barra de direcciones. iOS Safari NUNCA dispara ese
+        // evento (no existe instalación con un clic ahí), así que se
+        // muestra en cambio una instrucción corta de cómo hacerlo a mano.
+        function InstallAppBanner() {
+            const [installEvent, setInstallEvent] = React.useState(null);
+            const [dismissed, setDismissed] = React.useState(() => {
+                try { return localStorage.getItem('pwaInstallDismissed') === 'true'; } catch (e) { return false; }
+            });
+
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.MSStream;
+
+            React.useEffect(() => {
+                const handler = (e) => {
+                    e.preventDefault();
+                    setInstallEvent(e);
+                };
+                window.addEventListener('beforeinstallprompt', handler);
+                return () => window.removeEventListener('beforeinstallprompt', handler);
+            }, []);
+
+            const dismiss = () => {
+                setDismissed(true);
+                try { localStorage.setItem('pwaInstallDismissed', 'true'); } catch (e) {}
+            };
+
+            if (isStandalone || dismissed) return null;
+            if (!installEvent && !isIos) return null;
+
+            const handleInstall = async () => {
+                if (!installEvent) return;
+                installEvent.prompt();
+                await installEvent.userChoice;
+                setInstallEvent(null);
+                dismiss();
+            };
+
+            return (
+                <div style={{
+                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1900,
+                    backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)',
+                    padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: '0.75rem', flexWrap: 'wrap', boxShadow: '0 -2px 8px rgba(0,0,0,0.08)'
+                }}>
+                    {isIos && !installEvent ? (
+                        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                            📲 Instala esta app: toca <strong>Compartir</strong> y luego <strong>"Agregar a inicio"</strong>
+                        </span>
+                    ) : (
+                        <>
+                            <span className="text-sm" style={{ color: 'var(--text-primary)' }}>📲 Instala esta app para acceso más rápido</span>
+                            <button onClick={handleInstall} className="btn btn-primary text-sm" style={{ padding: '0.4rem 1rem' }}>Instalar</button>
+                        </>
+                    )}
+                    <button onClick={dismiss} className="text-sm" style={{ color: 'var(--text-secondary)' }} title="Cerrar">✕</button>
                 </div>
             );
         }
@@ -4335,10 +4418,21 @@
                     };
                 } catch (error) {
                     console.error('Error registrando asistencia:', error);
+                    if (error.code === 'permission-denied') {
+                        // El servidor ya rechazó la escritura porque la sesión
+                        // dejó de ser válida (el token no se pudo renovar,
+                        // normalmente porque el navegador borró los datos del
+                        // sitio) — en vez de dejar al estudiante viendo el
+                        // escáner sin explicación, se cierra la sesión local
+                        // ya mismo para que la app lo mande directo al login
+                        // con un mensaje claro, en lugar de un "error de
+                        // cámara" que no dice nada de lo que en realidad pasó.
+                        auth.signOut().catch(() => {});
+                    }
                     return {
                         type: 'error',
                         message: error.code === 'permission-denied'
-                            ? 'No se pudo registrar — tu sesión pudo haber expirado, vuelve a iniciar sesión'
+                            ? 'Tu sesión se cerró — vuelve a iniciar sesión para continuar'
                             : 'Error registrando asistencia'
                     };
                 }
@@ -4386,10 +4480,14 @@
                     return { type: 'success', message: '¡Salida registrada! Tu asistencia quedó completa.' };
                 } catch (error) {
                     console.error('Error registrando salida:', error);
+                    if (error.code === 'permission-denied') {
+                        // Ver el comentario equivalente en registerAttendance.
+                        auth.signOut().catch(() => {});
+                    }
                     return {
                         type: 'error',
                         message: error.code === 'permission-denied'
-                            ? 'No se pudo registrar — tu sesión pudo haber expirado, vuelve a iniciar sesión'
+                            ? 'Tu sesión se cerró — vuelve a iniciar sesión para continuar'
                             : 'Error registrando salida'
                     };
                 }
@@ -6391,6 +6489,18 @@
                 firebase.initializeApp(firebaseConfig);
                 const auth = firebase.auth();
 
+                // Fijar la persistencia a mano en vez de depender del valor
+                // por defecto del SDK: la sesión debe sobrevivir cerrar la
+                // pestaña o el navegador, y terminar SOLO con "Cerrar
+                // Sesión" (o si el propio navegador borra los datos del
+                // sitio, algo fuera del control de la app). No cambia nada
+                // en el caso normal — LOCAL ya es el default para web — pero
+                // descarta cualquier caso donde el contexto de carga termine
+                // usando otro modo de forma implícita.
+                auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((err) => {
+                    console.error('No se pudo fijar la persistencia de sesión:', err);
+                });
+
                 const unsubscribe = auth.onAuthStateChanged(async (user) => {
                     setCurrentUser(user);
 
@@ -6426,6 +6536,7 @@
             return (
                 <>
                     <OfflineBanner />
+                    <InstallAppBanner />
                     {currentUser ? (
                         userData?.userType === 'professor' ? (
                             <AdminDashboard currentUser={currentUser} />
