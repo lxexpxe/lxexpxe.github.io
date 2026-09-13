@@ -33,6 +33,20 @@ function compileJsx(jsxCode) {
     return result.code;
 }
 
+function getBuildVersion() {
+    // El SHA del commit que se está compilando — único por deploy y fácil
+    // de rastrear a qué versión corresponde. Si por lo que sea no hay repo
+    // git disponible (no debería pasar en el workflow de CI), se usa un
+    // timestamp: cualquier valor que cambie de un build a otro sirve, lo
+    // único que le importa a UpdateBanner es si es IGUAL o DISTINTO al que
+    // ya tiene cargado la pestaña.
+    try {
+        return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+    } catch (err) {
+        return `t${Date.now()}`;
+    }
+}
+
 function build() {
     const html = fs.readFileSync(SOURCE_HTML, 'utf8');
 
@@ -56,10 +70,17 @@ function build() {
     const compiledJs = compileJsx(jsxMatch[1]);
     console.log(`  -> ${compiledJs.length} bytes de JS compilado.`);
 
+    const buildVersion = getBuildVersion();
+    console.log(`Versión de build: ${buildVersion}`);
+    if (!html.includes('<meta name="app-version" content="dev">')) {
+        throw new Error('No se encontró <meta name="app-version" content="dev"> en index.html — UpdateBanner no podría detectar nuevas versiones.');
+    }
+
     let finalHtml = html
         .replace('<script src="https://cdn.tailwindcss.com"></script>', `<style>${css}</style>`)
         .replace('<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n    ', '')
-        .replace(jsxMatch[0], `<script>${compiledJs}</script>`);
+        .replace(jsxMatch[0], `<script>${compiledJs}</script>`)
+        .replace('<meta name="app-version" content="dev">', `<meta name="app-version" content="${buildVersion}">`);
 
     if (finalHtml.includes('text/babel') || finalHtml.includes('babel.min.js') || finalHtml.includes('cdn.tailwindcss.com')) {
         throw new Error('El HTML final todavía contiene referencias a Babel standalone o al CDN de Tailwind — el reemplazo falló.');
