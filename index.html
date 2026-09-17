@@ -5743,6 +5743,12 @@
             const [reviewInputs, setReviewInputs] = React.useState({});
             const [reviewFeedback, setReviewFeedback] = React.useState({});
             const [announcementText, setAnnouncementText] = React.useState('');
+            // Mapa agregado de "en qué misión está cada equipo" (Visión
+            // general): qué nodo tiene abierto su globo de nombres, y en
+            // qué posición (px, relativa al contenedor del mapa) dibujarlo.
+            const [openTeamsBubbleWk, setOpenTeamsBubbleWk] = React.useState(null);
+            const [teamsBubblePosition, setTeamsBubblePosition] = React.useState(null);
+            const teamsMapContainerRef = React.useRef(null);
 
             // --- estado de estudiante ---
             const [myTeam, setMyTeam] = React.useState(null);
@@ -6172,6 +6178,150 @@
                 );
             };
 
+            // Misión "actual" de un equipo: la primera que no está calificada
+            // (done) — la misma regla que usa el estudiante para saber cuál
+            // misión tiene desbloqueada y abierta. Si ya calificaron las 12,
+            // se queda mostrado en la 12 (no hay una casilla "graduado").
+            const getTeamCurrentMissionWk = (progress) => {
+                const firstOpen = EXPEDITION_MISSIONS.find(m => statusOf(progress, m.wk) !== 'done');
+                return firstOpen ? firstOpen.wk : 12;
+            };
+
+            // Mapa agregado para el profesor (pestaña Visión general): el
+            // mismo camino que ve el estudiante, pero cada nodo muestra
+            // cuántos equipos están ahí (en vez de "bloqueada/desbloqueada"
+            // para un solo equipo). Es una función nueva y separada de
+            // renderJourney en vez de reutilizarla con más parámetros: esta
+            // vista no tiene bloqueos ni misión "activa" de un estudiante,
+            // solo conteos por equipo, y así renderJourney queda intacta.
+            const renderTeamsOverviewMap = () => {
+                const scale = isMobile ? 2 : 1;
+                const mapH = 460 * scale;
+                const nodeR = 34 * scale;
+                const pos = (wk) => {
+                    const p = EXPEDITION_MAP_POSITIONS[wk];
+                    return { x: p.x, y: p.y * scale };
+                };
+
+                const teamsByMission = {};
+                profTeams.forEach(team => {
+                    const wk = getTeamCurrentMissionWk(profProgressByTeam[team.id]);
+                    if (!teamsByMission[wk]) teamsByMission[wk] = [];
+                    teamsByMission[wk].push(team.name);
+                });
+
+                const handleNodeClick = (wk) => {
+                    if (!teamsByMission[wk] || teamsByMission[wk].length === 0) return;
+                    if (openTeamsBubbleWk === wk) { setOpenTeamsBubbleWk(null); return; }
+                    if (teamsMapContainerRef.current) {
+                        const containerWidth = teamsMapContainerRef.current.getBoundingClientRect().width;
+                        const renderScale = containerWidth / 1200;
+                        const p = pos(wk);
+                        setTeamsBubblePosition({ left: p.x * renderScale, top: p.y * renderScale });
+                    }
+                    setOpenTeamsBubbleWk(wk);
+                };
+
+                return (
+                    <div ref={teamsMapContainerRef} className="mb-6 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-color)', position: 'relative' }}>
+                        <svg viewBox={`0 0 1200 ${mapH}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+                            <defs>
+                                <radialGradient id="expOverviewNodeBlue" cx="35%" cy="30%" r="75%">
+                                    <stop offset="0%" stopColor="#60a5fa" />
+                                    <stop offset="100%" stopColor="#1d4ed8" />
+                                </radialGradient>
+                            </defs>
+                            <image href="assets/expedition-map-bg.png" x="0" y="0" width="1200" height={mapH} preserveAspectRatio="xMidYMid slice" />
+                            {EXPEDITION_MISSIONS.slice(0, -1).map((m, i) => {
+                                // Mismas curvas que renderJourney (el camino es
+                                // solo decorativo acá, no depende de bloqueos).
+                                const a = pos(m.wk);
+                                const b = pos(m.wk + 1);
+                                const midX = (a.x + b.x) / 2;
+                                let c1, c2;
+                                if (m.wk === 5 || m.wk === 8) {
+                                    c1 = { x: midX, y: a.y };
+                                    c2 = { x: b.x, y: b.y - 60 * scale };
+                                } else if (m.wk === 6 || m.wk === 9) {
+                                    c1 = { x: a.x, y: a.y + 60 * scale };
+                                    c2 = { x: midX, y: b.y };
+                                } else {
+                                    const wave = (i % 2 === 0) ? -45 : 45;
+                                    c1 = { x: a.x + (b.x - a.x) * 0.33, y: a.y + wave * scale };
+                                    c2 = { x: a.x + (b.x - a.x) * 0.66, y: b.y + wave * scale };
+                                }
+                                return (
+                                    <path
+                                        key={m.wk}
+                                        d={`M ${a.x},${a.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`}
+                                        fill="none" stroke="#3f3f46" strokeWidth={6 * scale}
+                                        strokeDasharray={`${9 * scale} ${9 * scale}`} strokeLinecap="round" opacity={0.6}
+                                    />
+                                );
+                            })}
+                            {EXPEDITION_MISSIONS.map(m => {
+                                const p = pos(m.wk);
+                                const count = (teamsByMission[m.wk] || []).length;
+                                const hasTeams = count > 0;
+                                return (
+                                    <g
+                                        key={m.wk}
+                                        onClick={() => handleNodeClick(m.wk)}
+                                        className={hasTeams ? 'expedition-node-unlocked' : ''}
+                                        style={{ cursor: hasTeams ? 'pointer' : 'default' }}
+                                    >
+                                        <circle
+                                            cx={p.x} cy={p.y} r={nodeR}
+                                            fill={hasTeams ? 'url(#expOverviewNodeBlue)' : 'rgba(255,255,255,0.55)'}
+                                            stroke={hasTeams ? '#1d4ed8' : 'rgba(255,255,255,0.85)'}
+                                            strokeWidth={3 * scale}
+                                        />
+                                        <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fontSize={26 * scale} fontWeight="bold" fill={hasTeams ? '#fff' : 'var(--text-secondary)'}>
+                                            {m.wk}
+                                        </text>
+                                        {hasTeams && (
+                                            <>
+                                                <circle cx={p.x + nodeR * 0.72} cy={p.y + nodeR * 0.72} r={nodeR * 0.42} fill="#dc2626" stroke="white" strokeWidth={2 * scale} />
+                                                <text x={p.x + nodeR * 0.72} y={p.y + nodeR * 0.72} textAnchor="middle" dominantBaseline="central" fontSize={16 * scale} fontWeight="bold" fill="#fff">
+                                                    {count}
+                                                </text>
+                                            </>
+                                        )}
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                        {openTeamsBubbleWk && teamsBubblePosition && (
+                            <div style={{
+                                position: 'absolute',
+                                left: teamsBubblePosition.left, top: teamsBubblePosition.top,
+                                transform: 'translate(-50%, calc(-100% - 14px))',
+                                backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem', padding: '0.6rem 0.8rem', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                zIndex: 10, minWidth: '140px', maxWidth: '220px'
+                            }}>
+                                <div className="flex justify-between items-center gap-2 mb-1">
+                                    <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Misión {openTeamsBubbleWk}</span>
+                                    <button onClick={() => setOpenTeamsBubbleWk(null)} className="text-xs" style={{ color: 'var(--text-secondary)' }}>✕</button>
+                                </div>
+                                <ul className="text-xs space-y-0.5">
+                                    {(teamsByMission[openTeamsBubbleWk] || []).map((name, i) => (
+                                        <li key={i} style={{ color: 'var(--text-primary)' }}>• {name}</li>
+                                    ))}
+                                </ul>
+                                {/* Flechita del globo, apuntando hacia abajo al nodo */}
+                                <div style={{
+                                    position: 'absolute', bottom: '-7px', left: '50%', transform: 'translateX(-50%)',
+                                    width: 0, height: 0,
+                                    borderLeft: '7px solid transparent', borderRight: '7px solid transparent',
+                                    borderTop: '7px solid var(--bg-secondary)'
+                                }} />
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
             const header = (
                 <div className="flex justify-between items-center mb-6">
                     <div>
@@ -6226,19 +6376,22 @@
                             </div>
 
                             {profTab === 'overview' && (
-                                <div className="card rounded-xl p-6">
-                                    <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Tablero de comando</h2>
-                                    {sortedTeams.length === 0 ? (
-                                        <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos. Ve a la pestaña "Equipos" para crear el primero.</p>
-                                    ) : (
-                                        sortedTeams.map((team, i) => (
-                                            <div key={team.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                                                <span style={{ color: 'var(--text-secondary)' }}>#{i + 1}</span>
-                                                <span className="flex-1 mx-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
-                                                <span className="font-mono" style={{ color: 'var(--accent-color)' }}>{teamCrystals(profProgressByTeam[team.id])} 💎</span>
-                                            </div>
-                                        ))
-                                    )}
+                                <div>
+                                    {profTeams.length > 0 && renderTeamsOverviewMap()}
+                                    <div className="card rounded-xl p-6">
+                                        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Tablero de comando</h2>
+                                        {sortedTeams.length === 0 ? (
+                                            <p style={{ color: 'var(--text-secondary)' }}>Aún no hay equipos. Ve a la pestaña "Equipos" para crear el primero.</p>
+                                        ) : (
+                                            sortedTeams.map((team, i) => (
+                                                <div key={team.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                                                    <span style={{ color: 'var(--text-secondary)' }}>#{i + 1}</span>
+                                                    <span className="flex-1 mx-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{team.name}</span>
+                                                    <span className="font-mono" style={{ color: 'var(--accent-color)' }}>{teamCrystals(profProgressByTeam[team.id])} 💎</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
