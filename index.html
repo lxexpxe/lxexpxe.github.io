@@ -5986,12 +5986,27 @@
                 setActiveWeek(firstOpen ? firstOpen.wk : 12);
             }, [role, myTeam?.id, !!myProgress]);
 
+            // El progreso es UN documento por EQUIPO (progress/{teamId}), no
+            // por estudiante — cualquier integrante que suba algo ya queda
+            // visible para todo el equipo vía el onSnapshot de arriba. Pero
+            // este efecto solo dependía de [activeWeek, myTeam?.id]: si un
+            // compañero enviaba la MISMA semana que ya tenías abierta, tu
+            // formulario se quedaba mostrando lo último que TÚ habías
+            // escrito (o vacío) en vez de lo que el equipo acababa de subir,
+            // porque el efecto nunca se volvía a correr. Depender del
+            // contenido real de la semana activa (no de myProgress completo,
+            // que cambia de referencia ante CUALQUIER semana) hace que se
+            // actualice cuando cambia lo que corresponde, sin borrar un
+            // borrador en curso solo porque alguien calificó otra semana.
+            const currentWeekKey = String(activeWeek);
+            const currentWeekNote = (myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].note) || '';
+            const currentWeekLinksKey = JSON.stringify((myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links) || []);
+
             React.useEffect(() => {
-                const wk = String(activeWeek);
-                setNoteInput((myProgress && myProgress[wk] && myProgress[wk].note) || '');
-                const existingLinks = (myProgress && myProgress[wk] && myProgress[wk].links) || [];
+                setNoteInput(currentWeekNote);
+                const existingLinks = (myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links) || [];
                 setLinkInputs(existingLinks.length > 0 ? existingLinks : ['']);
-            }, [activeWeek, myTeam?.id]);
+            }, [activeWeek, myTeam?.id, currentWeekNote, currentWeekLinksKey]);
 
             const updateLinkInput = (index, value) => {
                 setLinkInputs(prev => prev.map((l, i) => i === index ? value : l));
