@@ -5750,6 +5750,18 @@
             const [teamsBubblePosition, setTeamsBubblePosition] = React.useState(null);
             const teamsMapContainerRef = React.useRef(null);
 
+            // El globo usa position:fixed (coordenadas de pantalla) para no
+            // quedar recortado por el overflow:hidden del mapa — pero eso
+            // significa que si el profesor hace scroll, el globo se queda
+            // "flotando" en el mismo punto de la pantalla en vez de seguir
+            // al nodo. Más simple cerrarlo que reposicionarlo en cada scroll.
+            React.useEffect(() => {
+                if (!openTeamsBubbleWk) return;
+                const closeBubble = () => setOpenTeamsBubbleWk(null);
+                window.addEventListener('scroll', closeBubble, true);
+                return () => window.removeEventListener('scroll', closeBubble, true);
+            }, [openTeamsBubbleWk]);
+
             // --- estado de estudiante ---
             const [myTeam, setMyTeam] = React.useState(null);
             const [myProgress, setMyProgress] = React.useState(null);
@@ -6214,10 +6226,15 @@
                     if (!teamsByMission[wk] || teamsByMission[wk].length === 0) return;
                     if (openTeamsBubbleWk === wk) { setOpenTeamsBubbleWk(null); return; }
                     if (teamsMapContainerRef.current) {
-                        const containerWidth = teamsMapContainerRef.current.getBoundingClientRect().width;
-                        const renderScale = containerWidth / 1200;
+                        // position: fixed (coordenadas de PANTALLA, no del
+                        // contenedor) para que el globo se dibuje por encima
+                        // de todo, sin que el overflow:hidden del mapa (ahí
+                        // a propósito, para las esquinas redondeadas) lo
+                        // recorte cuando la lista de equipos es larga.
+                        const rect = teamsMapContainerRef.current.getBoundingClientRect();
+                        const renderScale = rect.width / 1200;
                         const p = pos(wk);
-                        setTeamsBubblePosition({ left: p.x * renderScale, top: p.y * renderScale });
+                        setTeamsBubblePosition({ left: rect.left + p.x * renderScale, top: rect.top + p.y * renderScale });
                     }
                     setOpenTeamsBubbleWk(wk);
                 };
@@ -6293,14 +6310,15 @@
                         </svg>
                         {openTeamsBubbleWk && teamsBubblePosition && (
                             <div style={{
-                                position: 'absolute',
+                                position: 'fixed',
                                 left: teamsBubblePosition.left, top: teamsBubblePosition.top,
                                 transform: 'translate(-50%, calc(-100% - 14px))',
                                 backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
                                 borderRadius: '0.5rem', padding: '0.6rem 0.8rem', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                zIndex: 10, minWidth: '140px', maxWidth: '220px'
+                                zIndex: 1000, minWidth: '140px', maxWidth: '220px',
+                                maxHeight: '260px', overflowY: 'auto'
                             }}>
-                                <div className="flex justify-between items-center gap-2 mb-1">
+                                <div className="flex justify-between items-center gap-2 mb-1" style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-secondary)' }}>
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Misión {openTeamsBubbleWk}</span>
                                     <button onClick={() => setOpenTeamsBubbleWk(null)} className="text-xs" style={{ color: 'var(--text-secondary)' }}>✕</button>
                                 </div>
