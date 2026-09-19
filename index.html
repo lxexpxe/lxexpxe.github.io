@@ -1545,7 +1545,17 @@
                             width: 512,
                             height: 512,
                             colorDark: '#000000',
-                            colorLight: '#ffffff'
+                            colorLight: '#ffffff',
+                            // Por defecto esta librería usa el nivel de
+                            // corrección de errores más alto (H, 30% de
+                            // redundancia), pensado para códigos impresos que
+                            // se ensucian o rayan. Este QR se muestra en
+                            // pantalla/proyector, no se degrada físicamente,
+                            // así que ese nivel solo hace el código más denso
+                            // de lo necesario (más cuadritos, más difícil de
+                            // escanear de lejos o con poca luz) sin ganar
+                            // nada a cambio. L (7%) es suficiente aquí.
+                            correctLevel: QRCode.CorrectLevel.L
                         });
                     }
                 }, 100);
@@ -4343,27 +4353,31 @@
                         setQrZoomStep(0.5);
                         setQrZoomValue(1);
 
-                        // iOS/Safari: aplicar constraints sobre el track de
-                        // cámara YA arrancada (applyVideoConstraints, tanto
-                        // para enfoque como para zoom) es un mecanismo
-                        // conocido por congelar el video en WebKit — el feed
-                        // se ve "vivo" pero los frames dejan de actualizarse,
-                        // así que html5-qrcode nunca vuelve a decodificar
-                        // nada hasta cerrar y reabrir la cámara. Reportado en
-                        // producción: en iPhone, si el escaneo no ocurre casi
-                        // de inmediato al abrir la cámara, deja de funcionar.
-                        // Android y escritorio sí lo soportan bien, así que
-                        // esto se salta solo en iOS — el zoom sigue
-                        // disponible ahí vía el zoom digital de más abajo.
+                        // iOS/Safari: aplicar la constraint de ENFOQUE
+                        // continuo sobre el track de cámara ya arrancada es
+                        // un mecanismo conocido por congelar el video en
+                        // WebKit — el feed se ve "vivo" pero los frames dejan
+                        // de actualizarse, así que html5-qrcode nunca vuelve
+                        // a decodificar nada hasta cerrar y reabrir la
+                        // cámara. Reportado en producción: en iPhone, si el
+                        // escaneo no ocurre casi de inmediato al abrir la
+                        // cámara, deja de funcionar. Android y escritorio sí
+                        // lo soportan bien, así que ESTO (el enfoque) se
+                        // salta solo en iOS.
+                        //
+                        // OJO: esto NO debe aplicar también al zoom nativo —
+                        // leer capacidades (getRunningTrackCapabilities) no
+                        // toca el track para nada, y aplicar zoom pasa
+                        // siempre por applyQRZoom más abajo, disparado por el
+                        // usuario (deslizador/pellizco), no automáticamente
+                        // al abrir la cámara — nunca causó el freeze
+                        // reportado. Una versión anterior de este arreglo
+                        // saltaba TAMBIÉN la lectura de zoom nativo en iOS
+                        // por error, y eso rompió el zoom que antes sí
+                        // funcionaba ahí (quedaba forzado al zoom digital,
+                        // más limitado) — reportado en producción.
                         const isIosDevice = /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.MSStream;
 
-                        // Enfoque continuo, aplicado ya con la cámara corriendo
-                        // (no se puede pedir en el getUserMedia inicial, ver el
-                        // comentario junto a cameraConstraintsFallback más
-                        // arriba) — en celulares con varias lentes traseras,
-                        // sin esto el navegador puede quedarse en enfoque
-                        // fijo/lento al escanear de cerca. No bloquea nada si
-                        // el dispositivo no lo soporta.
                         if (!isIosDevice && !scanHandledRef.current && activeScanner && typeof activeScanner.applyVideoConstraints === 'function') {
                             try {
                                 await activeScanner.applyVideoConstraints({ advanced: [{ focusMode: 'continuous' }] });
@@ -4375,7 +4389,7 @@
                             appendQRLog('iOS: se omite enfoque continuo (applyVideoConstraints puede congelar el video en WebKit).');
                         }
 
-                        if (!isIosDevice && !scanHandledRef.current && activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
+                        if (!scanHandledRef.current && activeScanner && typeof activeScanner.getRunningTrackCapabilities === 'function') {
                             const capabilities = activeScanner.getRunningTrackCapabilities();
                             if (capabilities && capabilities.zoom) {
                                 const minZoom = typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1;
@@ -4388,14 +4402,24 @@
                                 setQrZoomValue(initialZoom);
                                 appendQRLog(`Zoom nativo soportado: min ${minZoom}, max ${maxZoom}, step ${stepZoom}. Zoom total habilitado hasta 20x (híbrido).`);
 
-                                try {
-                                    await activeScanner.applyVideoConstraints({
-                                        advanced: [{ zoom: initialZoom }]
-                                    });
-                                    appendQRLog(`Zoom inicial aplicado: ${initialZoom.toFixed(1)}x`);
-                                } catch (zoomError) {
-                                    console.error('Zoom no soportado en este dispositivo:', zoomError);
-                                    appendQRLog(`No se pudo aplicar zoom inicial: ${zoomError?.name || 'Error'} - ${zoomError?.message || 'Sin mensaje'}`);
+                                // El valor inicial (normalmente 1x, el propio
+                                // default de la cámara) es el único ajuste
+                                // automático de zoom al abrir la cámara — en
+                                // iOS se deja que el primer cambio real de
+                                // zoom (deslizador/pellizco) lo aplique en
+                                // vez de hacerlo aquí, para no sumar una
+                                // llamada más a applyVideoConstraints durante
+                                // la ventana frágil justo después de arrancar.
+                                if (!isIosDevice) {
+                                    try {
+                                        await activeScanner.applyVideoConstraints({
+                                            advanced: [{ zoom: initialZoom }]
+                                        });
+                                        appendQRLog(`Zoom inicial aplicado: ${initialZoom.toFixed(1)}x`);
+                                    } catch (zoomError) {
+                                        console.error('Zoom no soportado en este dispositivo:', zoomError);
+                                        appendQRLog(`No se pudo aplicar zoom inicial: ${zoomError?.name || 'Error'} - ${zoomError?.message || 'Sin mensaje'}`);
+                                    }
                                 }
                             } else {
                                 setQrNativeZoomMax(1);
