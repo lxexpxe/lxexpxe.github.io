@@ -5835,8 +5835,8 @@
             // --- estado de estudiante ---
             const [myTeam, setMyTeam] = React.useState(null);
             const [myProgress, setMyProgress] = React.useState(null);
-            const [noteInput, setNoteInput] = React.useState('');
-            const [linkInputs, setLinkInputs] = React.useState(['']);
+            const [missionConfirmed, setMissionConfirmed] = React.useState(false);
+            const [confirmingMission, setConfirmingMission] = React.useState(false);
             const [submitting, setSubmitting] = React.useState(false);
 
             // ===== Carga y listeners: PROFESOR =====
@@ -6077,32 +6077,15 @@
             // El progreso es UN documento por EQUIPO (progress/{teamId}), no
             // por estudiante — cualquier integrante que suba algo ya queda
             // visible para todo el equipo vía el onSnapshot de arriba. Pero
-            // este efecto solo dependía de [activeWeek, myTeam?.id]: si un
-            // compañero enviaba la MISMA semana que ya tenías abierta, tu
-            // formulario se quedaba mostrando lo último que TÚ habías
-            // escrito (o vacío) en vez de lo que el equipo acababa de subir,
-            // porque el efecto nunca se volvía a correr. Depender del
-            // contenido real de la semana activa (no de myProgress completo,
-            // que cambia de referencia ante CUALQUIER semana) hace que se
-            // actualice cuando cambia lo que corresponde, sin borrar un
-            // borrador en curso solo porque alguien calificó otra semana.
-            const currentWeekKey = String(activeWeek);
-            const currentWeekNote = (myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].note) || '';
-            const currentWeekLinksKey = JSON.stringify((myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links) || []);
-
+            // El checkbox de confirmación es un estado efímero de la UI, no
+            // un borrador que haya que sincronizar con lo que suba un
+            // compañero de equipo (a diferencia de los enlaces/bitácora de
+            // antes) — solo hace falta resetearlo al cambiar de misión, para
+            // que no quede marcado arrastrado de la misión anterior.
             React.useEffect(() => {
-                setNoteInput(currentWeekNote);
-                const existingLinks = (myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links) || [];
-                setLinkInputs(existingLinks.length > 0 ? existingLinks : ['']);
-            }, [activeWeek, myTeam?.id, currentWeekNote, currentWeekLinksKey]);
-
-            const updateLinkInput = (index, value) => {
-                setLinkInputs(prev => prev.map((l, i) => i === index ? value : l));
-            };
-            const addLinkInput = () => setLinkInputs(prev => [...prev, '']);
-            const removeLinkInput = (index) => {
-                setLinkInputs(prev => prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index));
-            };
+                setMissionConfirmed(false);
+                setConfirmingMission(false);
+            }, [activeWeek, myTeam?.id]);
 
             const submitMission = async () => {
                 if (!myTeam) return;
@@ -6110,20 +6093,44 @@
                 try {
                     const wk = String(activeWeek);
                     const existing = (myProgress && myProgress[wk]) || {};
-                    const links = linkInputs.map(l => l.trim()).filter(Boolean);
                     await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
                         [wk]: {
                             status: 'submitted',
-                            note: noteInput.trim(),
-                            links,
                             crystals: existing.crystals || 0,
                             submittedAt: new Date().toISOString()
                         }
                     }, { merge: true });
-                    toast.showToast('Entrega enviada. Espera la revisión del profesor.', 'success');
+                    toast.showToast('Misión dada por cumplida. Espera la revisión del profesor.', 'success');
                 } catch (error) {
-                    console.error('Error enviando la entrega:', error);
-                    toast.showToast('Error enviando la entrega', 'error');
+                    console.error('Error confirmando la entrega:', error);
+                    toast.showToast('Error confirmando la entrega', 'error');
+                } finally {
+                    setSubmitting(false);
+                    setConfirmingMission(false);
+                }
+            };
+
+            // Por si el equipo confirmó por error antes de subir de verdad
+            // la documentación — sin esto quedarían atascados en "en
+            // revisión" hasta que el profesor calificara con 0 cristales,
+            // sin forma de corregirlo ellos mismos.
+            const undoMissionConfirmation = async () => {
+                if (!myTeam) return;
+                setSubmitting(true);
+                try {
+                    const wk = String(activeWeek);
+                    const existing = (myProgress && myProgress[wk]) || {};
+                    await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
+                        [wk]: {
+                            status: 'open',
+                            crystals: existing.crystals || 0
+                        }
+                    }, { merge: true });
+                    setMissionConfirmed(false);
+                    toast.showToast('Confirmación retirada.', 'info');
+                } catch (error) {
+                    console.error('Error retirando la confirmación:', error);
+                    toast.showToast('Error retirando la confirmación', 'error');
                 } finally {
                     setSubmitting(false);
                 }
@@ -6504,9 +6511,14 @@
                                                         ))}
                                                     </ul>
                                                 ) : (
-                                                    <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Sin enlaces adjuntos.</p>
+                                                    // Entregas de después de pasar al modelo de confirmación por
+                                                    // checkbox no tienen enlaces/nota — el equipo solo confirmó
+                                                    // que ya subió la documentación a la plataforma académica.
+                                                    <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>El equipo confirmó haber subido la documentación a Teams/Samán/Moodle. Verifica ahí si necesitas revisar el contenido.</p>
                                                 )}
-                                                <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note || 'Sin comentario adjunto.'}</p>
+                                                {item.note && (
+                                                    <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{item.note}</p>
+                                                )}
                                                 <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Feedback para el equipo (opcional)</label>
                                                 <textarea
                                                     className="input-field w-full py-2 px-3 rounded-lg mb-3 text-sm"
@@ -6728,17 +6740,20 @@
                                 {currentEntry.status === 'done' ? (
                                     <div>
                                         <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>Esta entrega ya fue calificada y no se puede modificar.</p>
-                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
-                                        {(currentEntry.links || []).length > 0 ? (
-                                            <ul className="mb-3 list-disc list-inside">
-                                                {currentEntry.links.map((link, i) => (
-                                                    <li key={i} className="text-sm">
-                                                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{link}</a>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Sin enlaces adjuntos.</p>
+                                        {/* Enlaces/bitácora: solo quedan en entregas de antes de pasar
+                                            al modelo de confirmación por checkbox — las nuevas no los
+                                            tienen, así que no tiene sentido mostrar "sin enlaces". */}
+                                        {(currentEntry.links || []).length > 0 && (
+                                            <>
+                                                <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
+                                                <ul className="mb-3 list-disc list-inside">
+                                                    {currentEntry.links.map((link, i) => (
+                                                        <li key={i} className="text-sm">
+                                                            <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{link}</a>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </>
                                         )}
                                         {currentEntry.note && (
                                             <>
@@ -6757,50 +6772,46 @@
                                             <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Revisada — {currentEntry.crystals} 💎</p>
                                         </div>
                                     </div>
+                                ) : currentEntry.status === 'submitted' ? (
+                                    <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>✅ Misión dada por cumplida</p>
+                                        <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirmó que la documentación ya está subida a la plataforma académica. En espera de revisión del profesor.</p>
+                                        <button onClick={undoMissionConfirmation} disabled={submitting} className="text-xs text-red-500 hover:underline">
+                                            ¿Confirmaron por error? Deshacer confirmación
+                                        </button>
+                                    </div>
                                 ) : (
                                     <div>
-                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Enlaces del entregable</label>
-                                        <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Agrega uno o más enlaces según el tipo de evidencia (Figma, Google Drive, Behance, etc.).</p>
-                                        <div className="space-y-2 mb-3">
-                                            {linkInputs.map((link, i) => (
-                                                <div key={i} className="flex gap-2">
-                                                    <input
-                                                        type="url"
-                                                        placeholder="https://..."
-                                                        className="input-field flex-1 py-2 px-3 rounded-lg"
-                                                        value={link}
-                                                        onChange={(e) => updateLinkInput(i, e.target.value)}
-                                                    />
-                                                    <button
-                                                        onClick={() => removeLinkInput(i)}
-                                                        className="text-xs text-red-500 hover:underline px-2"
-                                                        title="Quitar enlace"
-                                                    >
-                                                        Quitar
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <button onClick={addLinkInput} className="btn btn-secondary text-xs px-3 mb-4">+ Agregar otro enlace</button>
+                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Confirmación de entrega</label>
+                                        <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Antes de continuar, confirma que ya subiste la documentación de esta misión a la plataforma académica (Teams, Samán o Moodle).</p>
+                                        <label className="flex items-start gap-2 mb-4 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1"
+                                                checked={missionConfirmed}
+                                                onChange={(e) => setMissionConfirmed(e.target.checked)}
+                                            />
+                                            <span>Ya subí la documentación de esta misión a Teams, Samán o Moodle.</span>
+                                        </label>
 
-                                        <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Bitácora de envío (opcional)</label>
-                                        <textarea
-                                            className="input-field w-full py-2 px-3 rounded-lg mb-3"
-                                            rows="4"
-                                            placeholder="Comentario o resumen de lo entregado..."
-                                            value={noteInput}
-                                            onChange={(e) => setNoteInput(e.target.value)}
-                                        ></textarea>
-                                        <div className="flex items-center gap-3">
-                                            <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">
-                                                {currentEntry.status === 'open' ? 'Enviar a revisión' : 'Actualizar envío'}
+                                        {!confirmingMission ? (
+                                            <button
+                                                onClick={() => setConfirmingMission(true)}
+                                                disabled={!missionConfirmed || submitting}
+                                                className="btn btn-primary text-sm"
+                                            >
+                                                Dar misión por cumplida
                                             </button>
-                                            {currentEntry.status !== 'open' && (
-                                                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                    Estado: <strong style={{ color: 'var(--text-primary)' }}>En revisión</strong>
-                                                </span>
-                                            )}
-                                        </div>
+                                        ) : (
+                                            <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>¿Seguro?</p>
+                                                <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirma que la documentación ya está subida. Esta acción se puede deshacer después si fue un error.</p>
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => setConfirmingMission(false)} disabled={submitting} className="btn btn-secondary text-sm">Cancelar</button>
+                                                    <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">Sí, confirmar</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
