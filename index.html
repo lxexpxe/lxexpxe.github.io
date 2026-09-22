@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="14e0178">
+    <meta name="app-version" content="3805c5a">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -4015,6 +4015,21 @@ function CoursePage({
                   // capacidades de un track que este stop() ya detuvo,
                   // y eso no debe mostrarse como "Error de cámara".
                   scanHandledRef.current = true;
+                  // Entre decodificar el QR (instantáneo) y que el
+                  // servidor confirme el registro puede haber varios
+                  // segundos de por medio con wifi de salón lenta —
+                  // registerAttendance/registerCheckout hacen dos
+                  // lecturas y una escritura antes de responder. Sin
+                  // este feedback inmediato, la pantalla se queda igual
+                  // que antes de escanear durante ese hueco, y el
+                  // estudiante asume que la cámara no detectó nada:
+                  // cierra el escáner y lo vuelve a abrir, cuando en
+                  // realidad el primer escaneo sí iba en camino
+                  // (reportado en producción: "parece que no lo lee").
+                  setQrScanFeedback({
+                    type: 'pending',
+                    message: 'QR detectado — registrando...'
+                  });
                   // phase ausente (QR generado antes de este cambio) se
                   // trata como 'checkin', el comportamiento de siempre.
                   const result = qrData.phase === 'checkout' ? await registerCheckout(qrData) : await registerAttendance(qrData);
@@ -4148,21 +4163,34 @@ function CoursePage({
           // un track que el propio escaneo exitoso ya cerró — no es un
           // error real que el usuario deba ver.
           //
-          // No toda falla acá es realmente de cámara: si el SDK ya
-          // detectó que la sesión murió (auth.currentUser es null),
-          // antes esto se mostraba igual como "Error de cámara"
-          // genérico, sin avisar que en realidad hacía falta volver a
-          // iniciar sesión (reportado en producción: varios
-          // estudiantes se quedaban atascados así al escanear el QR
-          // de salida). OJO: se revisa solo el valor YA conocido de
-          // auth.currentUser (gratis, sin red) — se probó forzar una
-          // renovación de token acá (getIdToken(true)) como señal más
-          // segura, pero esa llamada por sí sola puede fallar por
-          // cualquier hipo de red ajeno a la sesión, y eso producía
-          // falsos positivos: cerraba la sesión de gente con la
-          // sesión perfectamente válida cuyo problema real era otro
-          // (cámara no soportada, permiso denegado, etc.).
-          const sessionLost = !auth.currentUser;
+          // No toda falla acá es realmente de cámara: si la sesión ya
+          // murió, esto se mostraba antes igual como "Error de
+          // cámara" genérico, sin avisar que en realidad hacía falta
+          // volver a iniciar sesión (reportado en producción: varios
+          // estudiantes se quedaban atascados así al escanear, y solo
+          // se daban cuenta de que la sesión estaba muerta al
+          // refrescar la página). Revisar solo `!auth.currentUser`
+          // (gratis, sin red) no alcanza para detectar esto: ese
+          // objeto sigue viéndose "activo" en memoria aunque el
+          // navegador ya haya borrado los datos del sitio en segundo
+          // plano (típico en iOS tras varios días sin abrir la app) —
+          // hace falta forzar una renovación de token para
+          // descubrirlo de verdad. Igual que en el chequeo periódico
+          // de sesión (más arriba en AppContent), se filtra por
+          // código de error específico: un hipo de red al renovar el
+          // token NO significa sesión muerta (probado en carne
+          // propia, ver el comentario de ese efecto) — solo estos
+          // códigos confirman, sin ambigüedad, que ya no va a volver
+          // a ser válida sola.
+          const AUTH_SESSION_DEATH_CODES = new Set(['auth/user-token-expired', 'auth/user-disabled', 'auth/user-not-found', 'auth/invalid-user-token', 'auth/user-mismatch']);
+          let sessionLost = !auth.currentUser;
+          if (!sessionLost) {
+            try {
+              await auth.currentUser.getIdToken(true);
+            } catch (tokenError) {
+              sessionLost = AUTH_SESSION_DEATH_CODES.has(tokenError.code);
+            }
+          }
           if (sessionLost) {
             appendQRLog('La sesión ya no es válida — se cierra para volver al login.');
             toast.showToast('Tu sesión se cerró — vuelve a iniciar sesión para continuar', 'error');
@@ -4865,7 +4893,22 @@ function CoursePage({
       // sin importar si quedó marcado a tiempo o tarde.
       backgroundColor: qrScanFeedback.type === 'success' ? qrScanFeedback.late ? 'rgba(234, 88, 12, 0.92)' : 'rgba(22, 163, 74, 0.92)' : qrScanFeedback.type === 'error' ? 'rgba(220, 38, 38, 0.92)' : 'rgba(59, 130, 246, 0.92)'
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, qrScanFeedback.type === 'pending' ?
+  /*#__PURE__*/
+  // El spinner global (.spinner) usa tonos azules pensados
+  // para fondos claros — aquí el fondo YA es azul sólido,
+  // así que se sobreescriben los colores del borde a blanco
+  // para que el giro se note.
+  React.createElement("div", {
+    className: "spinner",
+    style: {
+      width: '3rem',
+      height: '3rem',
+      borderWidth: '5px',
+      borderColor: 'rgba(255, 255, 255, 0.35)',
+      borderLeftColor: '#ffffff'
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: '3.5rem',
       lineHeight: 1
@@ -5527,8 +5570,8 @@ function ExpeditionPage({
   // --- estado de estudiante ---
   const [myTeam, setMyTeam] = React.useState(null);
   const [myProgress, setMyProgress] = React.useState(null);
-  const [noteInput, setNoteInput] = React.useState('');
-  const [linkInputs, setLinkInputs] = React.useState(['']);
+  const [missionConfirmed, setMissionConfirmed] = React.useState(false);
+  const [confirmingMission, setConfirmingMission] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
   // ===== Carga y listeners: PROFESOR =====
@@ -5806,52 +5849,63 @@ function ExpeditionPage({
   // El progreso es UN documento por EQUIPO (progress/{teamId}), no
   // por estudiante — cualquier integrante que suba algo ya queda
   // visible para todo el equipo vía el onSnapshot de arriba. Pero
-  // este efecto solo dependía de [activeWeek, myTeam?.id]: si un
-  // compañero enviaba la MISMA semana que ya tenías abierta, tu
-  // formulario se quedaba mostrando lo último que TÚ habías
-  // escrito (o vacío) en vez de lo que el equipo acababa de subir,
-  // porque el efecto nunca se volvía a correr. Depender del
-  // contenido real de la semana activa (no de myProgress completo,
-  // que cambia de referencia ante CUALQUIER semana) hace que se
-  // actualice cuando cambia lo que corresponde, sin borrar un
-  // borrador en curso solo porque alguien calificó otra semana.
-  const currentWeekKey = String(activeWeek);
-  const currentWeekNote = myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].note || '';
-  const currentWeekLinksKey = JSON.stringify(myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links || []);
+  // El checkbox de confirmación es un estado efímero de la UI, no
+  // un borrador que haya que sincronizar con lo que suba un
+  // compañero de equipo (a diferencia de los enlaces/bitácora de
+  // antes) — solo hace falta resetearlo al cambiar de misión, para
+  // que no quede marcado arrastrado de la misión anterior.
   React.useEffect(() => {
-    setNoteInput(currentWeekNote);
-    const existingLinks = myProgress && myProgress[currentWeekKey] && myProgress[currentWeekKey].links || [];
-    setLinkInputs(existingLinks.length > 0 ? existingLinks : ['']);
-  }, [activeWeek, myTeam?.id, currentWeekNote, currentWeekLinksKey]);
-  const updateLinkInput = (index, value) => {
-    setLinkInputs(prev => prev.map((l, i) => i === index ? value : l));
-  };
-  const addLinkInput = () => setLinkInputs(prev => [...prev, '']);
-  const removeLinkInput = index => {
-    setLinkInputs(prev => prev.length <= 1 ? [''] : prev.filter((_, i) => i !== index));
-  };
+    setMissionConfirmed(false);
+    setConfirmingMission(false);
+  }, [activeWeek, myTeam?.id]);
   const submitMission = async () => {
     if (!myTeam) return;
     setSubmitting(true);
     try {
       const wk = String(activeWeek);
       const existing = myProgress && myProgress[wk] || {};
-      const links = linkInputs.map(l => l.trim()).filter(Boolean);
       await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
         [wk]: {
           status: 'submitted',
-          note: noteInput.trim(),
-          links,
           crystals: existing.crystals || 0,
           submittedAt: new Date().toISOString()
         }
       }, {
         merge: true
       });
-      toast.showToast('Entrega enviada. Espera la revisión del profesor.', 'success');
+      toast.showToast('Misión dada por cumplida. Espera la revisión del profesor.', 'success');
     } catch (error) {
-      console.error('Error enviando la entrega:', error);
-      toast.showToast('Error enviando la entrega', 'error');
+      console.error('Error confirmando la entrega:', error);
+      toast.showToast('Error confirmando la entrega', 'error');
+    } finally {
+      setSubmitting(false);
+      setConfirmingMission(false);
+    }
+  };
+
+  // Por si el equipo confirmó por error antes de subir de verdad
+  // la documentación — sin esto quedarían atascados en "en
+  // revisión" hasta que el profesor calificara con 0 cristales,
+  // sin forma de corregirlo ellos mismos.
+  const undoMissionConfirmation = async () => {
+    if (!myTeam) return;
+    setSubmitting(true);
+    try {
+      const wk = String(activeWeek);
+      const existing = myProgress && myProgress[wk] || {};
+      await db.doc(`artifacts/academic-platform/progress/${myTeam.id}`).set({
+        [wk]: {
+          status: 'open',
+          crystals: existing.crystals || 0
+        }
+      }, {
+        merge: true
+      });
+      setMissionConfirmed(false);
+      toast.showToast('Confirmación retirada.', 'info');
+    } catch (error) {
+      console.error('Error retirando la confirmación:', error);
+      toast.showToast('Error retirando la confirmación', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -6427,17 +6481,22 @@ function ExpeditionPage({
       target: "_blank",
       rel: "noopener noreferrer",
       className: "text-blue-600 hover:underline break-all"
-    }, link)))) : /*#__PURE__*/React.createElement("p", {
+    }, link)))) :
+    /*#__PURE__*/
+    // Entregas de después de pasar al modelo de confirmación por
+    // checkbox no tienen enlaces/nota — el equipo solo confirmó
+    // que ya subió la documentación a la plataforma académica.
+    React.createElement("p", {
       className: "text-sm mb-2",
       style: {
         color: 'var(--text-secondary)'
       }
-    }, "Sin enlaces adjuntos."), /*#__PURE__*/React.createElement("p", {
+    }, "El equipo confirm\xF3 haber subido la documentaci\xF3n a Teams/Sam\xE1n/Moodle. Verifica ah\xED si necesitas revisar el contenido."), item.note && /*#__PURE__*/React.createElement("p", {
       className: "text-sm mb-3",
       style: {
         color: 'var(--text-primary)'
       }
-    }, item.note || 'Sin comentario adjunto.'), /*#__PURE__*/React.createElement("label", {
+    }, item.note), /*#__PURE__*/React.createElement("label", {
       className: "block text-xs font-bold mb-1",
       style: {
         color: 'var(--text-primary)'
@@ -6752,12 +6811,12 @@ function ExpeditionPage({
     style: {
       color: 'var(--text-secondary)'
     }
-  }, "Esta entrega ya fue calificada y no se puede modificar."), /*#__PURE__*/React.createElement("label", {
+  }, "Esta entrega ya fue calificada y no se puede modificar."), (currentEntry.links || []).length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
     className: "block text-sm font-bold mb-2",
     style: {
       color: 'var(--text-primary)'
     }
-  }, "Enlaces del entregable"), (currentEntry.links || []).length > 0 ? /*#__PURE__*/React.createElement("ul", {
+  }, "Enlaces del entregable"), /*#__PURE__*/React.createElement("ul", {
     className: "mb-3 list-disc list-inside"
   }, currentEntry.links.map((link, i) => /*#__PURE__*/React.createElement("li", {
     key: i,
@@ -6767,12 +6826,7 @@ function ExpeditionPage({
     target: "_blank",
     rel: "noopener noreferrer",
     className: "text-blue-600 hover:underline break-all"
-  }, link)))) : /*#__PURE__*/React.createElement("p", {
-    className: "text-sm mb-3",
-    style: {
-      color: 'var(--text-secondary)'
-    }
-  }, "Sin enlaces adjuntos."), currentEntry.note && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+  }, link))))), currentEntry.note && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
     className: "block text-sm font-bold mb-2",
     style: {
       color: 'var(--text-primary)'
@@ -6814,61 +6868,77 @@ function ExpeditionPage({
     style: {
       color: 'var(--text-primary)'
     }
-  }, "Revisada \u2014 ", currentEntry.crystals, " \uD83D\uDC8E"))) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    className: "block text-sm font-bold mb-2",
+  }, "Revisada \u2014 ", currentEntry.crystals, " \uD83D\uDC8E"))) : currentEntry.status === 'submitted' ? /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-4",
+    style: {
+      backgroundColor: 'var(--bg-primary)',
+      border: '1px solid var(--border-color)'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-semibold mb-1",
     style: {
       color: 'var(--text-primary)'
     }
-  }, "Enlaces del entregable"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs mb-2",
+  }, "\u2705 Misi\xF3n dada por cumplida"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-3",
     style: {
       color: 'var(--text-secondary)'
     }
-  }, "Agrega uno o m\xE1s enlaces seg\xFAn el tipo de evidencia (Figma, Google Drive, Behance, etc.)."), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2 mb-3"
-  }, linkInputs.map((link, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "url",
-    placeholder: "https://...",
-    className: "input-field flex-1 py-2 px-3 rounded-lg",
-    value: link,
-    onChange: e => updateLinkInput(i, e.target.value)
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => removeLinkInput(i),
-    className: "text-xs text-red-500 hover:underline px-2",
-    title: "Quitar enlace"
-  }, "Quitar")))), /*#__PURE__*/React.createElement("button", {
-    onClick: addLinkInput,
-    className: "btn btn-secondary text-xs px-3 mb-4"
-  }, "+ Agregar otro enlace"), /*#__PURE__*/React.createElement("label", {
+  }, "Tu equipo confirm\xF3 que la documentaci\xF3n ya est\xE1 subida a la plataforma acad\xE9mica. En espera de revisi\xF3n del profesor."), /*#__PURE__*/React.createElement("button", {
+    onClick: undoMissionConfirmation,
+    disabled: submitting,
+    className: "text-xs text-red-500 hover:underline"
+  }, "\xBFConfirmaron por error? Deshacer confirmaci\xF3n")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block text-sm font-bold mb-2",
     style: {
       color: 'var(--text-primary)'
     }
-  }, "Bit\xE1cora de env\xEDo (opcional)"), /*#__PURE__*/React.createElement("textarea", {
-    className: "input-field w-full py-2 px-3 rounded-lg mb-3",
-    rows: "4",
-    placeholder: "Comentario o resumen de lo entregado...",
-    value: noteInput,
-    onChange: e => setNoteInput(e.target.value)
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3"
+  }, "Confirmaci\xF3n de entrega"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-3",
+    style: {
+      color: 'var(--text-secondary)'
+    }
+  }, "Antes de continuar, confirma que ya subiste la documentaci\xF3n de esta misi\xF3n a la plataforma acad\xE9mica (Teams, Sam\xE1n o Moodle)."), /*#__PURE__*/React.createElement("label", {
+    className: "flex items-start gap-2 mb-4 text-sm",
+    style: {
+      color: 'var(--text-primary)'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    className: "mt-1",
+    checked: missionConfirmed,
+    onChange: e => setMissionConfirmed(e.target.checked)
+  }), /*#__PURE__*/React.createElement("span", null, "Ya sub\xED la documentaci\xF3n de esta misi\xF3n a Teams, Sam\xE1n o Moodle.")), !confirmingMission ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmingMission(true),
+    disabled: !missionConfirmed || submitting,
+    className: "btn btn-primary text-sm"
+  }, "Dar misi\xF3n por cumplida") : /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-4",
+    style: {
+      backgroundColor: 'var(--bg-primary)',
+      border: '1px solid var(--border-color)'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-semibold mb-1",
+    style: {
+      color: 'var(--text-primary)'
+    }
+  }, "\xBFSeguro?"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-3",
+    style: {
+      color: 'var(--text-secondary)'
+    }
+  }, "Tu equipo confirma que la documentaci\xF3n ya est\xE1 subida. Esta acci\xF3n se puede deshacer despu\xE9s si fue un error."), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3"
   }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmingMission(false),
+    disabled: submitting,
+    className: "btn btn-secondary text-sm"
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
     onClick: submitMission,
     disabled: submitting,
     className: "btn btn-primary text-sm"
-  }, currentEntry.status === 'open' ? 'Enviar a revisión' : 'Actualizar envío'), currentEntry.status !== 'open' && /*#__PURE__*/React.createElement("span", {
-    className: "text-sm",
-    style: {
-      color: 'var(--text-secondary)'
-    }
-  }, "Estado: ", /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: 'var(--text-primary)'
-    }
-  }, "En revisi\xF3n"))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "S\xED, confirmar"))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "card rounded-xl p-6 mb-4 text-center"
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-3xl font-bold",
