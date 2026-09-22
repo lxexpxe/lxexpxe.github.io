@@ -4302,6 +4302,18 @@
                                                 // capacidades de un track que este stop() ya detuvo,
                                                 // y eso no debe mostrarse como "Error de cámara".
                                                 scanHandledRef.current = true;
+                                                // Entre decodificar el QR (instantáneo) y que el
+                                                // servidor confirme el registro puede haber varios
+                                                // segundos de por medio con wifi de salón lenta —
+                                                // registerAttendance/registerCheckout hacen dos
+                                                // lecturas y una escritura antes de responder. Sin
+                                                // este feedback inmediato, la pantalla se queda igual
+                                                // que antes de escanear durante ese hueco, y el
+                                                // estudiante asume que la cámara no detectó nada:
+                                                // cierra el escáner y lo vuelve a abrir, cuando en
+                                                // realidad el primer escaneo sí iba en camino
+                                                // (reportado en producción: "parece que no lo lee").
+                                                setQrScanFeedback({ type: 'pending', message: 'QR detectado — registrando...' });
                                                 // phase ausente (QR generado antes de este cambio) se
                                                 // trata como 'checkin', el comportamiento de siempre.
                                                 const result = qrData.phase === 'checkout'
@@ -4437,21 +4449,40 @@
                             // un track que el propio escaneo exitoso ya cerró — no es un
                             // error real que el usuario deba ver.
                             //
-                            // No toda falla acá es realmente de cámara: si el SDK ya
-                            // detectó que la sesión murió (auth.currentUser es null),
-                            // antes esto se mostraba igual como "Error de cámara"
-                            // genérico, sin avisar que en realidad hacía falta volver a
-                            // iniciar sesión (reportado en producción: varios
-                            // estudiantes se quedaban atascados así al escanear el QR
-                            // de salida). OJO: se revisa solo el valor YA conocido de
-                            // auth.currentUser (gratis, sin red) — se probó forzar una
-                            // renovación de token acá (getIdToken(true)) como señal más
-                            // segura, pero esa llamada por sí sola puede fallar por
-                            // cualquier hipo de red ajeno a la sesión, y eso producía
-                            // falsos positivos: cerraba la sesión de gente con la
-                            // sesión perfectamente válida cuyo problema real era otro
-                            // (cámara no soportada, permiso denegado, etc.).
-                            const sessionLost = !auth.currentUser;
+                            // No toda falla acá es realmente de cámara: si la sesión ya
+                            // murió, esto se mostraba antes igual como "Error de
+                            // cámara" genérico, sin avisar que en realidad hacía falta
+                            // volver a iniciar sesión (reportado en producción: varios
+                            // estudiantes se quedaban atascados así al escanear, y solo
+                            // se daban cuenta de que la sesión estaba muerta al
+                            // refrescar la página). Revisar solo `!auth.currentUser`
+                            // (gratis, sin red) no alcanza para detectar esto: ese
+                            // objeto sigue viéndose "activo" en memoria aunque el
+                            // navegador ya haya borrado los datos del sitio en segundo
+                            // plano (típico en iOS tras varios días sin abrir la app) —
+                            // hace falta forzar una renovación de token para
+                            // descubrirlo de verdad. Igual que en el chequeo periódico
+                            // de sesión (más arriba en AppContent), se filtra por
+                            // código de error específico: un hipo de red al renovar el
+                            // token NO significa sesión muerta (probado en carne
+                            // propia, ver el comentario de ese efecto) — solo estos
+                            // códigos confirman, sin ambigüedad, que ya no va a volver
+                            // a ser válida sola.
+                            const AUTH_SESSION_DEATH_CODES = new Set([
+                                'auth/user-token-expired',
+                                'auth/user-disabled',
+                                'auth/user-not-found',
+                                'auth/invalid-user-token',
+                                'auth/user-mismatch',
+                            ]);
+                            let sessionLost = !auth.currentUser;
+                            if (!sessionLost) {
+                                try {
+                                    await auth.currentUser.getIdToken(true);
+                                } catch (tokenError) {
+                                    sessionLost = AUTH_SESSION_DEATH_CODES.has(tokenError.code);
+                                }
+                            }
 
                             if (sessionLost) {
                                 appendQRLog('La sesión ya no es válida — se cierra para volver al login.');
@@ -5211,9 +5242,24 @@
                                                     : qrScanFeedback.type === 'error' ? 'rgba(220, 38, 38, 0.92)' : 'rgba(59, 130, 246, 0.92)'
                                             }}
                                         >
-                                            <div style={{ fontSize: '3.5rem', lineHeight: 1 }}>
-                                                {qrScanFeedback.type === 'success' ? (qrScanFeedback.late ? '⚠️' : '✅') : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'}
-                                            </div>
+                                            {qrScanFeedback.type === 'pending' ? (
+                                                // El spinner global (.spinner) usa tonos azules pensados
+                                                // para fondos claros — aquí el fondo YA es azul sólido,
+                                                // así que se sobreescriben los colores del borde a blanco
+                                                // para que el giro se note.
+                                                <div
+                                                    className="spinner"
+                                                    style={{
+                                                        width: '3rem', height: '3rem', borderWidth: '5px',
+                                                        borderColor: 'rgba(255, 255, 255, 0.35)',
+                                                        borderLeftColor: '#ffffff'
+                                                    }}
+                                                ></div>
+                                            ) : (
+                                                <div style={{ fontSize: '3.5rem', lineHeight: 1 }}>
+                                                    {qrScanFeedback.type === 'success' ? (qrScanFeedback.late ? '⚠️' : '✅') : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'}
+                                                </div>
+                                            )}
                                             <p className="text-white font-semibold text-base">{qrScanFeedback.message}</p>
                                         </div>
                                     )}
