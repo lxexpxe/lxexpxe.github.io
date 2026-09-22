@@ -6012,6 +6012,46 @@
                 }
             };
 
+            // Para cuando el equipo marcó la misión como cumplida pero el
+            // profesor revisa la plataforma académica (Teams/Samán/Moodle) y
+            // la documentación no está. Esto es independiente de la
+            // calificación: NO fuerza crystals a 0 ni cierra la misión — el
+            // profesor sigue pudiendo revisar y asignar los cristales que de
+            // verdad se ganen (ahora o después, con "Registrar revisión"
+            // normal). El campo `penalty` solo se resta del total del
+            // equipo en teamCrystals/phaseCrystals, sin tocar el rango 0-100
+            // de `crystals`, así que las reglas de seguridad no necesitan
+            // cambios. Queda visible tanto en "Envíos pendientes" (profesor)
+            // como en la ficha de la misión (estudiante) hasta que se quite.
+            const markFalsePositive = async (teamId, wk) => {
+                if (!window.confirm('¿Confirmas que la documentación NO está en la plataforma académica? Se aplicará -10 cristales de penalización a este equipo (la misión se sigue pudiendo calificar normalmente).')) {
+                    return;
+                }
+                try {
+                    await db.doc(`artifacts/academic-platform/progress/${teamId}`).update({
+                        [`${wk}.penalty`]: 10
+                    });
+                    toast.showToast('Falso positivo marcado. -10 cristales aplicados.', 'error');
+                } catch (error) {
+                    console.error('Error marcando falso positivo:', error);
+                    toast.showToast('Error marcando falso positivo', 'error');
+                }
+            };
+
+            // Por si el profesor marcó la penalización por error — sin esto
+            // quedaría atascada hasta editar Firestore a mano.
+            const undoFalsePositive = async (teamId, wk) => {
+                try {
+                    await db.doc(`artifacts/academic-platform/progress/${teamId}`).update({
+                        [`${wk}.penalty`]: 0
+                    });
+                    toast.showToast('Penalización retirada.', 'info');
+                } catch (error) {
+                    console.error('Error retirando la penalización:', error);
+                    toast.showToast('Error retirando la penalización', 'error');
+                }
+            };
+
             const publishAnnouncement = async () => {
                 const text = announcementText.trim();
                 if (!text) { toast.showToast('Escribe un texto para el anuncio', 'error'); return; }
@@ -6139,12 +6179,15 @@
             // ===== Helpers compartidos =====
             const teamCrystals = (progress) => {
                 if (!progress) return 0;
-                return Object.values(progress).reduce((sum, wk) => sum + (wk.crystals || 0), 0);
+                return Object.values(progress).reduce((sum, wk) => sum + (wk.crystals || 0) - (wk.penalty || 0), 0);
             };
             const phaseCrystals = (progress, phase) => {
                 if (!progress) return 0;
                 return EXPEDITION_MISSIONS.filter(m => m.phase === phase)
-                    .reduce((sum, m) => sum + ((progress[String(m.wk)] && progress[String(m.wk)].crystals) || 0), 0);
+                    .reduce((sum, m) => {
+                        const entry = progress[String(m.wk)];
+                        return sum + ((entry && entry.crystals) || 0) - ((entry && entry.penalty) || 0);
+                    }, 0);
             };
             const phaseMax = (phase) => EXPEDITION_MISSIONS.filter(m => m.phase === phase).length * EXPEDITION_MAX_PER_MISSION;
             const statusOf = (progress, wk) => (progress && progress[String(wk)] && progress[String(wk)].status) || 'open';
@@ -6439,7 +6482,7 @@
                     Object.entries(progress).forEach(([wk, data]) => {
                         if (data.status === 'submitted') {
                             const mission = EXPEDITION_MISSIONS.find(m => m.wk === Number(wk));
-                            pendingReviews.push({ team, wk: Number(wk), mission, note: data.note, links: data.links || [] });
+                            pendingReviews.push({ team, wk: Number(wk), mission, note: data.note, links: data.links || [], penalty: data.penalty || 0 });
                         }
                     });
                 });
@@ -6542,6 +6585,15 @@
                                                         <span className="text-xl" title="cristales">💎</span>
                                                     </div>
                                                     <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary text-sm">Registrar revisión</button>
+                                                    {item.penalty > 0 ? (
+                                                        <button onClick={() => undoFalsePositive(item.team.id, item.wk)} className="text-xs text-red-500 hover:underline ml-2">
+                                                            🚩 Penalización aplicada (-10) · Quitar
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => markFalsePositive(item.team.id, item.wk)} className="text-xs text-red-500 hover:underline ml-2">
+                                                            🚩 No está en la plataforma — marcar falso positivo (-10)
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))
@@ -6761,6 +6813,12 @@
                                                 <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>{currentEntry.note}</p>
                                             </>
                                         )}
+                                        {currentEntry.penalty > 0 && (
+                                            <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)', border: '1px solid rgba(220, 38, 38, 0.4)' }}>
+                                                <div className="text-xs uppercase font-bold mb-1 text-red-600">⚠️ Penalización — falso positivo</div>
+                                                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>El profesor revisó la plataforma académica y no encontró la documentación. Se aplicó -{currentEntry.penalty} 💎 a tu equipo.</p>
+                                            </div>
+                                        )}
                                         {currentEntry.feedback && (
                                             <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
                                                 <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--accent-color)' }}>Feedback del profesor</div>
@@ -6769,16 +6827,24 @@
                                         )}
                                         <div className="rounded-lg p-4 mt-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
                                             <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--accent-color)' }}>Estado</div>
-                                            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Revisada — {currentEntry.crystals} 💎</p>
+                                            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Revisada — {currentEntry.crystals} 💎{currentEntry.penalty > 0 ? ` (-${currentEntry.penalty} penalización)` : ''}</p>
                                         </div>
                                     </div>
                                 ) : currentEntry.status === 'submitted' ? (
-                                    <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
-                                        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>✅ Misión dada por cumplida</p>
-                                        <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirmó que la documentación ya está subida a la plataforma académica. En espera de revisión del profesor.</p>
-                                        <button onClick={undoMissionConfirmation} disabled={submitting} className="text-xs text-red-500 hover:underline">
-                                            ¿Confirmaron por error? Deshacer confirmación
-                                        </button>
+                                    <div>
+                                        {currentEntry.penalty > 0 && (
+                                            <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)', border: '1px solid rgba(220, 38, 38, 0.4)' }}>
+                                                <div className="text-xs uppercase font-bold mb-1 text-red-600">⚠️ Penalización — falso positivo</div>
+                                                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>El profesor revisó la plataforma académica y no encontró la documentación. Se aplicó -{currentEntry.penalty} 💎 a tu equipo. La misión se sigue calificando normalmente cuando la documentación esté lista.</p>
+                                            </div>
+                                        )}
+                                        <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>✅ Misión dada por cumplida</p>
+                                            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirmó que la documentación ya está subida a la plataforma académica. En espera de revisión del profesor.</p>
+                                            <button onClick={undoMissionConfirmation} disabled={submitting} className="text-xs text-red-500 hover:underline">
+                                                ¿Confirmaron por error? Deshacer confirmación
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div>
@@ -6805,7 +6871,7 @@
                                         ) : (
                                             <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
                                                 <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>¿Seguro?</p>
-                                                <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirma que la documentación ya está subida. Esta acción se puede deshacer después si fue un error.</p>
+                                                <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirma que ya está subida. Un falso positivo se penaliza con -10 cristales.</p>
                                                 <div className="flex gap-3">
                                                     <button onClick={() => setConfirmingMission(false)} disabled={submitting} className="btn btn-secondary text-sm">Cancelar</button>
                                                     <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">Sí, confirmar</button>
