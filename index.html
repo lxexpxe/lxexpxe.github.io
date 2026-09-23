@@ -368,10 +368,10 @@
             if (isOnline) return null;
 
             return (
-                <div style={{
+                <div className="text-sm" style={{
                     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2000,
                     backgroundColor: '#dc2626', color: 'white', textAlign: 'center',
-                    padding: '0.6rem 1rem', fontWeight: 600, fontSize: '0.875rem'
+                    padding: '0.6rem 1rem', fontWeight: 600
                 }}>
                     ⚠️ Sin conexión a internet — nada de lo que hagas ahora se va a guardar hasta que se reconecte
                 </div>
@@ -433,7 +433,7 @@
                     ) : (
                         <>
                             <span className="text-sm" style={{ color: 'var(--text-primary)' }}>📲 Instala esta app para acceso más rápido</span>
-                            <button onClick={handleInstall} className="btn btn-primary text-sm" style={{ padding: '0.4rem 1rem' }}>Instalar</button>
+                            <button onClick={handleInstall} className="btn btn-primary" style={{ padding: '0.4rem 1rem' }}>Instalar</button>
                         </>
                     )}
                     <button onClick={dismiss} className="text-sm" style={{ color: 'var(--text-secondary)' }} title="Cerrar">✕</button>
@@ -805,7 +805,7 @@
                     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                     Restablecer Contraseña
                                 </h2>
                                 <ThemeToggle />
@@ -858,7 +858,7 @@
                     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                     Verificar Código
                                 </h2>
                                 <ThemeToggle />
@@ -921,7 +921,7 @@
                 <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <div className="card rounded-2xl p-8 w-full max-w-md animate-fadeIn">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                            <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                                 {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
                             </h2>
                             <ThemeToggle />
@@ -1051,7 +1051,7 @@
 
                                 {isLogin && (
                                     <button
-                                        className="btn btn-secondary w-full text-sm"
+                                        className="btn btn-secondary w-full"
                                         type="button"
                                         onClick={() => setShowPasswordReset(true)}
                                     >
@@ -1101,6 +1101,11 @@
             const [showQRTeacherWarning, setShowQRTeacherWarning] = React.useState(false);
             const [forceShowTeacherQR, setForceShowTeacherQR] = React.useState(false);
             const [attendanceData, setAttendanceData] = React.useState({});
+            // Índice (dentro de todayRows) que está iluminado mientras corre
+            // el sorteo de "Elegir al azar", y si el sorteo está en curso.
+            const [randomPickIndex, setRandomPickIndex] = React.useState(null);
+            const [randomPickActive, setRandomPickActive] = React.useState(false);
+            const randomPickTimeoutRef = React.useRef(null);
             // Claves "studentId_date" con una acción de asistencia en curso
             // (marcar manual, o cambiar de estado) — mientras una celda está
             // acá, se muestra un spinner en vez del ícono, para que nunca se
@@ -2518,6 +2523,57 @@
                     return new Date(ta) - new Date(tb);
                 });
 
+                // Elige un ganador al azar PRIMERO (Math.random, una sola
+                // vez) — la animación es solo para comunicarlo, el resultado
+                // ya está decidido antes de que empiece a moverse. Cada
+                // destello salta a una posición al azar (nunca la misma dos
+                // veces seguidas) en vez de recorrer la lista en orden, y el
+                // último destello siempre es el ganador. 18 destellos con
+                // delay creciente (120ms al inicio, ~494ms al final) suman
+                // ~5s en total.
+                const startRandomPick = () => {
+                    const n = todayRows.length;
+                    if (n === 0 || randomPickActive) return;
+
+                    const winnerIndex = Math.floor(Math.random() * n);
+                    const totalTicks = 18;
+
+                    const randomIndexExcluding = (excludedList) => {
+                        if (n === 1) return 0;
+                        const excluded = new Set(excludedList);
+                        if (excluded.size >= n) excluded.clear(); // sin margen (n muy chico): relajar
+                        let idx;
+                        do { idx = Math.floor(Math.random() * n); } while (excluded.has(idx));
+                        return idx;
+                    };
+
+                    setRandomPickActive(true);
+                    let lastShown = randomIndexExcluding([]);
+                    setRandomPickIndex(lastShown);
+
+                    let tick = 0;
+                    const runTick = () => {
+                        tick++;
+                        const isLast = tick >= totalTicks - 1;
+                        // En el penúltimo destello se excluye también al
+                        // ganador, para que el salto final a la fila ganadora
+                        // siempre se vea como un salto real y no como "ya
+                        // estaba ahí" por coincidencia.
+                        const isSecondToLast = tick === totalTicks - 2;
+                        lastShown = isLast
+                            ? winnerIndex
+                            : randomIndexExcluding(isSecondToLast ? [lastShown, winnerIndex] : [lastShown]);
+                        setRandomPickIndex(lastShown);
+                        if (!isLast) {
+                            randomPickTimeoutRef.current = setTimeout(runTick, 120 + tick * 22);
+                        } else {
+                            setRandomPickActive(false);
+                            toast.showToast(`Estudiante elegido: ${todayRows[winnerIndex].checkin?.studentName || 'Estudiante'}`, 'success');
+                        }
+                    };
+                    randomPickTimeoutRef.current = setTimeout(runTick, 120);
+                };
+
                 const formatDateMmmDD = (dateStr) => {
                     const date = new Date(dateStr + 'T00:00:00');
                     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -2534,13 +2590,22 @@
                     return `${months[date.getMonth()]}-${String(date.getDate()).padStart(2, '0')}-${year}`;
                 };
 
+                // Formato 24h sin segundos (ej. "14:07") — hour12:false fuerza
+                // 24h sin importar el locale del navegador; al no pedir
+                // "second" tampoco se incluye.
+                const formatTime24 = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
                 return (
                     <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
-                        <div className="max-w-6xl mx-auto">
-                            <div className="card rounded-xl p-6 mb-6">
-                                <div className="flex justify-end items-center mb-4">
+                        <div className="w-full">
+                            <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <h1 className="text-2xl font-bold">Control de Asistencia</h1>
                                     <button
                                         onClick={() => {
+                                            clearTimeout(randomPickTimeoutRef.current);
+                                            setRandomPickActive(false);
+                                            setRandomPickIndex(null);
                                             setShowAttendance(false);
                                             setForceShowTeacherQR(false);
                                             setShowQRTeacherWarning(false);
@@ -2552,22 +2617,12 @@
                                         ← Volver
                                     </button>
                                 </div>
+                            </header>
 
+                            <div className="card rounded-xl p-6 mb-6">
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="flex flex-col items-center">
-                                        <h2 className="text-2xl font-bold mb-2">Control de Asistencia</h2>
-                                        <p className="text-2xl font-bold mb-4" style={{ color: 'var(--accent-color)' }}>{selectedCourse.name}</p>
-                                        <h3 className="font-semibold mb-2">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
-                                        <div className="mb-4 text-center">
-                                            <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>Generar para otra fecha (clase anterior)</label>
-                                            <input
-                                                type="date"
-                                                className="input-field text-sm py-1 px-2 rounded-lg"
-                                                value={qrDateOverride || today}
-                                                max={today}
-                                                onChange={(e) => e.target.value && changeQrDate(e.target.value)}
-                                            />
-                                        </div>
+                                        <p className="text-2xl font-bold mb-4" style={{ color: qrMode === 'late' ? '#fb923c' : qrMode === 'checkout' ? '#3b82f6' : '#22c55e' }}>{selectedCourse.name}</p>
 
                                         {qrTeacherVisible ? (
                                             <>
@@ -2583,7 +2638,6 @@
                                                 >
                                                     <div ref={qrCodeRef}></div>
                                                 </div>
-                                                <p className="text-sm text-gray-600 mt-2 mb-2">Escanea desde cualquier distancia</p>
                                                 {/* Selección directa (no un toggle): el botón del modo activo
                                                     queda relleno de su color, los otros dos solo delineados —
                                                     así el color de cada uno (verde/naranja/azul) es visible
@@ -2591,7 +2645,7 @@
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => selectQrMode('on-time')}
-                                                        className="btn text-sm"
+                                                        className="btn"
                                                         style={qrMode === 'on-time'
                                                             ? { backgroundColor: '#22c55e', color: 'white', border: '2px solid #22c55e' }
                                                             : { backgroundColor: 'transparent', color: '#22c55e', border: '2px solid #22c55e' }}
@@ -2601,7 +2655,7 @@
                                                     </button>
                                                     <button
                                                         onClick={() => selectQrMode('late')}
-                                                        className="btn text-sm"
+                                                        className="btn"
                                                         style={qrMode === 'late'
                                                             ? { backgroundColor: '#fb923c', color: 'white', border: '2px solid #fb923c' }
                                                             : { backgroundColor: 'transparent', color: '#fb923c', border: '2px solid #fb923c' }}
@@ -2611,7 +2665,7 @@
                                                     </button>
                                                     <button
                                                         onClick={() => selectQrMode('checkout')}
-                                                        className="btn text-sm"
+                                                        className="btn"
                                                         style={qrMode === 'checkout'
                                                             ? { backgroundColor: '#3b82f6', color: 'white', border: '2px solid #3b82f6' }
                                                             : { backgroundColor: 'transparent', color: '#3b82f6', border: '2px solid #3b82f6' }}
@@ -2619,6 +2673,17 @@
                                                     >
                                                         🔵 QR Salida
                                                     </button>
+                                                </div>
+
+                                                <h3 className="font-semibold mb-2 mt-4">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
+                                                <div className="text-center">
+                                                    <input
+                                                        type="date"
+                                                        className="input-field text-sm py-1 px-2 rounded-lg"
+                                                        value={qrDateOverride || today}
+                                                        max={today}
+                                                        onChange={(e) => e.target.value && changeQrDate(e.target.value)}
+                                                    />
                                                 </div>
                                             </>
                                         ) : (
@@ -2635,7 +2700,7 @@
                                                         setQrMode('on-time');
                                                         setTimeout(() => generateTodayQR('on-time', qrDateOverride), 100);
                                                     }}
-                                                    className="btn btn-primary text-sm"
+                                                    className="btn btn-primary"
                                                 >
                                                     Mostrar QR
                                                 </button>
@@ -2644,30 +2709,51 @@
                                     </div>
 
                                     <div className="flex flex-col h-full min-h-0">
-                                        <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center justify-between mb-4 gap-2">
                                             <h3 className="font-semibold">Asistencia de Hoy</h3>
-                                            {attendanceData[today] === undefined && (
-                                                <button
-                                                    onClick={createTodayAttendanceRecord}
-                                                    disabled={creatingTodayRecord}
-                                                    className="btn btn-secondary text-xs px-3 py-1"
-                                                    title="Crea el registro de hoy en la tabla de asistencia sin esperar el primer escaneo"
-                                                >
-                                                    {creatingTodayRecord ? 'Creando...' : '+ Crear día de hoy'}
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {todayRows.length > 0 && (
+                                                    <button
+                                                        onClick={startRandomPick}
+                                                        disabled={randomPickActive}
+                                                        className="btn btn-secondary px-3 py-1"
+                                                        style={{ border: 'none' }}
+                                                        title="Recorre la lista al azar durante unos segundos y se detiene en un estudiante"
+                                                    >
+                                                        {randomPickActive ? 'Sorteando...' : '🎲 Elegir al azar'}
+                                                    </button>
+                                                )}
+                                                {attendanceData[today] === undefined && (
+                                                    <button
+                                                        onClick={createTodayAttendanceRecord}
+                                                        disabled={creatingTodayRecord}
+                                                        className="btn btn-secondary px-3 py-1"
+                                                        title="Crea el registro de hoy en la tabla de asistencia sin esperar el primer escaneo"
+                                                    >
+                                                        {creatingTodayRecord ? 'Creando...' : '+ Crear día de hoy'}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="bg-gray-50 rounded-lg p-4 flex-1 min-h-0 overflow-y-auto">
                                             {todayRows.length > 0 ? (
-                                                <ul className="space-y-2">
-                                                    {todayRows.map(({ studentId, checkin, status }) => (
-                                                        <li key={studentId} className="flex items-center gap-2 text-sm">
+                                                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                                    {todayRows.map(({ studentId, checkin, status }, rowIndex) => (
+                                                        <li
+                                                            key={studentId}
+                                                            className="flex items-center gap-2 text-xs rounded-lg px-2 py-1"
+                                                            style={randomPickIndex === rowIndex ? {
+                                                                backgroundColor: 'var(--accent-color)',
+                                                                color: 'white',
+                                                                transition: 'background-color 0.1s ease'
+                                                            } : { transition: 'background-color 0.1s ease' }}
+                                                        >
                                                             <span title={status === 'incomplete' ? 'Falta escanear el QR de salida' : ''}>
                                                                 {status === 'late' ? '🟠' : status === 'ontime' ? '🟢' : '🔴'}
                                                             </span>
-                                                            <span>{checkin?.studentName || 'Estudiante'}</span>
-                                                            <span className="text-xs text-gray-500">
-                                                                ({checkin?.timestamp ? new Date(checkin.timestamp?.toDate ? checkin.timestamp.toDate() : checkin.timestamp).toLocaleTimeString() : '—'})
+                                                            <span className="truncate min-w-0">{checkin?.studentName || 'Estudiante'}</span>
+                                                            <span className="text-xs ml-auto text-right flex-shrink-0" style={{ color: randomPickIndex === rowIndex ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary, #6b7280)' }}>
+                                                                ({checkin?.timestamp ? formatTime24(new Date(checkin.timestamp?.toDate ? checkin.timestamp.toDate() : checkin.timestamp)) : '—'})
                                                             </span>
                                                         </li>
                                                     ))}
@@ -3202,7 +3288,7 @@
                                             ))}
                                             <button
                                                 onClick={() => setWeekContent({ ...weekContent, activities: [...(weekContent.activities || ['']), ''] })}
-                                                className="btn btn-secondary text-sm"
+                                                className="btn btn-secondary"
                                             >
                                                 + Agregar Actividad
                                             </button>
@@ -3378,7 +3464,7 @@
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
-                                <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
+                                <h1 className="text-2xl font-bold mb-2">Panel de Administración</h1>
                                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                     Profesor: {currentUser.email}
                                 </p>
@@ -3429,7 +3515,7 @@
 
                     {/* Pills de cursos */}
                     <div className="card rounded-xl p-6 mb-6">
-                        <h2 className="text-xl font-bold mb-4">Mis Cursos</h2>
+                        <h2 className="text-2xl font-bold mb-4">Mis Cursos</h2>
                         <div className="flex flex-wrap gap-3">
                             {sortCoursesBySchedule(courses).map(course => (
                                 <div key={course.id} className="relative group">
@@ -3470,21 +3556,21 @@
                             {/* Vista de contenido del curso */}
                             <div className="card rounded-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold">{selectedCourse.name}</h2>
+                                    <h2 className="text-2xl font-bold">{selectedCourse.name}</h2>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => {
                                                 setNewSemesterPeriod(selectedCourse.period || '');
                                                 setShowNewSemesterConfirm(true);
                                             }}
-                                            className="btn btn-secondary text-sm"
+                                            className="btn btn-secondary"
                                             title="Archiva el historial de asistencia y reinicia la tabla para un semestre nuevo"
                                         >
                                             🆕 Nuevo Semestre
                                         </button>
                                         <button
                                             onClick={() => editWeekContent(0)}
-                                            className="btn btn-secondary text-sm"
+                                            className="btn btn-secondary"
                                         >
                                             ✏️ Editar Información General
                                         </button>
@@ -3522,7 +3608,7 @@
 
                             <div className="card rounded-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold">Estudiantes Registrados ({students.length})</h2>
+                                    <h2 className="text-2xl font-bold">Estudiantes Registrados ({students.length})</h2>
                                     <div className="flex items-center gap-4">
                                         {pendingStudents.length > 0 && (
                                             <button
@@ -3543,14 +3629,14 @@
                                                 setShowRanking(!showRanking);
                                                 setShowPendingStudents(false);
                                             }}
-                                            className="btn btn-secondary text-sm"
+                                            className="btn btn-secondary"
                                         >
                                             {showRanking ? '👥 Vista Normal' : '🏆 Ver Ranking'}
                                         </button>
                                         {!showPendingStudents && !showRanking && students.length > 0 && (
                                             <button
                                                 onClick={removeAllStudents}
-                                                className="btn btn-secondary text-sm bg-red-100 text-red-800 hover:bg-red-200"
+                                                className="btn btn-secondary bg-red-100 text-red-800 hover:bg-red-200"
                                             >
                                                 🗑️ Remover Todos
                                             </button>
@@ -3801,7 +3887,7 @@
                                                 <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center font-bold">
                                                     {previewContent.week}
                                                 </div>
-                                                <h3 className="text-xl font-bold">{previewContent.title}</h3>
+                                                <h3 className="text-lg font-bold">{previewContent.title}</h3>
                                             </div>
                                             <p className="text-blue-100 text-sm">Vista previa del contenido semanal</p>
                                         </div>
@@ -5119,7 +5205,7 @@
                     <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
-                                <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                                <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                                     {courseInfo?.name || 'Cargando...'}
                                 </h1>
 
@@ -5206,7 +5292,7 @@
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className="card rounded-xl p-6 w-full max-w-md">
                                 <div className="flex items-start gap-3 mb-4">
-                                    <div className="text-4xl">🕐</div>
+                                    <div className="text-3xl">🕐</div>
                                     <div>
                                         <h3 className="text-lg font-bold">No es la hora de clase</h3>
                                         <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -5217,7 +5303,7 @@
 
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                                     <p className="text-sm font-semibold text-red-900 mb-2">⏰ Hora actual:</p>
-                                    <p className="text-lg font-bold text-red-700">{new Date().toLocaleTimeString()}</p>
+                                    <p className="text-lg font-bold text-red-700">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
                                 </div>
 
                                 {selectedCourse?.courseSchedule && (
@@ -5309,7 +5395,7 @@
                                                     {qrScanFeedback.type === 'success' ? (qrScanFeedback.late ? '⚠️' : '✅') : qrScanFeedback.type === 'error' ? '❌' : 'ℹ️'}
                                                 </div>
                                             )}
-                                            <p className="text-white font-semibold text-base">{qrScanFeedback.message}</p>
+                                            <p className="text-white font-semibold text-lg">{qrScanFeedback.message}</p>
                                         </div>
                                     )}
                                 </div>
@@ -6510,16 +6596,18 @@
             };
 
             const header = (
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🧭 Expedición Doble Diamante</h1>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{courseName} · Diseño e investigación en 12 semanas</p>
+                <header className="card rounded-xl p-6 mb-8 animate-fadeIn">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex-1">
+                            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🧭 Expedición Doble Diamante</h1>
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{courseName} · Diseño e investigación en 12 semanas</p>
+                        </div>
+                        <button onClick={onBack} className="btn btn-secondary">
+                            <span className="hidden sm:inline">← Volver</span>
+                            <span className="sm:hidden">←</span>
+                        </button>
                     </div>
-                    <button onClick={onBack} className="btn btn-secondary">
-                        <span className="hidden sm:inline">← Volver</span>
-                        <span className="sm:hidden">←</span>
-                    </button>
-                </div>
+                </header>
             );
 
             // ================= VISTA PROFESOR =================
@@ -6631,9 +6719,9 @@
                                                                 <option key={v} value={v}>{v}</option>
                                                             ))}
                                                         </select>
-                                                        <span className="text-xl" title="cristales">💎</span>
+                                                        <span className="text-lg" title="cristales">💎</span>
                                                     </div>
-                                                    <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary text-sm">Registrar revisión</button>
+                                                    <button onClick={() => gradeSubmission(item.team.id, item.wk)} className="btn btn-primary">Registrar revisión</button>
                                                     {item.penalty > 0 ? (
                                                         <button onClick={() => undoFalsePositive(item.team.id, item.wk)} className="text-xs text-red-500 hover:underline ml-2">
                                                             🚩 Penalización aplicada (-10) · Quitar
@@ -6661,7 +6749,7 @@
                                                 value={newTeamName}
                                                 onChange={(e) => setNewTeamName(e.target.value)}
                                             />
-                                            <button onClick={createTeam} className="btn btn-primary text-sm whitespace-nowrap">+ Crear equipo</button>
+                                            <button onClick={createTeam} className="btn btn-primary whitespace-nowrap">+ Crear equipo</button>
                                         </div>
 
                                         <h3 className="text-sm font-bold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>Roster de {courseName}</h3>
@@ -6744,7 +6832,7 @@
                                                                     value={emailToAdd[team.id] || ''}
                                                                     onChange={(e) => setEmailToAdd(prev => ({ ...prev, [team.id]: e.target.value }))}
                                                                 />
-                                                                <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary text-xs px-3">+ 📩</button>
+                                                                <button onClick={() => addMemberByEmail(team.id)} className="btn btn-secondary px-3">+ 📩</button>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -6766,7 +6854,7 @@
                                             value={announcementText}
                                             onChange={(e) => setAnnouncementText(e.target.value)}
                                         ></textarea>
-                                        <button onClick={publishAnnouncement} className="btn btn-primary text-sm">Enviar transmisión</button>
+                                        <button onClick={publishAnnouncement} className="btn btn-primary">Enviar transmisión</button>
                                     </div>
                                     <div className="card rounded-xl p-6">
                                         <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Historial</h2>
@@ -6814,7 +6902,7 @@
                         {header}
                         <div className="mb-2">
                             <span className="text-xs uppercase font-mono" style={{ color: 'var(--text-secondary)' }}>Tripulación</span>
-                            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{myTeam.name}</h2>
+                            <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{myTeam.name}</h2>
                         </div>
 
                         {renderJourney(myProgress, setActiveWeek)}
@@ -6913,7 +7001,7 @@
                                             <button
                                                 onClick={() => setConfirmingMission(true)}
                                                 disabled={!missionConfirmed || submitting}
-                                                className="btn btn-primary text-sm"
+                                                className="btn btn-primary"
                                             >
                                                 Dar misión por cumplida
                                             </button>
@@ -6922,8 +7010,8 @@
                                                 <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>¿Seguro?</p>
                                                 <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>Tu equipo confirma que ya está subida. Un falso positivo se penaliza con -10 cristales.</p>
                                                 <div className="flex gap-3">
-                                                    <button onClick={() => setConfirmingMission(false)} disabled={submitting} className="btn btn-secondary text-sm">Cancelar</button>
-                                                    <button onClick={submitMission} disabled={submitting} className="btn btn-primary text-sm">Sí, confirmar</button>
+                                                    <button onClick={() => setConfirmingMission(false)} disabled={submitting} className="btn btn-secondary">Cancelar</button>
+                                                    <button onClick={submitMission} disabled={submitting} className="btn btn-primary">Sí, confirmar</button>
                                                 </div>
                                             </div>
                                         )}
@@ -6933,7 +7021,7 @@
 
                             <div>
                                 <div className="card rounded-xl p-6 mb-4 text-center">
-                                    <div className="text-3xl font-bold" style={{ color: 'var(--accent-color)' }}>{crystalsTotal} 💎</div>
+                                    <div className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>{crystalsTotal} 💎</div>
                                     <div className="text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>cristales de insight</div>
                                     <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                                         <div className="h-2 rounded-full" style={{ width: `${Math.min(100, Math.round((crystalsTotal / totalMax) * 100))}%`, backgroundColor: 'var(--accent-color)' }}></div>
