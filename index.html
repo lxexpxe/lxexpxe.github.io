@@ -2681,12 +2681,7 @@
                             </div>
 
                             <div className="card rounded-xl p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-semibold">Historial de Asistencia</h3>
-                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                        🟢 A tiempo · 🟠 Tarde · 🔴 Sin salida registrada · - Ausente — clic para cambiar · fila resaltada: 3-4 inasistencias/incompletas en naranja, 5+ en rojo
-                                    </p>
-                                </div>
+                                <h3 className="font-semibold mb-4">Historial de Asistencia</h3>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead>
@@ -2712,19 +2707,25 @@
                                                     attendanceData[date]?.some(record => record.studentId === student.id)
                                                 ).length;
 
-                                                // Ausencias reales + días con llegada pero sin salida
+                                                // Ausencias reales + llegadas tarde + días sin salida
                                                 // validada, contadas sobre TODO el historial (no solo
                                                 // las últimas 10 fechas visibles) — igual que "Total".
                                                 // Esto NO cambia qué cuenta como "asistencia completa"
-                                                // en cada celda ni en el Total: un 🔴 sigue siendo
-                                                // asistencia, solo también suma para este resaltado.
-                                                const problemCount = dates.filter(date => {
+                                                // en cada celda ni en el Total: un 🟠/🔴 sigue siendo
+                                                // asistencia, solo también suma (diluido) para este
+                                                // resaltado — 3 llegadas tarde o 2 sin salida equivalen
+                                                // a 1 ausencia, una ausencia real siempre cuenta completa.
+                                                const statusCounts = dates.reduce((acc, date) => {
                                                     const s = getAttendanceStatus(attendanceData[date], student.id);
-                                                    return s === 'absent' || s === 'incomplete';
-                                                }).length;
-                                                const rowBg = problemCount >= 5
+                                                    acc[s] = (acc[s] || 0) + 1;
+                                                    return acc;
+                                                }, {});
+                                                const problemCount = (statusCounts.absent || 0)
+                                                    + Math.floor((statusCounts.late || 0) / 3)
+                                                    + Math.floor((statusCounts.incomplete || 0) / 2);
+                                                const rowBg = problemCount >= 4
                                                     ? 'rgba(239, 68, 68, 0.15)'
-                                                    : problemCount >= 3
+                                                    : problemCount >= 2
                                                         ? 'rgba(251, 146, 60, 0.15)'
                                                         : undefined;
 
