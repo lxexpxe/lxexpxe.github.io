@@ -1121,6 +1121,11 @@
             const [creatingTodayRecord, setCreatingTodayRecord] = React.useState(false);
             // 'on-time' | 'late' | 'checkout' — qué QR se está mostrando ahora mismo.
             const [qrMode, setQrMode] = React.useState('on-time');
+            // null = generar el QR para hoy; con una fecha (YYYY-MM-DD) se
+            // genera para ese día en concreto — para reabrir asistencia de
+            // una clase anterior (p. ej. alguien tuvo un problema técnico y
+            // no alcanzó a escanear).
+            const [qrDateOverride, setQrDateOverride] = React.useState(null);
             const qrCodeRef = React.useRef(null);
             const [weekContent, setWeekContent] = React.useState({
                 title: '',
@@ -1526,12 +1531,12 @@
                 loadStudents();
             };
 
-            const generateTodayQR = (mode = 'on-time') => {
+            const generateTodayQR = (mode = 'on-time', dateStr = null) => {
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const qrData = JSON.stringify({
                     courseId: selectedCourse.id,
-                    date: today,
+                    date: dateStr || today,
                     professorId: currentUser.uid,
                     phase: mode === 'checkout' ? 'checkout' : 'checkin',
                     late: mode === 'late'
@@ -1561,21 +1566,24 @@
                 }, 100);
             };
 
-            // Alterna el QR entre "a tiempo" y "llegada tarde". Si el QR de
-            // salida estaba activo, este botón lo regresa a modo de llegada
-            // (a tiempo) — es el "reset" natural desde ese modo.
-            const toggleQrLateMode = () => {
-                const next = qrMode === 'on-time' ? 'late' : 'on-time';
-                setQrMode(next);
-                generateTodayQR(next);
+            // Selección directa entre los 3 modos de QR (Entrada/Tardío/
+            // Salida) — cada botón elige su modo sin importar cuál estaba
+            // activo antes, a diferencia del toggle de dos estados de antes.
+            const selectQrMode = (mode) => {
+                setQrMode(mode);
+                generateTodayQR(mode, qrDateOverride);
             };
 
-            // Alterna el QR entre modo de llegada (a tiempo/tarde, lo que sea
-            // que estuviera activo antes) y modo de salida.
-            const toggleQrCheckoutMode = () => {
-                const next = qrMode === 'checkout' ? 'on-time' : 'checkout';
-                setQrMode(next);
-                generateTodayQR(next);
+            // Cambiar la fecha del QR siempre vuelve a modo "a tiempo": dejar
+            // "tarde" o "salida" activo al saltar a otro día generaría un QR
+            // con esa marca sin que sea evidente a simple vista.
+            const changeQrDate = (dateStr) => {
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                const override = dateStr === today ? null : dateStr;
+                setQrDateOverride(override);
+                setQrMode('on-time');
+                generateTodayQR('on-time', override);
             };
 
             // Estado de asistencia de un estudiante en una fecha, a partir de
@@ -2536,6 +2544,8 @@
                                             setShowAttendance(false);
                                             setForceShowTeacherQR(false);
                                             setShowQRTeacherWarning(false);
+                                            setQrDateOverride(null);
+                                            setQrMode('on-time');
                                         }}
                                         className="btn btn-secondary"
                                     >
@@ -2547,7 +2557,17 @@
                                     <div className="flex flex-col items-center">
                                         <h2 className="text-2xl font-bold mb-2">Control de Asistencia</h2>
                                         <p className="text-2xl font-bold mb-4" style={{ color: 'var(--accent-color)' }}>{selectedCourse.name}</p>
-                                        <h3 className="font-semibold mb-4">QR de hoy ({formatDateMmmDDYY(today)})</h3>
+                                        <h3 className="font-semibold mb-2">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
+                                        <div className="mb-4 text-center">
+                                            <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>Generar para otra fecha (clase anterior)</label>
+                                            <input
+                                                type="date"
+                                                className="input-field text-sm py-1 px-2 rounded-lg"
+                                                value={qrDateOverride || today}
+                                                max={today}
+                                                onChange={(e) => e.target.value && changeQrDate(e.target.value)}
+                                            />
+                                        </div>
 
                                         {qrTeacherVisible ? (
                                             <>
@@ -2558,31 +2578,46 @@
                                                             ? '4px solid #3b82f6'
                                                             : qrMode === 'late'
                                                                 ? '4px solid #fb923c'
-                                                                : '4px solid #f0f0f0'
+                                                                : '4px solid #22c55e'
                                                     }}
                                                 >
                                                     <div ref={qrCodeRef}></div>
                                                 </div>
-                                                <p className="text-sm text-gray-600 mt-2">Escanea desde cualquier distancia</p>
-                                                <div className={`mt-2 mb-2 text-sm font-semibold px-3 py-1 rounded-full ${qrMode === 'checkout' ? 'bg-blue-100 text-blue-800' : qrMode === 'late' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}`}>
-                                                    {qrMode === 'checkout' ? '🚪 Modo: QR de salida' : qrMode === 'late' ? '🟠 Modo: Llegada tarde' : '🟢 Modo: A tiempo'}
-                                                </div>
+                                                <p className="text-sm text-gray-600 mt-2 mb-2">Escanea desde cualquier distancia</p>
+                                                {/* Selección directa (no un toggle): el botón del modo activo
+                                                    queda relleno de su color, los otros dos solo delineados —
+                                                    así el color de cada uno (verde/naranja/azul) es visible
+                                                    siempre, esté seleccionado o no. */}
                                                 <div className="flex gap-2">
                                                     <button
-                                                        onClick={toggleQrLateMode}
+                                                        onClick={() => selectQrMode('on-time')}
                                                         className="btn text-sm"
-                                                        style={qrMode === 'late' ? {} : { backgroundColor: '#fb923c', color: 'white' }}
-                                                        title="Los estudiantes que escaneen este QR de aquí en adelante quedarán marcados con llegada tarde"
+                                                        style={qrMode === 'on-time'
+                                                            ? { backgroundColor: '#22c55e', color: 'white', border: '2px solid #22c55e' }
+                                                            : { backgroundColor: 'transparent', color: '#22c55e', border: '2px solid #22c55e' }}
+                                                        title="QR de llegada a tiempo"
                                                     >
-                                                        {qrMode === 'late' ? '↩️ Volver a a tiempo' : '🕐 QR de llegada tarde'}
+                                                        🟢 QR Entrada
                                                     </button>
                                                     <button
-                                                        onClick={toggleQrCheckoutMode}
+                                                        onClick={() => selectQrMode('late')}
                                                         className="btn text-sm"
-                                                        style={qrMode === 'checkout' ? {} : { backgroundColor: '#3b82f6', color: 'white' }}
+                                                        style={qrMode === 'late'
+                                                            ? { backgroundColor: '#fb923c', color: 'white', border: '2px solid #fb923c' }
+                                                            : { backgroundColor: 'transparent', color: '#fb923c', border: '2px solid #fb923c' }}
+                                                        title="Los estudiantes que escaneen este QR de aquí en adelante quedarán marcados con llegada tarde"
+                                                    >
+                                                        🟠 QR Tardío
+                                                    </button>
+                                                    <button
+                                                        onClick={() => selectQrMode('checkout')}
+                                                        className="btn text-sm"
+                                                        style={qrMode === 'checkout'
+                                                            ? { backgroundColor: '#3b82f6', color: 'white', border: '2px solid #3b82f6' }
+                                                            : { backgroundColor: 'transparent', color: '#3b82f6', border: '2px solid #3b82f6' }}
                                                         title="QR para que los estudiantes registren su salida y completen la asistencia del día"
                                                     >
-                                                        {qrMode === 'checkout' ? '↩️ Volver a QR de llegada' : '🚪 Generar QR de salida'}
+                                                        🔵 QR Salida
                                                     </button>
                                                 </div>
                                             </>
@@ -2598,7 +2633,7 @@
                                                         setForceShowTeacherQR(true);
                                                         setQrTeacherVisible(true);
                                                         setQrMode('on-time');
-                                                        setTimeout(() => generateTodayQR('on-time'), 100);
+                                                        setTimeout(() => generateTodayQR('on-time', qrDateOverride), 100);
                                                     }}
                                                     className="btn btn-primary text-sm"
                                                 >
@@ -4314,23 +4349,36 @@
                                                 // realidad el primer escaneo sí iba en camino
                                                 // (reportado en producción: "parece que no lo lee").
                                                 setQrScanFeedback({ type: 'pending', message: 'QR detectado — registrando...' });
+                                                // Cerrar cámara y modal a los 5s desde que se decodifica
+                                                // el QR, SIN esperar a que el servidor responda. Antes el
+                                                // cierre dependía de la respuesta de registerAttendance/
+                                                // registerCheckout (dos lecturas + una escritura), que en
+                                                // iPhone puede tardar 10s o más con wifi de salón lenta
+                                                // (~2s en Android) — mantener la cámara activa
+                                                // decodificando frames de video durante toda esa espera
+                                                // compite por CPU justo cuando hace falta procesar la
+                                                // respuesta de Firestore, y WebKit decodifica video de
+                                                // forma más pesada que Chrome/Android. El estudiante
+                                                // alcanza a ver "QR detectado" un momento y el modal se
+                                                // cierra solo; la confirmación final llega después como
+                                                // notificación (toast, dura 3s) sin importar si el
+                                                // servidor tardó más que esos 5s.
+                                                setTimeout(() => {
+                                                    html5QrCode.stop().catch(() => {}).finally(() => {
+                                                        setShowQRScanner(false);
+                                                        setQrScanFeedback(null);
+                                                    });
+                                                }, 5000);
                                                 // phase ausente (QR generado antes de este cambio) se
                                                 // trata como 'checkin', el comportamiento de siempre.
                                                 const result = qrData.phase === 'checkout'
                                                     ? await registerCheckout(qrData)
                                                     : await registerAttendance(qrData);
                                                 toast.showToast(result.message, result.type);
-                                                // Confirmación grande sobre la cámara, no solo el toast
-                                                // de esquina: se queda visible ~1.8s (el tiempo que se
-                                                // demora en cerrarse el modal) para que sea imposible de
-                                                // perder mientras el estudiante mira el visor.
+                                                // Si el modal todavía sigue abierto cuando llega la
+                                                // respuesta (red rápida, como en Android), se alcanza a
+                                                // ver el resultado real también ahí, no solo el toast.
                                                 setQrScanFeedback(result);
-                                                setTimeout(() => {
-                                                    html5QrCode.stop().catch(() => {}).finally(() => {
-                                                        setShowQRScanner(false);
-                                                        setQrScanFeedback(null);
-                                                    });
-                                                }, 1800);
                                             } else {
                                                 toast.showToast('QR inválido', 'error');
                                             }
