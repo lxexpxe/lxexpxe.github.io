@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="15a8949">
+    <meta name="app-version" content="f9dd79c">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -2581,16 +2581,9 @@ function AdminDashboard({
       className: "text-gray-500 text-center"
     }, "A\xFAn no hay asistencias registradas hoy"))))), /*#__PURE__*/React.createElement("div", {
       className: "card rounded-xl p-6"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center justify-between mb-4"
     }, /*#__PURE__*/React.createElement("h3", {
-      className: "font-semibold"
-    }, "Historial de Asistencia"), /*#__PURE__*/React.createElement("p", {
-      className: "text-xs",
-      style: {
-        color: 'var(--text-secondary)'
-      }
-    }, "\uD83D\uDFE2 A tiempo \xB7 \uD83D\uDFE0 Tarde \xB7 \uD83D\uDD34 Sin salida registrada \xB7 - Ausente \u2014 clic para cambiar \xB7 fila resaltada: 3-4 inasistencias/incompletas en naranja, 5+ en rojo")), /*#__PURE__*/React.createElement("div", {
+      className: "font-semibold mb-4"
+    }, "Historial de Asistencia"), /*#__PURE__*/React.createElement("div", {
       className: "overflow-x-auto"
     }, /*#__PURE__*/React.createElement("table", {
       className: "w-full text-xs"
@@ -2613,17 +2606,21 @@ function AdminDashboard({
     }, "Total"))), /*#__PURE__*/React.createElement("tbody", null, sortedStudents.map(student => {
       const attendanceCount = dates.filter(date => attendanceData[date]?.some(record => record.studentId === student.id)).length;
 
-      // Ausencias reales + días con llegada pero sin salida
+      // Ausencias reales + llegadas tarde + días sin salida
       // validada, contadas sobre TODO el historial (no solo
       // las últimas 10 fechas visibles) — igual que "Total".
       // Esto NO cambia qué cuenta como "asistencia completa"
-      // en cada celda ni en el Total: un 🔴 sigue siendo
-      // asistencia, solo también suma para este resaltado.
-      const problemCount = dates.filter(date => {
+      // en cada celda ni en el Total: un 🟠/🔴 sigue siendo
+      // asistencia, solo también suma (diluido) para este
+      // resaltado — 3 llegadas tarde o 2 sin salida equivalen
+      // a 1 ausencia, una ausencia real siempre cuenta completa.
+      const statusCounts = dates.reduce((acc, date) => {
         const s = getAttendanceStatus(attendanceData[date], student.id);
-        return s === 'absent' || s === 'incomplete';
-      }).length;
-      const rowBg = problemCount >= 5 ? 'rgba(239, 68, 68, 0.15)' : problemCount >= 3 ? 'rgba(251, 146, 60, 0.15)' : undefined;
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {});
+      const problemCount = (statusCounts.absent || 0) + Math.floor((statusCounts.late || 0) / 3) + Math.floor((statusCounts.incomplete || 0) / 2);
+      const rowBg = problemCount >= 4 ? 'rgba(239, 68, 68, 0.15)' : problemCount >= 2 ? 'rgba(251, 146, 60, 0.15)' : undefined;
       return /*#__PURE__*/React.createElement("tr", {
         key: student.id,
         className: "border-b hover:bg-gray-50",
