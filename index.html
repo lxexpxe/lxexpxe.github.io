@@ -5954,6 +5954,9 @@
             const [openTeamsBubbleWk, setOpenTeamsBubbleWk] = React.useState(null);
             const [teamsBubblePosition, setTeamsBubblePosition] = React.useState(null);
             const teamsMapContainerRef = React.useRef(null);
+            // Círculo grande (misión) -> modal con descripción y entregables.
+            // Círculo pequeño rojo (contador de equipos) -> globo con nombres.
+            const [openMissionModalWk, setOpenMissionModalWk] = React.useState(null);
 
             // El globo usa position:fixed (coordenadas de pantalla) para no
             // quedar recortado por el overflow:hidden del mapa — pero eso
@@ -6494,6 +6497,9 @@
                     setOpenTeamsBubbleWk(wk);
                 };
 
+                const openMission = openMissionModalWk ? EXPEDITION_MISSIONS.find(m => m.wk === openMissionModalWk) : null;
+                const openMissionPhase = openMission ? EXPEDITION_PHASES[openMission.phase] : null;
+
                 return (
                     <div ref={teamsMapContainerRef} className="mb-6 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-color)', position: 'relative' }}>
                         <svg viewBox={`0 0 1200 ${mapH}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
@@ -6536,28 +6542,29 @@
                                 const count = (teamsByMission[m.wk] || []).length;
                                 const hasTeams = count > 0;
                                 return (
-                                    <g
-                                        key={m.wk}
-                                        onClick={() => handleNodeClick(m.wk)}
-                                        className={hasTeams ? 'expedition-node-unlocked' : ''}
-                                        style={{ cursor: hasTeams ? 'pointer' : 'default' }}
-                                    >
-                                        <circle
-                                            cx={p.x} cy={p.y} r={nodeR}
-                                            fill={hasTeams ? 'url(#expOverviewNodeBlue)' : 'rgba(255,255,255,0.55)'}
-                                            stroke={hasTeams ? '#1d4ed8' : 'rgba(255,255,255,0.85)'}
-                                            strokeWidth={3 * scale}
-                                        />
-                                        <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fontSize={26 * scale} fontWeight="bold" fill={hasTeams ? '#fff' : 'var(--text-secondary)'}>
-                                            {m.wk}
-                                        </text>
+                                    <g key={m.wk}>
+                                        <g
+                                            onClick={() => setOpenMissionModalWk(m.wk)}
+                                            className={hasTeams ? 'expedition-node-unlocked' : ''}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <circle
+                                                cx={p.x} cy={p.y} r={nodeR}
+                                                fill={hasTeams ? 'url(#expOverviewNodeBlue)' : 'rgba(255,255,255,0.55)'}
+                                                stroke={hasTeams ? '#1d4ed8' : 'rgba(255,255,255,0.85)'}
+                                                strokeWidth={3 * scale}
+                                            />
+                                            <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fontSize={26 * scale} fontWeight="bold" fill={hasTeams ? '#fff' : 'var(--text-secondary)'}>
+                                                {m.wk}
+                                            </text>
+                                        </g>
                                         {hasTeams && (
-                                            <>
+                                            <g onClick={() => handleNodeClick(m.wk)} style={{ cursor: 'pointer' }}>
                                                 <circle cx={p.x + nodeR * 0.72} cy={p.y + nodeR * 0.72} r={nodeR * 0.42} fill="#dc2626" stroke="white" strokeWidth={2 * scale} />
                                                 <text x={p.x + nodeR * 0.72} y={p.y + nodeR * 0.72} textAnchor="middle" dominantBaseline="central" fontSize={16 * scale} fontWeight="bold" fill="#fff">
                                                     {count}
                                                 </text>
-                                            </>
+                                            </g>
                                         )}
                                     </g>
                                 );
@@ -6589,6 +6596,54 @@
                                     borderLeft: '7px solid transparent', borderRight: '7px solid transparent',
                                     borderTop: '7px solid var(--bg-secondary)'
                                 }} />
+                            </div>
+                        )}
+                        {openMission && (
+                            <div
+                                className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
+                                onClick={() => setOpenMissionModalWk(null)}
+                            >
+                                <div
+                                    className="rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col"
+                                    style={{ maxHeight: '85vh', backgroundColor: 'var(--bg-secondary)', boxShadow: '0 20px 50px rgba(0,0,0,0.35)' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="p-6" style={{ background: `linear-gradient(135deg, ${openMissionPhase.color}, ${openMissionPhase.color}aa)` }}>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div>
+                                                <span className="text-xs font-bold uppercase" style={{ color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}>
+                                                    {openMissionPhase.name} · Semana {openMission.wk} · {openMission.code}
+                                                </span>
+                                                <h3 className="text-lg font-bold mt-1" style={{ color: 'white' }}>{openMission.title}</h3>
+                                            </div>
+                                            <button
+                                                onClick={() => setOpenMissionModalWk(null)}
+                                                style={{
+                                                    backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none',
+                                                    borderRadius: '9999px', width: '2rem', height: '2rem', flexShrink: 0, cursor: 'pointer'
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-6" style={{ overflowY: 'auto' }}>
+                                        <p className="italic mb-6" style={{ color: 'var(--text-secondary)' }}>{openMission.objective}</p>
+                                        <h4 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>📋 Tareas</h4>
+                                        <ul className="space-y-2 mb-6">
+                                            {openMission.tasks.map((t, i) => (
+                                                <li key={i} className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                                                    <span className="font-bold" style={{ color: openMissionPhase.color }}>✓</span>
+                                                    <span style={{ color: 'var(--text-primary)' }}>{t}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <div className="rounded-xl p-4" style={{ backgroundColor: `${openMissionPhase.color}1a`, borderLeft: `4px solid ${openMissionPhase.color}` }}>
+                                            <h4 className="font-semibold mb-1" style={{ color: openMissionPhase.color }}>📦 Entregable</h4>
+                                            <p style={{ color: 'var(--text-primary)' }}>{openMission.deliverable}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
