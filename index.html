@@ -5812,89 +5812,225 @@
 
         const EXPEDITION_MISSIONS = [
             { wk: 1, phase: 1, code: 'D1-S1', title: 'Bitácora de Campo y Duelo de Entrevistas', objective: 'Explorar el campus como territorio inexplorado: observar y entrevistar para detectar problemas reales, no inventados.',
+              guideRef: 'Fase 1 → "1. Bitácora de Campo" y "2. Duelo de Entrevistas" (— Semana 1)',
               tasks: [
                 'Recorrer mínimo 3 sectores del campus y registrar 5 problemas observados con foto/video.',
                 'Diseñar un guion de entrevista semiestructurado de 6-8 preguntas abiertas.',
                 'Intercambiar el guion con otro equipo para detectar preguntas dirigidas.',
                 'Realizar mínimo 5 entrevistas usando preguntas abiertas, con consentimiento verbal explicado.'
-              ], deliverable: "Documento 'Bitácora de Campo' + guion de entrevista validado + evidencia visual (fotos/video)." },
+              ],
+              deliverables: [
+                { name: 'Documento "Bitácora de Campo"', checklist: [
+                  'Mínimo 5 problemas observados.',
+                  'Cada uno con: sector del campus, descripción de 2-3 líneas, y foto o video de evidencia.',
+                  'Fecha y hora de cada observación.'
+                ] },
+                { name: 'Guion de entrevista validado', checklist: [
+                  '6 a 8 preguntas abiertas (ninguna de sí/no).',
+                  'Evidencia de que otro equipo lo revisó y qué corrigieron, si aplica.'
+                ] }
+              ] },
             { wk: 2, phase: 1, code: 'D1-S2', title: 'Codificación y Cierre de la Misión Descubrir', objective: 'Transformar las entrevistas crudas en patrones de sentido mediante codificación abierta.',
+              guideRef: 'Fase 1 → "2.2 Análisis preliminar de las entrevistas" (— Semana 2). La Nota de Enfoque Metodológico retoma la actividad de la Introducción.',
               tasks: [
                 'Transcribir las 5 entrevistas, anonimizando a los participantes (E1, E2...).',
                 'Subrayar frases repetidas entre entrevistados y agruparlas en 3-5 códigos/temas.',
                 'Construir una matriz de codificación con la frecuencia de cada tema.',
-                'Redactar la Declaración Oficial de la Misión con el enfoque metodológico (cualitativo/cuantitativo/mixto).'
-              ], deliverable: 'Transcripciones anonimizadas + matriz de codificación + Declaración Oficial de la Misión.' },
+                'Redactar la Nota de Enfoque Metodológico (3-4 líneas) declarando si el proyecto es cualitativo, cuantitativo o mixto.'
+              ],
+              deliverables: [
+                { name: 'Transcripciones anonimizadas', checklist: [
+                  'Texto completo de las 5 entrevistas.',
+                  'Participantes identificados como E1, E2... nunca con nombre real.'
+                ] },
+                { name: 'Matriz de codificación', checklist: [
+                  'Tabla: Código/tema | Frecuencia (N.º de entrevistados que lo mencionaron) | Ejemplo de frase.',
+                  'Mínimo 3 y máximo 5 temas.'
+                ] },
+                { name: 'Nota de Enfoque Metodológico', checklist: [
+                  '3 a 4 líneas indicando si el proyecto es cualitativo, cuantitativo o mixto.',
+                  'Justificación basada en lo que arrojaron las entrevistas (no es una definición de libro, es la decisión de este equipo).'
+                ] }
+              ] },
             { wk: 3, phase: 2, code: 'D2-S1', title: 'Selección del Problema y Árbol de Problemas', objective: 'Convergir en un solo problema, fundamentado en evidencia, y mapear sus causas y consecuencias.',
+              guideRef: 'Fase 2 → "1. Selección y Justificación...", "2. El Reto 5W+H", "3. Creación del Árbol de Problemas" y "4. Planteamiento del Problema" (— Semana 3)',
               tasks: [
                 'Seleccionar el problema con mayor frecuencia/impacto según la matriz de codificación.',
                 'Responder las preguntas 5W+H (Qué, Quién, Dónde, Cuándo, Por qué, Cómo).',
                 'Construir el árbol de problemas: tronco, raíces (causas) y ramas (consecuencias).',
                 'Redactar el planteamiento del problema (contexto, síntomas, causas, consecuencias, situación deseada) sin mencionar soluciones.'
-              ], deliverable: 'Árbol de problemas + planteamiento del problema escrito.' },
+              ],
+              deliverables: [
+                { name: 'Árbol de problemas (diagrama)', checklist: [
+                  'Problema central en el tronco, en una sola frase.',
+                  'Mínimo 3 causas en las raíces.',
+                  'Mínimo 3 consecuencias en las ramas.',
+                  'Puede incluir como anexo las respuestas a las 5W+H que sirvieron de insumo.'
+                ] },
+                { name: 'Planteamiento del problema (documento)', checklist: [
+                  '5 secciones obligatorias, cada una con su título: Contexto, Síntomas, Causas, Consecuencias, Situación deseada.',
+                  'Máximo 1 página.',
+                  'No debe mencionar ninguna solución ni tecnología.'
+                ] }
+              ] },
             { wk: 4, phase: 2, code: 'D2-S2', title: 'Revisión Sistemática de la Literatura', objective: 'Fundamentar el problema con evidencia académica siguiendo un protocolo de búsqueda replicable.',
+              guideRef: 'Fase 2 → "5. Revisión Sistemática de la Literatura" (— Semana 4)',
               tasks: [
                 'Definir 3-5 palabras clave y sus equivalentes en inglés.',
                 'Construir cadenas de búsqueda con operadores booleanos (AND/OR).',
                 'Definir criterios de inclusión/exclusión antes de buscar.',
                 'Buscar en al menos 2 bases de datos académicas y registrar resultados en una bitácora de búsqueda.',
                 'Construir una matriz de síntesis con mínimo 6 fuentes (autor/año, objetivo, metodología, hallazgo, relación con el problema).'
-              ], deliverable: 'Bitácora de búsqueda + matriz de síntesis de literatura.' },
+              ],
+              deliverables: [
+                { name: 'Bitácora de búsqueda', checklist: [
+                  'Tabla: Base de datos | Cadena de búsqueda usada | N.º de resultados | N.º descartados y por qué | N.º incluidos.',
+                  'Mínimo 2 bases de datos académicas distintas.'
+                ] },
+                { name: 'Matriz de síntesis de literatura', checklist: [
+                  'Tabla con mínimo 6 fuentes.',
+                  'Columnas: Autor/Año, Objetivo del estudio, Metodología, Hallazgo clave, Relación con nuestro problema.'
+                ] }
+              ] },
             { wk: 5, phase: 2, code: 'D2-S3', title: 'Pregunta, Objetivos e Hipótesis', objective: 'Convertir el problema fundamentado en una pregunta de investigación clara y objetivos verificables.',
+              guideRef: 'Fase 2 → "6. Formulación de la Pregunta Problema", "7. Definición de Objetivos" y "8. Planteamiento de Hipótesis" (— Semana 5)',
               tasks: [
                 'Formular la pregunta de investigación a partir del planteamiento del problema y la literatura.',
                 'Redactar el objetivo general (responde a la pregunta de forma amplia).',
                 'Redactar 3 objetivos específicos tipo SMART.',
                 'Plantear una hipótesis verificable que responda tentativamente a la pregunta.'
-              ], deliverable: 'Pregunta de investigación + objetivo general + objetivos específicos + hipótesis.' },
+              ],
+              deliverables: [
+                { name: 'Documento único de Pregunta, Objetivos e Hipótesis', checklist: [
+                  'La pregunta de investigación: una sola oración, clara y específica.',
+                  'El objetivo general: una oración que responde a la pregunta de forma amplia.',
+                  '3 objetivos específicos redactados en formato SMART.',
+                  'La hipótesis: una oración verificable (no una pregunta ni un deseo).'
+                ] }
+              ] },
             { wk: 6, phase: 2, code: 'D2-S4', title: 'Justificación y Reto HMW — Cierre del Diamante 1', objective: 'Argumentar por qué vale la pena el proyecto y abrir la puerta a la ideación con una pregunta HMW.',
+              guideRef: 'Fase 2 → "9. Justificación del Proyecto" y "10. Formular preguntas de tipo HMW..." (— Semana 6)',
               tasks: [
                 'Redactar la justificación cubriendo originalidad, importancia, interés y viabilidad.',
                 "Formular al menos 3 preguntas '¿Cómo podríamos...?' (HMW) a partir del problema.",
                 'Seleccionar la pregunta HMW más prometedora, ni muy amplia ni una solución disfrazada.',
-                'Consolidar el Informe de Investigación Formal con todo lo producido en la Fase Definir.'
-              ], deliverable: 'Informe de Investigación Formal completo + pregunta HMW seleccionada.' },
+                'Consolidar la Declaración Oficial de la Misión con todo lo producido en la Fase Definir.'
+              ],
+              deliverables: [
+                { name: 'Declaración Oficial de la Misión (documento maestro)', checklist: [
+                  'Planteamiento del problema (de la Semana 3).',
+                  'Árbol de problemas (de la Semana 3).',
+                  'Bitácora de búsqueda + matriz de síntesis (de la Semana 4).',
+                  'Pregunta, objetivos e hipótesis (de la Semana 5).',
+                  'Justificación redactada en 4 párrafos cortos: originalidad, importancia, interés y viabilidad.'
+                ] },
+                { name: 'Pregunta HMW seleccionada', checklist: [
+                  "Mínimo 3 preguntas HMW candidatas, formuladas como '¿Cómo podríamos...?'.",
+                  'La pregunta elegida, resaltada, con 2-3 líneas explicando por qué se escogió entre las demás.'
+                ] }
+              ] },
             { wk: 7, phase: 3, code: 'D3-S1', title: 'Ideación — Tormenta de Estrellas', objective: 'Generar el mayor número de ideas de solución posibles antes de converger en una.',
+              guideRef: 'Fase 3 → "1. Sesión de Ideación" y "2. Selección de la Idea" (— Semana 7)',
               tasks: [
                 'Cada integrante genera individualmente 10 ideas de solución a la pregunta HMW.',
                 "Compartir en equipo sin criticar (regla 'sí, y además...') y agrupar ideas similares.",
                 "Realizar una ronda de Crazy 8's: 8 variaciones visuales rápidas de una posible solución.",
                 'Evaluar las ideas agrupadas en una matriz de Impacto vs. Factibilidad.'
-              ], deliverable: "Registro de ideación (fotos del brainstorming y Crazy 8's) + matriz de priorización con la idea elegida." },
+              ],
+              deliverables: [
+                { name: 'Registro de ideación', checklist: [
+                  'Evidencia (foto o documento) de la lista individual de 10 ideas de cada integrante.',
+                  'Evidencia de la agrupación de ideas similares (clustering).',
+                  "Las 8 variaciones de la ronda de Crazy 8's."
+                ] },
+                { name: 'Matriz de priorización', checklist: [
+                  'Tabla de Impacto (alto/medio/bajo) vs. Factibilidad (alto/medio/bajo) con todas las ideas agrupadas ubicadas.',
+                  'La idea elegida marcada y justificada en 2-3 líneas.'
+                ] }
+              ] },
             { wk: 8, phase: 3, code: 'D3-S2', title: 'Prototipado Fundamentado', objective: 'Construir un prototipo navegable, respaldando decisiones clave de diseño con literatura puntual.',
+              guideRef: 'Fase 3 → "3. Prototipado" y "4. Retorno a la literatura" (— Semana 8)',
               tasks: [
                 'Construir bocetos o wireframes de las pantallas/interacciones principales.',
                 'Antes de decidir un patrón de interfaz clave, buscar 1-2 referencias de UX/usabilidad que lo respalden.',
                 'Construir un prototipo interactivo navegable (Figma u otra herramienta) de fidelidad media-alta.',
                 'Documentar cada decisión de diseño relevante con su referencia.'
-              ], deliverable: 'Prototipo navegable + documento de decisiones de diseño con referencias.' },
+              ],
+              deliverables: [
+                { name: 'Prototipo navegable', checklist: [
+                  'Enlace a Figma (u otra herramienta) con las pantallas o interacciones principales conectadas y clicables, no solo imágenes estáticas.'
+                ] },
+                { name: 'Documento de decisiones de diseño', checklist: [
+                  'Mínimo 2 decisiones de interfaz clave documentadas.',
+                  'Cada una con su referencia de UX/usabilidad citada (fuente y por qué respalda la decisión).'
+                ] }
+              ] },
             { wk: 9, phase: 3, code: 'D3-S3', title: 'Refinamiento — Cierre del Diamante 2 (parte 1)', objective: 'Pulir el prototipo y dejarlo listo para ser puesto a prueba con usuarios reales.',
+              guideRef: 'Fase 3 → "5. Refinamiento del Prototipo" (— Semana 9)',
               tasks: [
-                'Revisar el prototipo completo en equipo y corregir inconsistencias.',
-                'Verificar que el prototipo resuelve directamente la pregunta HMW seleccionada.',
-                'Preparar una lista de tareas candidatas para las pruebas de usuario de la próxima semana.'
-              ], deliverable: 'Prototipo refinado + lista preliminar de tareas para pruebas de usuario.' },
+                'Revisar el prototipo completo en equipo y corregir inconsistencias (pantallas que no conectan, textos de relleno sin sentido, flujos incompletos).',
+                'Verificar que el prototipo resuelve directamente la pregunta HMW seleccionada en la Semana 6; si se alejó del reto original, corregirlo ahora, no en la Fase 4.',
+                'Preparar una lista preliminar de 3 o más tareas concretas que un usuario real intentará realizar con el prototipo en la Semana 10.'
+              ],
+              deliverables: [
+                { name: 'Prototipo refinado', checklist: [
+                  'Versión corregida del prototipo de la Semana 8, con las inconsistencias resueltas en la revisión de equipo.'
+                ] },
+                { name: 'Lista de tareas para pruebas de usuario', checklist: [
+                  "Mínimo 3 tareas concretas que el usuario deberá intentar realizar en la Semana 10 (ej. 'Haz un pre-pedido para las 12:30 pm')."
+                ] }
+              ] },
             { wk: 10, phase: 4, code: 'D4-S1', title: 'Plan y Ejecución de Pruebas de Usuario', objective: 'Poner el prototipo frente a usuarios reales y recoger evidencia sobre si resuelve el problema.',
+              guideRef: 'Fase 4 → "1. Diseño del Plan de Pruebas de Usuario" y "2. Ejecución de Pruebas" (— Semana 10)',
               tasks: [
                 'Diseñar el protocolo de pruebas: tareas concretas + qué se va a medir (tiempo, éxito/error, satisfacción).',
                 'Pilotear el protocolo con un compañero de otro equipo y ajustar instrucciones ambiguas.',
                 'Ejecutar las pruebas con mínimo 5 usuarios representativos, sin guiarlos durante la tarea.',
                 'Registrar observaciones cualitativas y datos cuantitativos de cada prueba.'
-              ], deliverable: 'Protocolo de pruebas + registro completo de las 5+ pruebas (datos y observaciones).' },
+              ],
+              deliverables: [
+                { name: 'Protocolo de pruebas', checklist: [
+                  'Las tareas definidas + qué se mide en cada una: tiempo, éxito/error, satisfacción (escala 1-5).',
+                  'Evidencia de que el protocolo se piloteó con un compañero de otro equipo antes de las pruebas reales.'
+                ] },
+                { name: 'Registro de pruebas', checklist: [
+                  'Datos de mínimo 5 usuarios: tiempo en tarea, éxito/error, calificación de satisfacción.',
+                  'Observaciones cualitativas de cada prueba (qué dudó, dónde se atascó, qué comentó).'
+                ] }
+              ] },
             { wk: 11, phase: 4, code: 'D4-S2', title: 'Análisis y Contraste de la Hipótesis', objective: 'Cerrar el ciclo investigativo: interpretar los datos y responder si la hipótesis se sostuvo o no.',
+              guideRef: 'Fase 4 → "3. Análisis de Resultados y Contraste de la Hipótesis" y "4. Iteración" (— Semana 11)',
               tasks: [
                 'Organizar los datos cuantitativos en tablas o gráficos simples.',
                 'Agrupar las observaciones cualitativas en patrones recurrentes.',
                 '¿La evidencia apoya, refuta o matiza la hipótesis planteada? Responder explícitamente.',
                 'Proponer al menos 2 ajustes concretos que harían al prototipo en una siguiente iteración.'
-              ], deliverable: 'Informe de análisis con contraste explícito de la hipótesis + ajustes propuestos.' },
+              ],
+              deliverables: [
+                { name: 'Informe de análisis de resultados', checklist: [
+                  'Tabla o gráfico simple con los datos cuantitativos organizados.',
+                  'Patrones cualitativos identificados, agrupados igual que en la codificación de la Semana 2.',
+                  'Respuesta explícita: ¿la hipótesis se apoya, se refuta o se matiza? — con la evidencia que lo sustente.',
+                  'Mínimo 2 ajustes concretos propuestos para una siguiente iteración.'
+                ] }
+              ] },
             { wk: 12, phase: 4, code: 'D4-S3', title: 'Informe Final y Presentación — Fin de la Expedición', objective: 'Comunicar todo el proceso investigativo y de diseño a una audiencia no especializada.',
+              guideRef: 'Fase 4 → "5. Comunicación de Resultados" (— Semana 12)',
               tasks: [
                 'Consolidar el informe final: problema, literatura, pregunta/objetivos/hipótesis, ideación, prototipo, pruebas, hallazgos.',
                 'Preparar una presentación de máximo 10 minutos para el jurado académico.',
                 'Incluir conclusiones, limitaciones del estudio y trabajo futuro.',
                 'Ensayar la presentación en equipo antes de la sesión final.'
-              ], deliverable: 'Informe final consolidado + presentación ante jurado académico.' }
+              ],
+              deliverables: [
+                { name: 'Informe final consolidado', checklist: [
+                  'Todo el proceso: problema, literatura, pregunta/objetivos/hipótesis, ideación, prototipo, pruebas, hallazgos, conclusiones, limitaciones y trabajo futuro.'
+                ] },
+                { name: 'Presentación ante jurado', checklist: [
+                  'Máximo 10 minutos.',
+                  'Cubre los mismos puntos del informe final, de forma resumida y visual (apoyada en diapositivas, no leída del informe).'
+                ] }
+              ] }
         ];
 
         const EXPEDITION_PHASES = {
@@ -6638,9 +6774,18 @@
                                                 </li>
                                             ))}
                                         </ul>
-                                        <div className="rounded-xl p-4" style={{ backgroundColor: `${openMissionPhase.color}1a`, borderLeft: `4px solid ${openMissionPhase.color}` }}>
-                                            <h4 className="font-semibold mb-1" style={{ color: openMissionPhase.color }}>📦 Entregable</h4>
-                                            <p style={{ color: 'var(--text-primary)' }}>{openMission.deliverable}</p>
+                                        <h4 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>📦 Entregables</h4>
+                                        <div className="space-y-3">
+                                            {openMission.deliverables.map((d, i) => (
+                                                <div key={i} className="rounded-xl p-4" style={{ backgroundColor: `${openMissionPhase.color}1a`, borderLeft: `4px solid ${openMissionPhase.color}` }}>
+                                                    <div className="font-semibold mb-1" style={{ color: openMissionPhase.color }}>{d.name}</div>
+                                                    <ul className="list-disc pl-5 space-y-0.5">
+                                                        {d.checklist.map((c, j) => (
+                                                            <li key={j} style={{ color: 'var(--text-primary)' }}>{c}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
@@ -6737,6 +6882,23 @@
                                                 <div className="text-xs uppercase font-mono mb-1" style={{ color: 'var(--text-secondary)' }}>
                                                     {item.team.name} · Semana {item.wk} · {item.mission ? item.mission.title : ''}
                                                 </div>
+                                                {item.mission && (
+                                                    <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)' }}>
+                                                        <div className="text-xs uppercase font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>Entregable esperado</div>
+                                                        <div className="space-y-2">
+                                                            {item.mission.deliverables.map((d, i) => (
+                                                                <div key={i}>
+                                                                    <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{d.name}</div>
+                                                                    <ul className="list-disc pl-5">
+                                                                        {d.checklist.map((c, j) => (
+                                                                            <li key={j} className="text-xs" style={{ color: 'var(--text-secondary)' }}>{c}</li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {item.links.length > 0 ? (
                                                     <ul className="mb-2 list-disc list-inside">
                                                         {item.links.map((link, i) => (
@@ -6968,7 +7130,8 @@
                                     Fase {mission.phase} · {phaseMeta.name} — Semana {mission.wk}
                                 </div>
                                 <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{mission.title}</h3>
-                                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>{mission.objective}</p>
+                                <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>{mission.objective}</p>
+                                <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>📖 Ampliar en la Guía: {mission.guideRef}</p>
                                 <div className="space-y-2 mb-4">
                                     {mission.tasks.map((t, i) => (
                                         <div key={i} className="flex gap-2 text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -6976,9 +7139,18 @@
                                         </div>
                                     ))}
                                 </div>
-                                <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
-                                    <div className="text-xs uppercase font-bold mb-1" style={{ color: 'var(--warning-color, #f59e0b)' }}>Entregable</div>
-                                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{mission.deliverable}</p>
+                                <div className="text-xs uppercase font-bold mb-2" style={{ color: 'var(--warning-color, #f59e0b)' }}>Entregables</div>
+                                <div className="space-y-3 mb-4">
+                                    {mission.deliverables.map((d, i) => (
+                                        <div key={i} className="rounded-lg p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+                                            <div className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{d.name}</div>
+                                            <ul className="list-disc pl-5 space-y-0.5">
+                                                {d.checklist.map((c, j) => (
+                                                    <li key={j} className="text-sm" style={{ color: 'var(--text-primary)' }}>{c}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
                                 </div>
 
                                 {currentEntry.status === 'done' ? (
