@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="5e73e09">
+    <meta name="app-version" content="0405435">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -2653,7 +2653,7 @@ function AdminDashboard({
       className: "flex items-center justify-between mb-4 gap-2"
     }, /*#__PURE__*/React.createElement("h3", {
       className: "font-semibold"
-    }, "Asistencia de Hoy"), /*#__PURE__*/React.createElement("div", {
+    }, "Asistencia de Hoy", todayRows.length > 0 ? ` (${todayRows.length})` : ''), /*#__PURE__*/React.createElement("div", {
       className: "flex items-center gap-2"
     }, todayRows.length > 0 && /*#__PURE__*/React.createElement("button", {
       onClick: startRandomPick,
