@@ -335,6 +335,17 @@
         }
 
         const User = ({ className = '' }) => React.createElement('span', { className }, '👤');
+        // No existe un emoji de QR; este SVG toma el color del texto
+        // (currentColor), así se ve blanco sobre el botón relleno y del color
+        // del borde cuando el botón solo está delineado.
+        const QrIcon = ({ size = 18 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4" />
+            </svg>
+        );
         const LogOut = ({ className = '' }) => React.createElement('span', { className }, '⏻');
         const Loader2 = ({ className = '' }) => React.createElement('div', { className: `spinner ${className}` });
 
@@ -2529,8 +2540,8 @@
                 // destello salta a una posición al azar (nunca la misma dos
                 // veces seguidas) en vez de recorrer la lista en orden, y el
                 // último destello siempre es el ganador. 18 destellos con
-                // delay creciente (120ms al inicio, ~494ms al final) suman
-                // ~5s en total.
+                // delay creciente (95ms al inicio, 375ms al final) suman
+                // ~4s en total.
                 const startRandomPick = () => {
                     const n = todayRows.length;
                     if (n === 0 || randomPickActive) return;
@@ -2565,13 +2576,13 @@
                             : randomIndexExcluding(isSecondToLast ? [lastShown, winnerIndex] : [lastShown]);
                         setRandomPickIndex(lastShown);
                         if (!isLast) {
-                            randomPickTimeoutRef.current = setTimeout(runTick, 120 + tick * 22);
+                            randomPickTimeoutRef.current = setTimeout(runTick, 95 + tick * 17.5);
                         } else {
                             setRandomPickActive(false);
                             toast.showToast(`Estudiante elegido: ${todayRows[winnerIndex].checkin?.studentName || 'Estudiante'}`, 'success');
                         }
                     };
-                    randomPickTimeoutRef.current = setTimeout(runTick, 120);
+                    randomPickTimeoutRef.current = setTimeout(runTick, 95);
                 };
 
                 const formatDateMmmDD = (dateStr) => {
@@ -2626,6 +2637,9 @@
 
                                         {qrTeacherVisible ? (
                                             <>
+                                                {/* El contenedor toma el ancho del cuadro del QR (el hijo más
+                                                    ancho), y la fila de botones se reparte ese ancho por igual. */}
+                                                <div className="flex flex-col items-stretch">
                                                 <div
                                                     className="bg-white p-8 rounded-lg inline-block shadow-lg"
                                                     style={{
@@ -2642,37 +2656,38 @@
                                                     queda relleno de su color, los otros dos solo delineados —
                                                     así el color de cada uno (verde/naranja/azul) es visible
                                                     siempre, esté seleccionado o no. */}
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-2 mt-4 w-full">
                                                     <button
                                                         onClick={() => selectQrMode('on-time')}
-                                                        className="btn"
+                                                        className="btn flex-1 min-w-0 !px-2 whitespace-nowrap inline-flex items-center justify-center gap-2"
                                                         style={qrMode === 'on-time'
                                                             ? { backgroundColor: '#22c55e', color: 'white', border: '2px solid #22c55e' }
                                                             : { backgroundColor: 'transparent', color: '#22c55e', border: '2px solid #22c55e' }}
                                                         title="QR de llegada a tiempo"
                                                     >
-                                                        🟢 QR Entrada
+                                                        <QrIcon /> Entrada
                                                     </button>
                                                     <button
                                                         onClick={() => selectQrMode('late')}
-                                                        className="btn"
+                                                        className="btn flex-1 min-w-0 !px-2 whitespace-nowrap inline-flex items-center justify-center gap-2"
                                                         style={qrMode === 'late'
                                                             ? { backgroundColor: '#fb923c', color: 'white', border: '2px solid #fb923c' }
                                                             : { backgroundColor: 'transparent', color: '#fb923c', border: '2px solid #fb923c' }}
                                                         title="Los estudiantes que escaneen este QR de aquí en adelante quedarán marcados con llegada tarde"
                                                     >
-                                                        🟠 QR Tardío
+                                                        <QrIcon /> Tardío
                                                     </button>
                                                     <button
                                                         onClick={() => selectQrMode('checkout')}
-                                                        className="btn"
+                                                        className="btn flex-1 min-w-0 !px-2 whitespace-nowrap inline-flex items-center justify-center gap-2"
                                                         style={qrMode === 'checkout'
                                                             ? { backgroundColor: '#3b82f6', color: 'white', border: '2px solid #3b82f6' }
                                                             : { backgroundColor: 'transparent', color: '#3b82f6', border: '2px solid #3b82f6' }}
                                                         title="QR para que los estudiantes registren su salida y completen la asistencia del día"
                                                     >
-                                                        🔵 QR Salida
+                                                        <QrIcon /> Salida
                                                     </button>
+                                                </div>
                                                 </div>
 
                                                 <h3 className="font-semibold mb-2 mt-4">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
