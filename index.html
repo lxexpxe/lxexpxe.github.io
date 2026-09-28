@@ -2710,7 +2710,7 @@
 
                                     <div className="flex flex-col h-full min-h-0">
                                         <div className="flex items-center justify-between mb-4 gap-2">
-                                            <h3 className="font-semibold">Asistencia de Hoy</h3>
+                                            <h3 className="font-semibold">Asistencia de Hoy{todayRows.length > 0 ? ` (${todayRows.length})` : ''}</h3>
                                             <div className="flex items-center gap-2">
                                                 {todayRows.length > 0 && (
                                                     <button
