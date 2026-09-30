@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="0405435">
+    <meta name="app-version" content="34546f6">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -5558,11 +5558,11 @@ const EXPEDITION_MISSIONS = [{
   guideRef: 'Fase 2 → "1. Selección y Justificación...", "2. El Reto 5W+H", "3. Creación del Árbol de Problemas" y "4. Planteamiento del Problema" (— Semana 3)',
   tasks: ['Seleccionar el problema con mayor frecuencia/impacto según la matriz de codificación.', 'Responder las preguntas 5W+H (Qué, Quién, Dónde, Cuándo, Por qué, Cómo).', 'Construir el árbol de problemas: tronco, raíces (causas) y ramas (consecuencias).', 'Redactar el planteamiento del problema (contexto, síntomas, causas, consecuencias, situación deseada) sin mencionar soluciones.'],
   deliverables: [{
-    name: 'Árbol de problemas (diagrama)',
-    checklist: ['Problema central en el tronco, en una sola frase.', 'Mínimo 3 causas en las raíces.', 'Mínimo 3 consecuencias en las ramas.', 'Puede incluir como anexo las respuestas a las 5W+H que sirvieron de insumo.']
-  }, {
     name: 'Planteamiento del problema (documento)',
-    checklist: ['5 secciones obligatorias, cada una con su título: Contexto, Síntomas, Causas, Consecuencias, Situación deseada.', 'Máximo 1 página.', 'No debe mencionar ninguna solución ni tecnología.']
+    checklist: ['5 secciones obligatorias: Contexto, Síntomas, Causas, Consecuencias, Situación deseada (sin títulos de las secciones).', 'Mínimo 1 página.', 'No debe mencionar ninguna solución ni tecnología.']
+  }, {
+    name: 'Árbol de problemas (diagrama)',
+    checklist: ['Problema central en el tronco, en una sola frase.', 'Todas las causas en las raíces.', 'Todas las consecuencias en las ramas.', 'Puede incluir como anexo las respuestas a las 5W+H que sirvieron de insumo.']
   }]
 }, {
   wk: 4,
