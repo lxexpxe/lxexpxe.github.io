@@ -1675,25 +1675,18 @@
                         let updatedStudents;
                         if (isQrVerifiedRecord(students, studentId)) {
                             // Registro por QR: cicla verde -> naranja -> rojo -> verde,
-                            // nunca vuelve a ausente. Se recalcula el resultado exacto
-                            // en cada paso (en vez de solo alternar el flag `late`)
-                            // para que el ciclo sea el mismo sin importar de qué
-                            // estado se venga.
+                            // nunca vuelve a ausente. Siempre el mismo ciclo puro, sin
+                            // importar de qué estado se venga ni qué `late` traiga el
+                            // check-in original — una versión anterior intentaba
+                            // "respetar" ese `late` original al salir de rojo, pero eso
+                            // dejaba la celda atascada rebotando entre naranja y rojo
+                            // para siempre en cuanto el check-in real traía late:true
+                            // (p. ej. por un QR que quedó un momento en modo "Tardío"),
+                            // sin forma de llegar nunca a verde a mano (reportado en
+                            // producción). El profesor sigue teniendo control total:
+                            // si quiere "tarde" en vez de "a tiempo", un clic más.
                             const cycle = ['ontime', 'late', 'incomplete'];
-                            let nextStatus;
-                            if (status === 'incomplete') {
-                                // Confirmar salida manualmente (clic sobre una
-                                // celda roja): se respeta el "tarde" real que
-                                // ya traía el check-in por QR, en vez de
-                                // reiniciar siempre a "a tiempo" — si no, una
-                                // llegada tarde sin salida quedaba en verde al
-                                // confirmarla, perdiendo en silencio su
-                                // estado real hasta el próximo clic manual.
-                                const checkin = students.find(r => r.studentId === studentId && r.type !== 'checkout');
-                                nextStatus = (checkin && checkin.late) ? 'late' : 'ontime';
-                            } else {
-                                nextStatus = cycle[(cycle.indexOf(status) + 1) % cycle.length];
-                            }
+                            const nextStatus = cycle[(cycle.indexOf(status) + 1) % cycle.length];
                             const withoutCheckout = students.filter(r => !(r.studentId === studentId && r.type === 'checkout'));
 
                             if (nextStatus === 'incomplete') {
