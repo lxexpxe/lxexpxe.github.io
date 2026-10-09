@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="44abf1d">
+    <meta name="app-version" content="871a41a">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -5567,16 +5567,16 @@ const EXPEDITION_MISSIONS = [{
   title: 'Revisión Sistemática (Parte A): Pregunta y Protocolo',
   objective: 'Formular la pregunta específica de la revisión de literatura y diseñar un protocolo de búsqueda replicable, sin ejecutarla todavía.',
   guideRef: 'Fase 2 → "6. Revisión Sistemática de la Literatura (Parte A)" (— Semana 4)',
-  tasks: ['Formular la pregunta problema si la Misión 3 quedó pendiente (ver nota del entregable).', 'Explorar 3-4 ángulos de revisión a partir del árbol de problemas y elegir uno, justificando relevancia, factibilidad y literatura disponible.', 'Redactar la pregunta de la RSL e identificar su tipo (qué existe, qué tan efectivo es, o qué factores influyen).', 'Elegir un protocolo (Okoli & Schabram, Wohlin u otro) y construir la tabla PICOC derivada de la pregunta de la RSL.', 'Construir la cadena de búsqueda y validarla con el Quasi-Gold Standard (2-3 artículos clave).', 'Definir los criterios de inclusión/exclusión y un checklist de calidad antes de buscar.'],
+  tasks: ['Formular la pregunta problema si la Misión 3 quedó pendiente (ver nota del entregable).', 'Explorar 3-4 ángulos de revisión a partir del árbol de problemas y elegir uno, justificando relevancia, factibilidad y literatura disponible.', 'Redactar la pregunta de la RSL, identificar su tipo (qué existe, qué tan efectivo es, o qué factores influyen) y el tipo de revisión que harán (sistematizada, de alcance o mapeo).', 'Elegir un protocolo (Okoli & Schabram, Kitchenham u otro), decidir si usarán snowballing como estrategia de búsqueda, y construir la tabla PICOC derivada de la pregunta de la RSL.', 'Construir la cadena de búsqueda y validarla con un Quasi-Gold Standard de 5 a 10 artículos clave (captura mínima del 80 %).', 'Definir los criterios de inclusión/exclusión y un checklist de calidad antes de buscar.'],
   deliverables: [{
     name: 'Pregunta problema',
     checklist: ['Una sola oración, clara y específica, redactada como pregunta de investigación.', 'Se deriva del planteamiento y del árbol de problemas, no de una solución ya definida.', 'Describe el problema general; de ella saldrán las preguntas más específicas de la revisión de literatura (Semana 4).', 'Pendiente de la misión 3: formúlala antes de derivar la pregunta de la RSL.']
   }, {
     name: 'Pregunta de la RSL',
-    checklist: ['Lista de 3 o 4 ángulos de revisión derivados del árbol de problemas.', 'Ángulo elegido y su justificación: relevancia para el diseño, factibilidad y literatura disponible.', 'Pregunta de la RSL redactada, con su tipo identificado: qué existe, qué tan efectivo es o qué factores influyen.']
+    checklist: ['Lista de 3 o 4 ángulos de revisión derivados del árbol de problemas.', 'Ángulo elegido y su justificación: relevancia para el diseño, factibilidad y literatura disponible.', 'Pregunta de la RSL redactada, con su tipo identificado: qué existe, qué tan efectivo es o qué factores influyen.', 'Tipo de revisión que harán (sistematizada, de alcance o mapeo), coherente con el tipo de pregunta.']
   }, {
     name: 'Protocolo de la revisión',
-    checklist: ['Protocolo elegido (Okoli & Schabram, Wohlin u otro) y su justificación en 2 o 3 líneas.', 'Tabla PICOC derivada de la pregunta de la RSL (no de la pregunta problema).', 'Cadena de búsqueda con operadores booleanos, validada con 2 o 3 artículos clave (Quasi-Gold Standard).', 'Criterios de inclusión y exclusión definidos antes de buscar.', 'Checklist de calidad (CASP o uno propio de 3 o 4 preguntas de sí/no).']
+    checklist: ['Protocolo elegido (Okoli & Schabram, Kitchenham u otro) y estrategia de búsqueda (bases de datos, snowballing o ambas), con su justificación en 2 o 3 líneas.', 'Tabla PICOC derivada de la pregunta de la RSL (no de la pregunta problema).', 'Cadena de búsqueda con operadores booleanos, validada con un Quasi-Gold Standard de 5 a 10 artículos clave (captura mínima del 80 %).', 'Criterios de inclusión y exclusión definidos antes de buscar.', 'Checklist de calidad (CASP o uno propio de 3 o 4 preguntas de sí/no).']
   }]
 }, {
   wk: 5,
@@ -5585,10 +5585,10 @@ const EXPEDITION_MISSIONS = [{
   title: 'Revisión Sistemática (Parte B): Ejecución y Síntesis',
   objective: 'Ejecutar el protocolo de búsqueda, evaluar la calidad de los artículos y sintetizar los hallazgos hasta señalar la brecha de investigación.',
   guideRef: 'Fase 2 → "7. Revisión Sistemática de la Literatura (Parte B)" (— Semana 5)',
-  tasks: ['Ejecutar la búsqueda (o el snowballing) y gestionar los resultados con un gestor de referencias y cribado (ej. Zotero/Mendeley + Rayyan.ai).', 'Evaluar la calidad de cada artículo con CASP (estudios con personas) o un checklist propio de 3-4 preguntas (prototipos/ingeniería).', 'Extraer los datos de los artículos que pasaron el filtro de calidad en la matriz de síntesis.', 'Sintetizar los hallazgos (narrativa, temática o taxonomía según el tipo de pregunta) y señalar la brecha de investigación.', 'Reportar el proceso con el diagrama de flujo PRISMA (identificación, cribado, elegibilidad, inclusión).'],
+  tasks: ['Ejecutar la búsqueda (o el snowballing) y gestionar los resultados con un gestor de referencias, registrando fecha, cadena exacta, campos y filtros de cada búsqueda.', 'Calibrar el cribado entre 2 integrantes con 20 resúmenes de prueba antes de repartirse el resto, y ajustar los criterios donde hubo desacuerdo.', 'Evaluar la calidad de cada artículo con CASP (estudios con personas) o un checklist propio de 3-4 preguntas (prototipos/ingeniería).', 'Extraer los datos de los artículos que pasaron el filtro de calidad en la matriz de síntesis.', 'Sintetizar los hallazgos (narrativa, temática o taxonomía según el tipo de pregunta) y señalar la brecha de investigación.', 'Reportar el proceso con el diagrama de flujo PRISMA 2020 (identificación, cribado, inclusión).'],
   deliverables: [{
     name: 'Bitácora de búsqueda y diagrama PRISMA',
-    checklist: ['Tabla: Base de datos | Cadena de búsqueda usada | N.º de resultados | N.º descartados y por qué | N.º incluidos.', 'Mínimo 2 bases de datos académicas distintas (o los ciclos de snowballing documentados).', 'Diagrama de flujo PRISMA con los números de las 4 fases: identificación, cribado, elegibilidad e inclusión.']
+    checklist: ['Tabla: Fecha | Base de datos | Cadena exacta | Campos y filtros | N.º de resultados | N.º descartados y por qué | N.º incluidos.', 'Mínimo 2 bases de datos académicas distintas (o los ciclos de snowballing documentados).', 'Registro de la calibración del cribado: desacuerdos en los 20 resúmenes de prueba y criterios ajustados.', 'Diagrama de flujo PRISMA 2020 (plantilla oficial de prisma-statement.org) con los números de identificación, cribado e inclusión; si usaron snowballing, en la columna de "otros métodos".']
   }, {
     name: 'Matriz de síntesis de literatura',
     checklist: ['Tabla con mínimo 6 fuentes que superaron la evaluación de calidad.', 'Columnas: Autor/Año, Objetivo del estudio, Metodología, Hallazgo clave, Relación con nuestro problema y Puntaje de calidad.', 'Síntesis de una página (narrativa, temática o taxonomía, según el tipo de pregunta) que cierre con la brecha de investigación identificada.', 'Si usaron IA (por ejemplo, NotebookLM), una nota metodológica que indique en qué fase.']
