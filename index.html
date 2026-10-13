@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="2d160ba">
+    <meta name="app-version" content="1ef7d82">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -392,6 +392,51 @@ const LoadingSpinner = () => /*#__PURE__*/React.createElement("div", {
   }
 }, "Cargando..."));
 
+// Códigos que confirman, sin ambigüedad, que la sesión fue anulada en
+// el servidor (usuario borrado/deshabilitado, credenciales revocadas).
+const SESSION_REVOKED_CODES = new Set(['auth/user-token-expired', 'auth/user-disabled', 'auth/user-not-found', 'auth/invalid-user-token', 'auth/user-mismatch', 'auth/invalid-refresh-token']);
+const isNetworkAuthError = error => !navigator.onLine || error && (error.code === 'auth/network-request-failed' || error.code === 'auth/timeout');
+
+// ¿La sesión todavía sirve para leer/escribir? 'ok' | 'dead' | 'network'.
+//
+// Primero se fuerza una renovación (detecta revocación en el servidor).
+// Si falla por algo que no es una revocación clara, se pregunta por el
+// token SIN forzar: si el actual sigue vigente, la sesión funciona
+// aunque no se haya podido renovar. Solo si ese token ya venció y no
+// hay forma de reemplazarlo, la sesión está muerta en la práctica — es
+// justo el caso de "la pestaña quedó abierta, pasó más de una hora y
+// todo falla" (p. ej. si la API key bloquea el servicio de renovación
+// securetoken.googleapis.com, el token vence a la hora sin remedio).
+// Un error de red nunca se toma como sesión muerta.
+async function checkSessionUsable() {
+  const user = firebase.auth().currentUser;
+  if (!user) return 'dead';
+  try {
+    await user.getIdToken(true);
+    return 'ok';
+  } catch (error) {
+    if (SESSION_REVOKED_CODES.has(error.code)) return 'dead';
+    if (isNetworkAuthError(error)) return 'network';
+  }
+  try {
+    await user.getIdToken(false);
+    return 'ok';
+  } catch (error) {
+    return isNetworkAuthError(error) ? 'network' : 'dead';
+  }
+}
+
+// Cierra la sesión dejando un aviso que AuthPage muestra de forma
+// persistente — un toast solo dura 3 segundos y se pierde justo en el
+// cambio de pantalla al login.
+const SESSION_EXPIRED_NOTICE_KEY = 'sessionExpiredNotice';
+function expireSession() {
+  try {
+    sessionStorage.setItem(SESSION_EXPIRED_NOTICE_KEY, '1');
+  } catch (e) {}
+  firebase.auth().signOut().catch(() => {});
+}
+
 // Aviso global de "sin conexión". navigator.onLine es una señal
 // heurística (detecta la interfaz de red caída, no garantiza que
 // haya internet real detrás de un router) — se complementa con el
@@ -635,6 +680,21 @@ function AuthPage() {
   const [showPasswordReset, setShowPasswordReset] = React.useState(false);
   const [newPassword, setNewPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  // Lo deja expireSession() justo antes de cerrar la sesión; se
+  // muestra una sola vez (se borra al montar) y no aparece tras un
+  // "Cerrar Sesión" manual, que no lo deja.
+  const [sessionExpiredNotice, setSessionExpiredNotice] = React.useState(() => {
+    try {
+      return sessionStorage.getItem(SESSION_EXPIRED_NOTICE_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  });
+  React.useEffect(() => {
+    try {
+      sessionStorage.removeItem(SESSION_EXPIRED_NOTICE_KEY);
+    } catch (e) {}
+  }, []);
   const validateEmail = email => {
     const validDomains = /^[a-zA-Z0-9._%+-]+@(icesi\.edu\.co|u\.icesi\.edu\.co|estudiante\.uniajc\.edu\.co|profesores\.uniajc\.edu\.co)$/;
     return validDomains.test(email);
@@ -953,7 +1013,26 @@ function AuthPage() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "card rounded-2xl p-8 w-full max-w-md animate-fadeIn"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, sessionExpiredNotice && /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3 mb-4 text-sm flex items-start gap-2",
+    role: "alert",
+    style: {
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      border: '1px solid rgba(245, 158, 11, 0.5)',
+      color: 'var(--text-primary)'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true"
+  }, "\u23F0"), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1"
+  }, "Tu sesi\xF3n expir\xF3. Vuelve a iniciar sesi\xF3n para continuar."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setSessionExpiredNotice(false),
+    "aria-label": "Cerrar aviso",
+    style: {
+      color: 'var(--text-secondary)'
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between items-center mb-6"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "text-2xl font-bold",
@@ -4329,37 +4408,15 @@ function CoursePage({
           // error real que el usuario deba ver.
           //
           // No toda falla acá es realmente de cámara: si la sesión ya
-          // murió, esto se mostraba antes igual como "Error de
+          // no sirve, esto se mostraba antes igual como "Error de
           // cámara" genérico, sin avisar que en realidad hacía falta
-          // volver a iniciar sesión (reportado en producción: varios
-          // estudiantes se quedaban atascados así al escanear, y solo
-          // se daban cuenta de que la sesión estaba muerta al
-          // refrescar la página). Revisar solo `!auth.currentUser`
-          // (gratis, sin red) no alcanza para detectar esto: ese
-          // objeto sigue viéndose "activo" en memoria aunque el
-          // navegador ya haya borrado los datos del sitio en segundo
-          // plano (típico en iOS tras varios días sin abrir la app) —
-          // hace falta forzar una renovación de token para
-          // descubrirlo de verdad. Igual que en el chequeo periódico
-          // de sesión (más arriba en AppContent), se filtra por
-          // código de error específico: un hipo de red al renovar el
-          // token NO significa sesión muerta (probado en carne
-          // propia, ver el comentario de ese efecto) — solo estos
-          // códigos confirman, sin ambigüedad, que ya no va a volver
-          // a ser válida sola.
-          const AUTH_SESSION_DEATH_CODES = new Set(['auth/user-token-expired', 'auth/user-disabled', 'auth/user-not-found', 'auth/invalid-user-token', 'auth/user-mismatch']);
-          let sessionLost = !auth.currentUser;
-          if (!sessionLost) {
-            try {
-              await auth.currentUser.getIdToken(true);
-            } catch (tokenError) {
-              sessionLost = AUTH_SESSION_DEATH_CODES.has(tokenError.code);
-            }
-          }
-          if (sessionLost) {
+          // volver a iniciar sesión (reportado en producción). Se
+          // usa el mismo criterio que el chequeo al volver a la
+          // pestaña (checkSessionUsable), que nunca toma un error de
+          // red como sesión muerta.
+          if ((await checkSessionUsable()) === 'dead') {
             appendQRLog('La sesión ya no es válida — se cierra para volver al login.');
-            toast.showToast('Tu sesión se cerró — vuelve a iniciar sesión para continuar', 'error');
-            auth.signOut().catch(() => {});
+            expireSession();
           } else {
             toast.showToast('Error de cámara', 'error');
           }
@@ -4471,22 +4528,34 @@ function CoursePage({
       };
     } catch (error) {
       console.error('Error registrando asistencia:', error);
-      if (error.code === 'permission-denied') {
-        // El servidor ya rechazó la escritura porque la sesión
-        // dejó de ser válida (el token no se pudo renovar,
-        // normalmente porque el navegador borró los datos del
-        // sitio) — en vez de dejar al estudiante viendo el
-        // escáner sin explicación, se cierra la sesión local
-        // ya mismo para que la app lo mande directo al login
-        // con un mensaje claro, en lugar de un "error de
-        // cámara" que no dice nada de lo que en realidad pasó.
-        auth.signOut().catch(() => {});
-      }
+      return await scanErrorResult(error, 'Error registrando asistencia');
+    }
+  };
+
+  // Un error al registrar puede venir de una sesión que ya no sirve,
+  // y no siempre llega como 'permission-denied': si Firestore no
+  // logra renovar el token, el error puede traer 'unauthenticated' o
+  // directamente un código 'auth/...'. Antes solo se reconocía
+  // 'permission-denied', así que el resto caía en un "Error
+  // registrando asistencia" genérico, sin avisar que había que
+  // volver a iniciar sesión (reportado en producción). Ahora, ante
+  // cualquiera de esos, se comprueba de verdad si la sesión sirve —
+  // y si sirve, un 'permission-denied' es un problema real de
+  // permisos, no se cierra sesión por error.
+  const scanErrorResult = async (error, genericMessage) => {
+    const code = error && error.code || '';
+    const mightBeSession = code === 'permission-denied' || code === 'unauthenticated' || code.startsWith('auth/');
+    if (mightBeSession && (await checkSessionUsable()) === 'dead') {
+      expireSession();
       return {
         type: 'error',
-        message: error.code === 'permission-denied' ? 'Tu sesión se cerró — vuelve a iniciar sesión para continuar' : 'Error registrando asistencia'
+        message: 'Tu sesión se cerró — vuelve a iniciar sesión para continuar'
       };
     }
+    return {
+      type: 'error',
+      message: genericMessage
+    };
   };
   const registerCheckout = async qrData => {
     try {
@@ -4539,14 +4608,7 @@ function CoursePage({
       };
     } catch (error) {
       console.error('Error registrando salida:', error);
-      if (error.code === 'permission-denied') {
-        // Ver el comentario equivalente en registerAttendance.
-        auth.signOut().catch(() => {});
-      }
-      return {
-        type: 'error',
-        message: error.code === 'permission-denied' ? 'Tu sesión se cerró — vuelve a iniciar sesión para continuar' : 'Error registrando salida'
-      };
+      return await scanErrorResult(error, 'Error registrando salida');
     }
   };
   const getShiftForHour = hour => {
@@ -7586,29 +7648,41 @@ function AppContent() {
   // problema fue un hipo de conexión. Solo estos códigos de
   // Firebase Auth confirman, sin ambigüedad, que la sesión ya no
   // es válida y no va a volver a serlo sola.
+  //
+  // Si el chequeo coincide con que no hay red (típico en iPhone justo
+  // al reactivar la pestaña), se reintenta apenas vuelva la conexión
+  // y a los pocos segundos, en vez de esperar al siguiente intervalo
+  // de 5 minutos — si no, el estudiante alcanza a escanear con una
+  // sesión que ya no sirve antes de que nadie se lo diga.
   React.useEffect(() => {
     if (!currentUser) return;
-    const SESSION_DEATH_CODES = new Set(['auth/user-token-expired', 'auth/user-disabled', 'auth/user-not-found', 'auth/invalid-user-token', 'auth/user-mismatch']);
-    const checkSessionStillValid = async () => {
-      const auth = firebase.auth();
-      if (!auth.currentUser) return; // onAuthStateChanged ya se encargó de esto
-      try {
-        await auth.currentUser.getIdToken(true);
-      } catch (error) {
-        if (SESSION_DEATH_CODES.has(error.code)) {
-          toast.showToast('Tu sesión ya no era válida — vuelve a iniciar sesión', 'error');
-          auth.signOut().catch(() => {});
-        }
-        // Cualquier otro código (red, etc.) se ignora a propósito.
+    let cancelled = false;
+    let retryTimer = null;
+    const runCheck = async attempt => {
+      clearTimeout(retryTimer);
+      if (cancelled || !firebase.auth().currentUser) return;
+      const result = await checkSessionUsable();
+      if (cancelled) return;
+      if (result === 'dead') {
+        expireSession();
+      } else if (result === 'network' && navigator.onLine && attempt < 3) {
+        // Sin red del todo no se reintenta por tiempo: lo
+        // dispara el evento 'online' cuando vuelva.
+        retryTimer = setTimeout(() => runCheck(attempt + 1), 5000);
       }
     };
+    const check = () => runCheck(0);
     const onVisibility = () => {
-      if (!document.hidden) checkSessionStillValid();
+      if (!document.hidden) check();
     };
     document.addEventListener('visibilitychange', onVisibility);
-    const interval = setInterval(checkSessionStillValid, 5 * 60 * 1000);
+    window.addEventListener('online', check);
+    const interval = setInterval(check, 5 * 60 * 1000);
     return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', check);
       clearInterval(interval);
     };
   }, [currentUser]);
