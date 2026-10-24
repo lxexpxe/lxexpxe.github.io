@@ -2730,6 +2730,62 @@
                 // "second" tampoco se incluye.
                 const formatTime24 = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
+                // Cuadro del switch NFC. Se usa en dos lugares: dentro del contenedor
+                // del QR (toma su ancho) y bajo el aviso de "QR Oculto" (toma el de
+                // ese aviso). Con width:0 + minWidth:100% se estira al contenedor sin
+                // ensancharlo: un texto o URL largos no deben agrandar el QR.
+                const renderNfcBox = (nfcBoxSizeStyle) => {
+                                            const nfcUrl = `${window.location.origin}${window.location.pathname}?nfc=${currentUser.uid}`;
+                                            const canTurnOn = qrMode === 'on-time';
+                                            return (
+                                                <div className="mt-6 rounded-lg p-4" style={{ border: '1px solid var(--border-color)', ...nfcBoxSizeStyle }}>
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div>
+                                                            <div className="font-semibold text-sm">Registro por NFC</div>
+                                                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                                                {nfcOpen
+                                                                    ? 'Activo: el sticker registra llegadas a tiempo de hoy en este curso.'
+                                                                    : canTurnOn ? 'Inactivo: el sticker no registra asistencia.' : 'Solo se puede activar en modo Entrada.'}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            role="switch"
+                                                            aria-checked={nfcOpen}
+                                                            aria-label="Registro por NFC"
+                                                            disabled={nfcSaving || (!nfcOpen && !canTurnOn)}
+                                                            onClick={() => setNfcCheckin(!nfcOpen)}
+                                                            className="flex-shrink-0"
+                                                            style={{
+                                                                position: 'relative', width: '44px', height: '24px', borderRadius: '9999px',
+                                                                backgroundColor: nfcOpen ? '#22c55e' : '#d1d5db',
+                                                                opacity: nfcSaving || (!nfcOpen && !canTurnOn) ? 0.5 : 1,
+                                                                transition: 'background-color 0.15s ease',
+                                                                cursor: nfcSaving || (!nfcOpen && !canTurnOn) ? 'not-allowed' : 'pointer'
+                                                            }}
+                                                        >
+                                                            <span style={{ position: 'absolute', top: '2px', left: nfcOpen ? '22px' : '2px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'white', transition: 'left 0.15s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
+                                                        </button>
+                                                    </div>
+                                                    <details className="mt-3 text-xs">
+                                                        <summary className="cursor-pointer" style={{ color: 'var(--text-secondary)' }}>Enlace para grabar en el sticker</summary>
+                                                        <div className="mt-2 flex gap-2 items-center">
+                                                            <code className="flex-1 break-all p-2 rounded" style={{ backgroundColor: 'var(--bg-primary)' }}>{nfcUrl}</code>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary text-xs"
+                                                                onClick={() => navigator.clipboard.writeText(nfcUrl).then(() => toast.showToast('Enlace copiado', 'success')).catch(() => toast.showToast('No se pudo copiar', 'error'))}
+                                                            >
+                                                                Copiar
+                                                            </button>
+                                                        </div>
+                                                        <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Grábalo como "URL" con una app como NFC Tools. Sirve para todos tus cursos: registra en el que tenga el switch activo.</p>
+                                                    </details>
+                                                </div>
+                                            );
+                };
+
+
                 return (
                     <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
                         <div className="w-full">
@@ -2813,21 +2869,24 @@
                                                             <QrIcon /> Salida
                                                         </button>
                                                     </div>
-                                                </div>
 
-                                                <h3 className="font-semibold mb-2 mt-4">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
-                                                <div className="text-center">
-                                                    <input
-                                                        type="date"
-                                                        className="input-field text-sm py-1 px-2 rounded-lg"
-                                                        value={qrDateOverride || today}
-                                                        max={today}
-                                                        onChange={(e) => e.target.value && changeQrDate(e.target.value)}
-                                                    />
+                                                    <h3 className="font-semibold mb-2 mt-4 text-center">QR de {qrDateOverride ? 'esta clase' : 'hoy'} ({formatDateMmmDDYY(qrDateOverride || today)})</h3>
+                                                    <div className="text-center">
+                                                        <input
+                                                            type="date"
+                                                            className="input-field text-sm py-1 px-2 rounded-lg"
+                                                            value={qrDateOverride || today}
+                                                            max={today}
+                                                            onChange={(e) => e.target.value && changeQrDate(e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    {renderNfcBox({ width: 0, minWidth: '100%' })}
                                                 </div>
                                             </>
                                         ) : (
-                                            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 w-full max-w-sm text-center">
+                                            <>
+                                                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 w-full max-w-sm text-center">
                                                 <div className="text-3xl mb-3">🔒</div>
                                                 <h4 className="font-semibold text-yellow-900 mb-2">QR Oculto</h4>
                                                 <p className="text-sm text-yellow-800 mb-4">
@@ -2844,59 +2903,11 @@
                                                 >
                                                     Mostrar QR
                                                 </button>
-                                            </div>
+                                                </div>
+                                                {renderNfcBox({ width: '100%', maxWidth: '24rem' })}
+                                            </>
                                         )}
 
-                                        {(() => {
-                                            const nfcUrl = `${window.location.origin}${window.location.pathname}?nfc=${currentUser.uid}`;
-                                            const canTurnOn = qrMode === 'on-time';
-                                            return (
-                                                <div className="mt-6 w-full max-w-sm rounded-lg p-4" style={{ border: '1px solid var(--border-color)' }}>
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <div>
-                                                            <div className="font-semibold text-sm">Registro por NFC</div>
-                                                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                                                {nfcOpen
-                                                                    ? 'Activo: el sticker registra llegadas a tiempo de hoy en este curso.'
-                                                                    : canTurnOn ? 'Inactivo: el sticker no registra asistencia.' : 'Solo se puede activar en modo Entrada.'}
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            role="switch"
-                                                            aria-checked={nfcOpen}
-                                                            aria-label="Registro por NFC"
-                                                            disabled={nfcSaving || (!nfcOpen && !canTurnOn)}
-                                                            onClick={() => setNfcCheckin(!nfcOpen)}
-                                                            className="flex-shrink-0"
-                                                            style={{
-                                                                position: 'relative', width: '44px', height: '24px', borderRadius: '9999px',
-                                                                backgroundColor: nfcOpen ? '#22c55e' : '#d1d5db',
-                                                                opacity: nfcSaving || (!nfcOpen && !canTurnOn) ? 0.5 : 1,
-                                                                transition: 'background-color 0.15s ease',
-                                                                cursor: nfcSaving || (!nfcOpen && !canTurnOn) ? 'not-allowed' : 'pointer'
-                                                            }}
-                                                        >
-                                                            <span style={{ position: 'absolute', top: '2px', left: nfcOpen ? '22px' : '2px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'white', transition: 'left 0.15s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
-                                                        </button>
-                                                    </div>
-                                                    <details className="mt-3 text-xs">
-                                                        <summary className="cursor-pointer" style={{ color: 'var(--text-secondary)' }}>Enlace para grabar en el sticker</summary>
-                                                        <div className="mt-2 flex gap-2 items-center">
-                                                            <code className="flex-1 break-all p-2 rounded" style={{ backgroundColor: 'var(--bg-primary)' }}>{nfcUrl}</code>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-secondary text-xs"
-                                                                onClick={() => navigator.clipboard.writeText(nfcUrl).then(() => toast.showToast('Enlace copiado', 'success')).catch(() => toast.showToast('No se pudo copiar', 'error'))}
-                                                            >
-                                                                Copiar
-                                                            </button>
-                                                        </div>
-                                                        <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Grábalo como "URL" con una app como NFC Tools. Sirve para todos tus cursos: registra en el que tenga el switch activo.</p>
-                                                    </details>
-                                                </div>
-                                            );
-                                        })()}
                                     </div>
 
                                     <div className="flex flex-col h-full min-h-0">
