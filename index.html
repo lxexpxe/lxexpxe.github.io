@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="a370635">
+    <meta name="app-version" content="cf43d72">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -2697,7 +2697,7 @@ function AdminDashboard({
         style: {
           color: 'var(--text-secondary)'
         }
-      }, nfcOpen ? 'Activo: el sticker registra llegadas a tiempo de hoy en este curso.' : canTurnOn ? 'Inactivo: el sticker no registra asistencia.' : 'Solo se puede activar en modo Entrada.')), /*#__PURE__*/React.createElement("button", {
+      }, nfcOpen ? 'Activo: la etiqueta (TAG) registra llegadas a tiempo de hoy en este curso.' : canTurnOn ? 'Inactivo: la etiqueta (TAG) no registra asistencia.' : 'Solo se puede activar en modo Entrada.')), /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "switch",
         "aria-checked": nfcOpen,
@@ -2734,7 +2734,7 @@ function AdminDashboard({
         style: {
           color: 'var(--text-secondary)'
         }
-      }, "Enlace para grabar en el sticker"), /*#__PURE__*/React.createElement("div", {
+      }, "Enlace para grabar en la etiqueta (TAG)"), /*#__PURE__*/React.createElement("div", {
         className: "mt-2 flex gap-2 items-center"
       }, /*#__PURE__*/React.createElement("code", {
         className: "flex-1 break-all p-2 rounded",
@@ -2745,12 +2745,7 @@ function AdminDashboard({
         type: "button",
         className: "btn btn-secondary text-xs",
         onClick: () => navigator.clipboard.writeText(nfcUrl).then(() => toast.showToast('Enlace copiado', 'success')).catch(() => toast.showToast('No se pudo copiar', 'error'))
-      }, "Copiar")), /*#__PURE__*/React.createElement("p", {
-        className: "mt-1",
-        style: {
-          color: 'var(--text-secondary)'
-        }
-      }, "Gr\xE1balo como \"URL\" con una app como NFC Tools. Sirve para todos tus cursos: registra en el que tenga el switch activo.")));
+      }, "Copiar"))));
     };
     return /*#__PURE__*/React.createElement("div", {
       className: "min-h-screen p-4 md:p-8",
