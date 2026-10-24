@@ -2742,11 +2742,9 @@
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div>
                                                             <div className="font-semibold text-sm">Registro por NFC</div>
-                                                            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                                                {nfcOpen
-                                                                    ? 'Activo: la etiqueta (TAG) registra llegadas a tiempo de hoy en este curso.'
-                                                                    : canTurnOn ? 'Inactivo: la etiqueta (TAG) no registra asistencia.' : 'Solo se puede activar en modo Entrada.'}
-                                                            </div>
+                                                            {!nfcOpen && !canTurnOn && (
+                                                                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Solo se puede activar en modo Entrada.</div>
+                                                            )}
                                                         </div>
                                                         <button
                                                             type="button"
