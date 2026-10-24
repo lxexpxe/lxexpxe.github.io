@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="cf43d72">
+    <meta name="app-version" content="7542678">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -2692,12 +2692,12 @@ function AdminDashboard({
         className: "flex items-center justify-between gap-3"
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
         className: "font-semibold text-sm"
-      }, "Registro por NFC"), /*#__PURE__*/React.createElement("div", {
+      }, "Registro por NFC"), !nfcOpen && !canTurnOn && /*#__PURE__*/React.createElement("div", {
         className: "text-xs",
         style: {
           color: 'var(--text-secondary)'
         }
-      }, nfcOpen ? 'Activo: la etiqueta (TAG) registra llegadas a tiempo de hoy en este curso.' : canTurnOn ? 'Inactivo: la etiqueta (TAG) no registra asistencia.' : 'Solo se puede activar en modo Entrada.')), /*#__PURE__*/React.createElement("button", {
+      }, "Solo se puede activar en modo Entrada.")), /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "switch",
         "aria-checked": nfcOpen,
