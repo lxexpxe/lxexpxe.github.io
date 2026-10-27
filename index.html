@@ -20,7 +20,7 @@
          reemplaza "dev" por un identificador real en cada build; UpdateBanner
          (en el script de abajo) compara este valor contra un fetch fresco
          de este mismo archivo cada tanto, y avisa si cambió. -->
-    <meta name="app-version" content="7542678">
+    <meta name="app-version" content="511b09c">
     <title>Plataforma Académica</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4D96FF">
@@ -1257,6 +1257,7 @@ function AdminDashboard({
   // los estudiantes pueden leer pero solo el profesor escribir.
   const [nfcOpen, setNfcOpen] = React.useState(false);
   const [nfcSaving, setNfcSaving] = React.useState(false);
+  const [nfcMode, setNfcMode] = React.useState('checkin');
   const qrCodeRef = React.useRef(null);
   const [weekContent, setWeekContent] = React.useState({
     title: '',
@@ -1662,11 +1663,13 @@ function AdminDashboard({
   // Salida) — cada botón elige su modo sin importar cuál estaba
   // activo antes, a diferencia del toggle de dos estados de antes.
   const selectQrMode = mode => {
+    // El TAG registra lo que corresponde al modo en que se encendió
+    // (llegada a tiempo en Entrada, salida en Salida). Al cambiar de
+    // modo se apaga, para que no siga registrando lo del modo
+    // anterior; en Tardío no se puede encender (marcaría "a tiempo").
+    if (nfcOpen && mode !== qrMode) setNfcCheckin(false);
     setQrMode(mode);
     generateTodayQR(mode, qrDateOverride);
-    // El sticker siempre registra "a tiempo": al pasar a Tardío o
-    // Salida se apaga, para que quien llega tarde no lo use.
-    if (mode !== 'on-time' && nfcOpen) setNfcCheckin(false);
   };
   const setNfcCheckin = async open => {
     if (!selectedCourse) return;
@@ -1675,7 +1678,8 @@ function AdminDashboard({
       await db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`).update({
         nfcCheckin: {
           open,
-          date: todayDateKey()
+          date: todayDateKey(),
+          mode: qrMode === 'checkout' ? 'checkout' : 'checkin'
         }
       });
     } catch (error) {
@@ -1697,6 +1701,7 @@ function AdminDashboard({
     const unsubscribe = db.doc(`artifacts/academic-platform/professors/${currentUser.uid}/courses/${selectedCourse.id}`).onSnapshot(snap => {
       const nfc = snap.exists && snap.data().nfcCheckin || {};
       setNfcOpen(!!nfc.open && nfc.date === todayDateKey());
+      setNfcMode(nfc.mode === 'checkout' ? 'checkout' : 'checkin');
     }, error => console.error('Error leyendo el estado del NFC:', error));
     return () => unsubscribe();
   }, [showAttendance, selectedCourse?.id]);
@@ -2594,9 +2599,12 @@ function AdminDashboard({
     const todayStudentIds = [...new Set(todayRecords.map(r => r.studentId))];
     const todayRows = todayStudentIds.map(studentId => {
       const checkin = todayRecords.find(r => r.studentId === studentId && r.type !== 'checkout') || todayRecords.find(r => r.studentId === studentId);
+      // Qué partes del día se registraron con el TAG NFC (llegada y/o salida).
+      const nfcParts = ['checkin', 'checkout'].filter(kind => todayRecords.some(r => r.studentId === studentId && r.source === 'nfc' && (kind === 'checkout' ? r.type === 'checkout' : r.type !== 'checkout')));
       return {
         studentId,
         checkin,
+        nfcParts,
         status: getAttendanceStatus(todayRecords, studentId)
       };
     }).sort((a, b) => {
@@ -2681,7 +2689,7 @@ function AdminDashboard({
     // ensancharlo: un texto o URL largos no deben agrandar el QR.
     const renderNfcBox = nfcBoxSizeStyle => {
       const nfcUrl = `${window.location.origin}${window.location.pathname}?nfc=${currentUser.uid}`;
-      const canTurnOn = qrMode === 'on-time';
+      const canTurnOn = qrMode === 'on-time' || qrMode === 'checkout';
       return /*#__PURE__*/React.createElement("div", {
         className: "mt-6 rounded-lg p-4",
         style: {
@@ -2697,11 +2705,12 @@ function AdminDashboard({
         style: {
           color: 'var(--text-secondary)'
         }
-      }, "Solo se puede activar en modo Entrada.")), /*#__PURE__*/React.createElement("button", {
+      }, "Solo se puede activar en modo Entrada o Salida.")), /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "switch",
         "aria-checked": nfcOpen,
-        "aria-label": "Registro por NFC",
+        "aria-label": nfcOpen && nfcMode === 'checkout' ? 'Registro por NFC (salidas)' : 'Registro por NFC',
+        title: nfcOpen ? nfcMode === 'checkout' ? 'Registrando salidas' : 'Registrando llegadas a tiempo' : undefined,
         disabled: nfcSaving || !nfcOpen && !canTurnOn,
         onClick: () => setNfcCheckin(!nfcOpen),
         className: "flex-shrink-0",
@@ -2710,7 +2719,7 @@ function AdminDashboard({
           width: '44px',
           height: '24px',
           borderRadius: '9999px',
-          backgroundColor: nfcOpen ? '#22c55e' : '#d1d5db',
+          backgroundColor: nfcOpen ? nfcMode === 'checkout' ? '#3b82f6' : '#22c55e' : '#d1d5db',
           opacity: nfcSaving || !nfcOpen && !canTurnOn ? 0.5 : 1,
           transition: 'background-color 0.15s ease',
           cursor: nfcSaving || !nfcOpen && !canTurnOn ? 'not-allowed' : 'pointer'
@@ -2894,6 +2903,7 @@ function AdminDashboard({
     }, todayRows.map(({
       studentId,
       checkin,
+      nfcParts,
       status
     }, rowIndex) => /*#__PURE__*/React.createElement("li", {
       key: studentId,
@@ -2909,9 +2919,9 @@ function AdminDashboard({
       title: status === 'incomplete' ? 'Falta escanear el QR de salida' : ''
     }, status === 'late' ? '🟠' : status === 'ontime' ? '🟢' : '🔴'), /*#__PURE__*/React.createElement("span", {
       className: "truncate min-w-0"
-    }, checkin?.studentName || 'Estudiante'), checkin?.source === 'nfc' && /*#__PURE__*/React.createElement("span", {
+    }, checkin?.studentName || 'Estudiante'), nfcParts.length > 0 && /*#__PURE__*/React.createElement("span", {
       className: "flex-shrink-0 font-semibold rounded px-1",
-      title: "Llegada registrada con el sticker NFC",
+      title: nfcParts.length === 2 ? 'Llegada y salida registradas con el TAG NFC' : nfcParts[0] === 'checkout' ? 'Salida registrada con el TAG NFC' : 'Llegada registrada con el TAG NFC',
       style: {
         fontSize: '0.6rem',
         border: '1px solid currentColor',
@@ -4721,15 +4731,15 @@ function CoursePage({
     };
   };
 
-  // Llegada por el sticker NFC: solo cuenta si el profesor tiene el
-  // switch de NFC activo HOY en alguno de sus cursos (el sticker no
-  // sabe de qué curso es; lo decide la ventana abierta). Siempre
-  // registra "a tiempo": el switch se apaga solo al pasar a modo
-  // Tardío o Salida.
+  // Toque al TAG NFC: solo cuenta si el profesor tiene el switch de NFC
+  // activo HOY en alguno de sus cursos (el TAG no sabe de qué curso
+  // es; lo decide la ventana abierta). Según el modo en que se
+  // encendió, registra la llegada (siempre "a tiempo": en Tardío no
+  // se puede encender) o la salida.
   const runNfcCheckin = async professorId => {
     setNfcFeedback({
       type: 'pending',
-      message: 'Registrando tu llegada…'
+      message: 'Registrando…'
     });
     try {
       const today = todayDateKey();
@@ -4744,21 +4754,27 @@ function CoursePage({
       }
       let result = null;
       for (const courseDoc of openCourses) {
-        result = await registerAttendance({
+        const data = {
           courseId: courseDoc.id,
           date: today,
           professorId,
-          phase: 'checkin',
-          late: false,
           source: 'nfc'
+        };
+        result = courseDoc.data().nfcCheckin.mode === 'checkout' ? await registerCheckout({
+          ...data,
+          phase: 'checkout'
+        }) : await registerAttendance({
+          ...data,
+          phase: 'checkin',
+          late: false
         });
         if (!result.notEnrolled) break;
       }
       setNfcFeedback(result);
       toast.showToast(result.message, result.type);
     } catch (error) {
-      console.error('Error registrando llegada por NFC:', error);
-      setNfcFeedback(await scanErrorResult(error, 'No se pudo registrar tu llegada. Escanea el QR del profesor.'));
+      console.error('Error registrando por NFC:', error);
+      setNfcFeedback(await scanErrorResult(error, 'No se pudo registrar tu asistencia. Escanea el QR del profesor.'));
     }
   };
   React.useEffect(() => {
@@ -4779,6 +4795,7 @@ function CoursePage({
       if (!studentDoc.exists) {
         return {
           type: 'error',
+          notEnrolled: true,
           message: 'No estás matriculado en este curso'
         };
       }
@@ -4814,7 +4831,10 @@ function CoursePage({
         students: firebase.firestore.FieldValue.arrayUnion({
           studentId: currentUser.uid,
           timestamp: new Date(),
-          type: 'checkout'
+          type: 'checkout',
+          ...(qrData.source ? {
+            source: qrData.source
+          } : {})
         })
       }), () => toast.showToast('Esto está tardando más de lo normal — revisa tu conexión a internet', 'info'));
       return {
